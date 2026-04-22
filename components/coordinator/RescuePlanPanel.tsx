@@ -19,12 +19,18 @@ import {
   resourceTypeIcons,
   severityConfig,
 } from "@/lib/constants";
+import {
+  getClothingGenderLabel,
+  getMedicalIssueLabel,
+  getPersonTypeLabel,
+} from "@/lib/sos";
 import { analyzeMissionSupplyBalance } from "@/lib/mission-supply-balance";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -88,6 +94,7 @@ import {
   ClusterRescueSuggestionResponse,
   MissionSuggestionEntity,
   AlternativeDepot,
+  ClusterTargetVictim,
 } from "@/services/sos_cluster/type";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
@@ -125,6 +132,10 @@ import {
   DotsSixVertical,
   Path,
   NavigationArrow,
+  Users,
+  User,
+  Phone,
+  FirstAid,
 } from "@phosphor-icons/react";
 
 // Extract lat/lng from activity description text
@@ -198,6 +209,10 @@ type SuggestionPreview = {
   id: string;
   sourceSuggestionId: number | null;
   sourceKind: "saved" | "stream" | "split";
+  isSuccess: boolean | null;
+  errorMessage: string | null;
+  responseTimeMs: number | null;
+  sosRequestCount: number | null;
   suggestedMissionTitle: string | null;
   suggestedMissionType: string | null;
   suggestedPriorityScore: number | null;
@@ -210,6 +225,7 @@ type SuggestionPreview = {
   needsManualReview: boolean;
   lowConfidenceWarning: string | null;
   needsAdditionalDepot: boolean;
+  multiDepotRecommended: boolean;
   supplyShortages: ClusterSupplyShortage[];
   suggestedResources: ClusterSuggestedResource[];
   suggestedActivities: ClusterSuggestedActivity[];
@@ -556,6 +572,535 @@ function trimToNull(value?: string | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function formatExecutionModeLabel(value?: string | null): string | null {
+  const normalized = trimToNull(value)?.toUpperCase();
+  if (!normalized) return null;
+
+  const labels: Record<string, string> = {
+    SINGLE_TEAM: "Một đội",
+    SPLIT_ACROSS_TEAMS: "Chia nhiều đội",
+    SPLITACROSSTEAMS: "Chia nhiều đội",
+    PARALLEL: "Song song",
+    SEQUENTIAL: "Tuần tự",
+  };
+
+  return labels[normalized] ?? labels[normalized.replace(/[\s_-]+/g, "")] ?? value!;
+}
+
+function isSplitAcrossTeams(value?: string | null): boolean {
+  const normalized = trimToNull(value)
+    ?.toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  return normalized === "splitacrossteams" || normalized === "parallel";
+}
+
+function getRequiredTeamCount(activity: Pick<ClusterSuggestedActivity, "requiredTeamCount">): number {
+  const count = toFiniteNumber(activity.requiredTeamCount);
+  return count != null && count > 0 ? count : 0;
+}
+
+function hasSuggestedTeam(activity: Pick<ClusterSuggestedActivity, "suggestedTeam">): boolean {
+  const team = activity.suggestedTeam;
+  if (!team) return false;
+
+  const teamId = toFiniteNumber(team.teamId);
+  return (
+    (teamId != null && teamId > 0) ||
+    trimToNull(team.teamName) != null ||
+    trimToNull(team.teamType) != null
+  );
+}
+
+function formatVictimSeverityLabel(value?: string | null): string | null {
+  const normalized = trimToNull(value)?.toUpperCase();
+  if (!normalized) return null;
+
+  const labels: Record<string, string> = {
+    LOW: "Nhẹ",
+    MILD: "Nhẹ",
+    MODERATE: "Trung bình",
+    HIGH: "Nặng",
+    SEVERE: "Nặng",
+    CRITICAL: "Nguy kịch",
+  };
+
+  return labels[normalized] ?? value!;
+}
+
+function buildVictimFallbackSummary(
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "targetVictimSummary" | "sosRequestId"
+  >,
+): string | null {
+  return (
+    trimToNull(activity.targetVictimSummary) ??
+    (activity.sosRequestId != null
+      ? `Nạn nhân thuộc SOS #${activity.sosRequestId}`
+      : null)
+  );
+}
+
+function getVictimDisplayName(victim: ClusterTargetVictim): string {
+  const name = trimToNull(victim.displayName);
+  if (name) return name;
+
+  const personType = trimToNull(victim.personType);
+  const index = toFiniteNumber(victim.index);
+  if (personType && index != null && index > 0) {
+    return `${getPersonTypeLabel(personType)} ${index}`;
+  }
+
+  return "Nạn nhân";
+}
+
+function getVictimMedicalIssues(victim: ClusterTargetVictim): string[] {
+  return Array.isArray(victim.medicalIssues)
+    ? victim.medicalIssues.filter(
+        (issue): issue is string =>
+          typeof issue === "string" && issue.trim().length > 0,
+      )
+    : [];
+}
+
+function getActivityExecutionWarning(
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "executionMode" | "requiredTeamCount" | "suggestedTeam"
+  >,
+): string | null {
+  const requiredTeamCount = getRequiredTeamCount(activity);
+  if (
+    isSplitAcrossTeams(activity.executionMode) &&
+    requiredTeamCount > 0 &&
+    !hasSuggestedTeam(activity)
+  ) {
+    return `Cần ${requiredTeamCount} đội nhưng bước này chưa được gán đội.`;
+  }
+
+  return null;
+}
+
+function ActivityExecutionMeta({
+  activity,
+  className,
+}: {
+  activity: ClusterSuggestedActivity;
+  className?: string;
+}) {
+  const executionModeLabel = formatExecutionModeLabel(activity.executionMode);
+  const requiredTeamCount = getRequiredTeamCount(activity);
+  const warningMessage = getActivityExecutionWarning(activity);
+  const destinationLabel =
+    trimToNull(activity.destinationName) ??
+    formatCoordinateLabel(activity.destinationLatitude, activity.destinationLongitude);
+
+  if (
+    !executionModeLabel &&
+    requiredTeamCount === 0 &&
+    activity.sosRequestId == null &&
+    activity.depotId == null &&
+    !destinationLabel &&
+    !warningMessage
+  ) {
+    return null;
+  }
+
+  return (
+    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+      {activity.sosRequestId != null ? (
+        <Badge variant="outline" className="h-5 px-1.5 text-sm">
+          SOS #{activity.sosRequestId}
+        </Badge>
+      ) : null}
+      {activity.depotId != null ? (
+        <Badge
+          variant="outline"
+          className="h-5 border-amber-200 bg-amber-50 px-1.5 text-sm text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300"
+        >
+          Kho #{activity.depotId}
+        </Badge>
+      ) : null}
+      {destinationLabel ? (
+        <Badge
+          variant="outline"
+          className="h-5 border-blue-200 bg-blue-50 px-1.5 text-sm text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
+        >
+          Điểm đến: {destinationLabel}
+        </Badge>
+      ) : null}
+      {executionModeLabel ? (
+        <Badge
+          variant="outline"
+          className="h-5 border-indigo-200 bg-indigo-50 px-1.5 text-sm text-indigo-700 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300"
+        >
+          {executionModeLabel}
+        </Badge>
+      ) : null}
+      {requiredTeamCount > 0 ? (
+        <Badge
+          variant="outline"
+          className="h-5 border-emerald-200 bg-emerald-50 px-1.5 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300"
+        >
+          {requiredTeamCount} đội cần
+        </Badge>
+      ) : null}
+      {warningMessage ? (
+        <Badge
+          variant="outline"
+          className="h-5 border-amber-300 bg-amber-50 px-1.5 text-sm font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+        >
+          Chưa gán đội
+        </Badge>
+      ) : null}
+    </div>
+  );
+}
+
+function ActivityExecutionWarningBlock({
+  activity,
+  compact = false,
+}: {
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "executionMode" | "requiredTeamCount" | "suggestedTeam"
+  >;
+  compact?: boolean;
+}) {
+  const warningMessage = getActivityExecutionWarning(activity);
+  if (!warningMessage) return null;
+
+  return (
+    <div className="mt-2 rounded-md border border-amber-300/80 bg-amber-50/80 px-2.5 py-2 dark:border-amber-700/60 dark:bg-amber-900/20">
+      <p
+        className={cn(
+          "flex items-start gap-1.5 text-amber-800 dark:text-amber-300",
+          compact ? "text-sm" : "text-sm leading-relaxed",
+        )}
+      >
+        <Warning className="mt-0.5 h-3.5 w-3.5 shrink-0" weight="fill" />
+        {warningMessage}
+      </p>
+    </div>
+  );
+}
+
+function CoordinationNotesBlock({
+  activity,
+}: {
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "coordinationGroupKey" | "coordinationNotes"
+  >;
+}) {
+  const notes = trimToNull(activity.coordinationNotes);
+  if (!notes) return null;
+
+  return (
+    <div className="mt-2 rounded-md border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-2 dark:border-indigo-800/50 dark:bg-indigo-950/20">
+      <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+        Phối hợp{activity.coordinationGroupKey ? `: ${activity.coordinationGroupKey}` : ""}
+      </p>
+      <p className="mt-0.5 text-sm leading-relaxed text-indigo-700/85 dark:text-indigo-200/85">
+        {notes}
+      </p>
+    </div>
+  );
+}
+
+function TargetVictimsBlock({
+  activity,
+  compact = false,
+  className,
+}: {
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "targetVictimSummary" | "targetVictims" | "sosRequestId"
+  >;
+  compact?: boolean;
+  className?: string;
+}) {
+  const victims = Array.isArray(activity.targetVictims)
+    ? activity.targetVictims
+    : [];
+  const fallbackSummary = buildVictimFallbackSummary(activity);
+
+  if (victims.length === 0 && !fallbackSummary) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-md border border-rose-200/70 bg-rose-50/60 px-2.5 py-2 dark:border-rose-800/40 dark:bg-rose-950/20",
+        className,
+      )}
+    >
+      <p className="flex items-center gap-1 text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+        <Users className="h-3.5 w-3.5" weight="fill" />
+        Đối tượng cần hỗ trợ
+      </p>
+
+      {victims.length === 0 ? (
+        <p className="mt-1 text-sm leading-relaxed text-rose-700/85 dark:text-rose-200/85">
+          {fallbackSummary}
+        </p>
+      ) : (
+        <div className={cn("mt-1.5", compact ? "space-y-1" : "space-y-1.5")}>
+          {victims.map((victim, index) => {
+            const personTypeLabel = victim.personType
+              ? getPersonTypeLabel(victim.personType)
+              : "Nạn nhân";
+            const severityLabel = formatVictimSeverityLabel(victim.severity);
+            const medicalIssues = getVictimMedicalIssues(victim);
+            const phone = trimToNull(victim.personPhone);
+            const diet = trimToNull(victim.specialDietDescription);
+            const clothingGender = trimToNull(victim.clothingGender);
+            const needsClothing = victim.clothingNeeded === true;
+
+            return (
+              <div
+                key={`${victim.personId ?? "victim"}-${index}`}
+                className="rounded border border-rose-100 bg-background/90 px-2 py-1.5 text-sm shadow-sm dark:border-rose-900/50"
+              >
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex min-w-0 items-center gap-1 font-semibold text-foreground">
+                    <User className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                    <span className="truncate">{getVictimDisplayName(victim)}</span>
+                  </span>
+                  <Badge variant="outline" className="h-5 px-1.5 text-sm">
+                    {personTypeLabel}
+                  </Badge>
+                  {victim.isInjured ? (
+                    <Badge
+                      variant="outline"
+                      className="h-5 border-red-200 bg-red-50 px-1.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300"
+                    >
+                      Bị thương{severityLabel ? `: ${severityLabel}` : ""}
+                    </Badge>
+                  ) : severityLabel ? (
+                    <Badge variant="outline" className="h-5 px-1.5 text-sm">
+                      {severityLabel}
+                    </Badge>
+                  ) : null}
+                  {phone ? (
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                      <Phone className="h-3 w-3" />
+                      {phone}
+                    </span>
+                  ) : null}
+                </div>
+
+                {!compact && medicalIssues.length > 0 ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {medicalIssues.slice(0, 4).map((issue) => (
+                      <Badge
+                        key={issue}
+                        variant="outline"
+                        className="h-5 border-red-200 bg-red-50 px-1.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300"
+                      >
+                        <FirstAid className="mr-1 h-3 w-3" weight="fill" />
+                        {getMedicalIssueLabel(issue)}
+                      </Badge>
+                    ))}
+                    {medicalIssues.length > 4 ? (
+                      <Badge variant="outline" className="h-5 px-1.5 text-sm">
+                        +{medicalIssues.length - 4}
+                      </Badge>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {!compact && (diet || needsClothing) ? (
+                  <div className="mt-1 flex flex-wrap gap-1 text-sm text-muted-foreground">
+                    {diet ? (
+                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
+                        Chế độ ăn: {diet}
+                      </span>
+                    ) : null}
+                    {needsClothing ? (
+                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
+                        Cần quần áo
+                        {clothingGender
+                          ? ` (${getClothingGenderLabel(clothingGender)})`
+                          : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type CoordinationSummaryEntry = {
+  key: string;
+  activities: ClusterSuggestedActivity[];
+  sosIds: number[];
+  executionModeLabel: string | null;
+  requiredTeamCount: number;
+  assignedTeamCount: number;
+  notes: string | null;
+  hasMissingTeams: boolean;
+};
+
+function buildCoordinationSummaryEntries(
+  activities: ClusterSuggestedActivity[],
+): CoordinationSummaryEntry[] {
+  const groups = new Map<
+    string,
+    {
+      activities: ClusterSuggestedActivity[];
+      sosIds: Set<number>;
+      executionModes: Set<string>;
+      requiredTeamCount: number;
+      assignedTeams: Set<string>;
+      notes: string | null;
+    }
+  >();
+
+  for (const activity of activities) {
+    const groupKey = trimToNull(activity.coordinationGroupKey);
+    if (!groupKey) continue;
+
+    const existing =
+      groups.get(groupKey) ??
+      {
+        activities: [],
+        sosIds: new Set<number>(),
+        executionModes: new Set<string>(),
+        requiredTeamCount: 0,
+        assignedTeams: new Set<string>(),
+        notes: null,
+      };
+
+    existing.activities.push(activity);
+
+    if (activity.sosRequestId != null && Number.isFinite(activity.sosRequestId)) {
+      existing.sosIds.add(activity.sosRequestId);
+    }
+
+    const executionMode = formatExecutionModeLabel(activity.executionMode);
+    if (executionMode) {
+      existing.executionModes.add(executionMode);
+    }
+
+    existing.requiredTeamCount = Math.max(
+      existing.requiredTeamCount,
+      getRequiredTeamCount(activity),
+    );
+
+    const teamId = toFiniteNumber(activity.suggestedTeam?.teamId);
+    const teamName = trimToNull(activity.suggestedTeam?.teamName);
+    if (teamId != null && teamId > 0) {
+      existing.assignedTeams.add(`id-${teamId}`);
+    } else if (teamName) {
+      existing.assignedTeams.add(`name-${teamName}`);
+    }
+
+    existing.notes = existing.notes ?? trimToNull(activity.coordinationNotes);
+    groups.set(groupKey, existing);
+  }
+
+  return Array.from(groups.entries()).map(([key, group]) => {
+    const assignedTeamCount = group.assignedTeams.size;
+    const requiredTeamCount = group.requiredTeamCount;
+
+    return {
+      key,
+      activities: group.activities,
+      sosIds: Array.from(group.sosIds).sort((left, right) => left - right),
+      executionModeLabel:
+        Array.from(group.executionModes).join(", ") || "Chưa rõ chế độ",
+      requiredTeamCount,
+      assignedTeamCount,
+      notes: group.notes,
+      hasMissingTeams:
+        requiredTeamCount > 0 && assignedTeamCount < requiredTeamCount,
+    };
+  });
+}
+
+function CoordinationSummaryPanel({
+  entries,
+  compact = false,
+}: {
+  entries: CoordinationSummaryEntry[];
+  compact?: boolean;
+}) {
+  if (entries.length === 0) return null;
+
+  return (
+    <section className="space-y-2">
+      <h4 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        <TreeStructure className="h-3.5 w-3.5" weight="fill" />
+        Nhóm phối hợp
+      </h4>
+      <div className="space-y-1.5">
+        {entries.map((entry) => (
+          <div
+            key={entry.key}
+            className={cn(
+              "rounded-lg border px-2.5 py-2",
+              entry.hasMissingTeams
+                ? "border-amber-300 bg-amber-50/70 dark:border-amber-700/60 dark:bg-amber-900/20"
+                : "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/50 dark:bg-emerald-900/15",
+            )}
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-sm font-bold text-foreground">
+                {entry.key}
+              </span>
+              <Badge variant="outline" className="h-5 px-1.5 text-sm">
+                {entry.activities.length} bước
+              </Badge>
+              {entry.sosIds.length > 0 ? (
+                <Badge variant="outline" className="h-5 px-1.5 text-sm">
+                  SOS {entry.sosIds.join(", ")}
+                </Badge>
+              ) : null}
+              <Badge
+                variant="outline"
+                className="h-5 border-indigo-200 bg-indigo-50 px-1.5 text-sm text-indigo-700 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300"
+              >
+                {entry.executionModeLabel}
+              </Badge>
+              {entry.requiredTeamCount > 0 ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-5 px-1.5 text-sm font-semibold",
+                    entry.hasMissingTeams
+                      ? "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      : "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                  )}
+                >
+                  {entry.assignedTeamCount}/{entry.requiredTeamCount} đội
+                </Badge>
+              ) : null}
+            </div>
+
+            {entry.hasMissingTeams ? (
+              <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-300">
+                Nhóm này cần bổ sung đội trước khi xác nhận nhiệm vụ.
+              </p>
+            ) : null}
+            {!compact && entry.notes ? (
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {entry.notes}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function getMissionSuggestionPhasePriority(phase?: string | null): number {
   const normalized = (phase ?? "").trim().toLowerCase();
 
@@ -597,7 +1142,11 @@ function pickPreferredMissionSuggestionActivityGroup(
     const hasLeftCreatedAt = Number.isFinite(leftCreatedAt);
     const hasRightCreatedAt = Number.isFinite(rightCreatedAt);
 
-    if (hasLeftCreatedAt && hasRightCreatedAt && leftCreatedAt !== rightCreatedAt) {
+    if (
+      hasLeftCreatedAt &&
+      hasRightCreatedAt &&
+      leftCreatedAt !== rightCreatedAt
+    ) {
       return rightCreatedAt - leftCreatedAt;
     }
 
@@ -614,7 +1163,8 @@ function pickPreferredMissionSuggestionActivityGroup(
 function flattenMissionSuggestionActivities(
   suggestion: MissionSuggestionEntity,
 ): ClusterSuggestedActivity[] {
-  const preferredGroup = pickPreferredMissionSuggestionActivityGroup(suggestion);
+  const preferredGroup =
+    pickPreferredMissionSuggestionActivityGroup(suggestion);
 
   return Array.isArray(preferredGroup?.suggestedActivities)
     ? preferredGroup.suggestedActivities
@@ -647,6 +1197,10 @@ function buildSuggestionPreviewFromMissionSuggestion(
     id: `saved-${suggestion.id}`,
     sourceSuggestionId: suggestion.id,
     sourceKind: "saved",
+    isSuccess: suggestion.isSuccess ?? null,
+    errorMessage: suggestion.errorMessage ?? null,
+    responseTimeMs: suggestion.responseTimeMs ?? null,
+    sosRequestCount: suggestion.sosRequestCount ?? null,
     suggestedMissionTitle: suggestion.suggestedMissionTitle,
     suggestedMissionType: suggestion.suggestedMissionType,
     suggestedPriorityScore: suggestion.suggestedPriorityScore,
@@ -659,6 +1213,7 @@ function buildSuggestionPreviewFromMissionSuggestion(
     needsManualReview: suggestion.needsManualReview,
     lowConfidenceWarning: suggestion.lowConfidenceWarning,
     needsAdditionalDepot: suggestion.needsAdditionalDepot,
+    multiDepotRecommended: Boolean(suggestion.multiDepotRecommended),
     supplyShortages: suggestion.supplyShortages ?? [],
     suggestedResources: suggestion.suggestedResources ?? [],
     suggestedActivities: flattenMissionSuggestionActivities(suggestion),
@@ -679,6 +1234,10 @@ function buildSuggestionPreviewFromRescueSuggestion(
       `${sourceKind}-${suggestion.suggestionId ?? suggestion.suggestedMissionTitle ?? "draft"}`,
     sourceSuggestionId: suggestion.suggestionId ?? null,
     sourceKind,
+    isSuccess: suggestion.isSuccess ?? null,
+    errorMessage: suggestion.errorMessage ?? null,
+    responseTimeMs: suggestion.responseTimeMs ?? null,
+    sosRequestCount: suggestion.sosRequestCount ?? null,
     suggestedMissionTitle: suggestion.suggestedMissionTitle,
     suggestedMissionType: suggestion.suggestedMissionType,
     suggestedPriorityScore: suggestion.suggestedPriorityScore,
@@ -691,6 +1250,7 @@ function buildSuggestionPreviewFromRescueSuggestion(
     needsManualReview: suggestion.needsManualReview,
     lowConfidenceWarning: suggestion.lowConfidenceWarning,
     needsAdditionalDepot: suggestion.needsAdditionalDepot,
+    multiDepotRecommended: suggestion.multiDepotRecommended,
     supplyShortages: suggestion.supplyShortages ?? [],
     suggestedResources: suggestion.suggestedResources ?? [],
     suggestedActivities: suggestion.suggestedActivities ?? [],
@@ -1638,6 +2198,7 @@ const DepotInventoryCard = ({
                       : item.availableQuantity;
                   const itemId = item.itemModelId;
                   const itemName = item.itemModelName;
+                  const itemImageUrl = item.imageUrl?.trim() || "";
 
                   return (
                     <div
@@ -1683,7 +2244,18 @@ const DepotInventoryCard = ({
                           : "cursor-default",
                       )}
                     >
-                      <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <Avatar className="h-9 w-9 shrink-0 rounded-md border border-border/70 bg-slate-100/80 dark:bg-slate-900/60">
+                        <AvatarImage
+                          src={itemImageUrl || undefined}
+                          alt={itemName}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover"
+                        />
+                        <AvatarFallback className="rounded-md bg-slate-100 text-blue-500 dark:bg-slate-900 dark:text-blue-300">
+                          <Package className="h-4 w-4" weight="fill" />
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
                           {itemName}
@@ -6444,6 +7016,10 @@ const SuggestionCard = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const allActivities = suggestion.suggestedActivities;
+  const coordinationEntries = useMemo(
+    () => buildCoordinationSummaryEntries(allActivities),
+    [allActivities],
+  );
   const createdAtLabel = suggestion.createdAt
     ? new Date(suggestion.createdAt).toLocaleString("vi-VN", {
         day: "2-digit",
@@ -6452,11 +7028,15 @@ const SuggestionCard = ({
         minute: "2-digit",
       })
     : "Chưa rõ thời gian";
+  const aiErrorMessage = trimToNull(suggestion.errorMessage);
+  const hasAiError = suggestion.isSuccess === false || aiErrorMessage != null;
   const hasSystemWarnings =
     suggestion.needsManualReview ||
     trimToNull(suggestion.lowConfidenceWarning) != null ||
     trimToNull(suggestion.mixedRescueReliefWarning) != null ||
+    hasAiError ||
     suggestion.needsAdditionalDepot ||
+    suggestion.multiDepotRecommended ||
     suggestion.supplyShortages.length > 0;
 
   return (
@@ -6510,10 +7090,18 @@ const SuggestionCard = ({
               : "N/A"}
           </span>
           <span>{allActivities.length} bước</span>
+          {typeof suggestion.sosRequestCount === "number" &&
+          suggestion.sosRequestCount > 0 ? (
+            <span>{suggestion.sosRequestCount} SOS</span>
+          ) : null}
           <span className="flex items-center gap-1">
             <Lightning className="h-3 w-3" weight="fill" />
             {suggestion.modelName || "AI"}
           </span>
+          {typeof suggestion.responseTimeMs === "number" &&
+          suggestion.responseTimeMs > 0 ? (
+            <span>{(suggestion.responseTimeMs / 1000).toFixed(1)}s</span>
+          ) : null}
           <span>
             Tin cậy:{" "}
             {typeof suggestion.confidenceScore === "number"
@@ -6547,6 +7135,22 @@ const SuggestionCard = ({
                 className="h-5 px-1.5 text-sm border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/20 dark:text-sky-300"
               >
                 Thiếu vật phẩm / cần thêm kho
+              </Badge>
+            ) : null}
+            {suggestion.multiDepotRecommended ? (
+              <Badge
+                variant="outline"
+                className="h-5 px-1.5 text-sm border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+              >
+                Khuyến nghị nhiều kho
+              </Badge>
+            ) : null}
+            {hasAiError ? (
+              <Badge
+                variant="outline"
+                className="h-5 px-1.5 text-sm border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300"
+              >
+                Có lỗi AI
               </Badge>
             ) : null}
           </div>
@@ -6593,6 +7197,23 @@ const SuggestionCard = ({
                 </p>
               </div>
             ) : null}
+
+            {hasAiError ? (
+              <div className="rounded-md border border-red-200 bg-red-50/80 px-2.5 py-2 dark:border-red-800/40 dark:bg-red-900/10">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                  Lỗi AI
+                </p>
+                <p className="mt-0.5 text-sm text-red-700/80 dark:text-red-300/80 leading-relaxed">
+                  {aiErrorMessage ??
+                    "AI trả về trạng thái không thành công nhưng chưa có chi tiết lỗi."}
+                </p>
+              </div>
+            ) : null}
+
+            <CoordinationSummaryPanel
+              entries={coordinationEntries}
+              compact
+            />
 
             {suggestion.supplyShortages.length > 0 ? (
               <div className="rounded-md border border-sky-200 bg-sky-50/80 px-2.5 py-2 dark:border-sky-800/40 dark:bg-sky-900/10">
@@ -6658,6 +7279,20 @@ const SuggestionCard = ({
                         <p className="text-sm text-foreground/80 mt-0.5 leading-relaxed">
                           {act.description}
                         </p>
+                        <ActivityExecutionMeta
+                          activity={act}
+                          className="mt-1"
+                        />
+                        <ActivityExecutionWarningBlock
+                          activity={act}
+                          compact
+                        />
+                        <TargetVictimsBlock
+                          activity={act}
+                          compact
+                          className="mt-1.5"
+                        />
+                        <CoordinationNotesBlock activity={act} />
                         {act.destinationName ? (
                           <p className="mt-0.5 text-sm text-muted-foreground">
                             Điểm đến: {act.destinationName}
@@ -6954,7 +7589,7 @@ const RescuePlanPanel = ({
             );
           const nextSuggestedTeam = hasAutoAssignedCollectorReason
             ? null
-            : activity.suggestedTeam ?? null;
+            : (activity.suggestedTeam ?? null);
 
           if (
             nextSuggestedTeam === activity.suggestedTeam &&
@@ -9038,6 +9673,14 @@ const RescuePlanPanel = ({
     return groups;
   }, [activeSuggestion, panelSOSRequests]);
 
+  const activeCoordinationEntries = useMemo(
+    () =>
+      buildCoordinationSummaryEntries(
+        activeSuggestion?.suggestedActivities ?? [],
+      ),
+    [activeSuggestion?.suggestedActivities],
+  );
+
   // Auto-collapse Quick Stats when user scrolls deep into the main plan content.
   useEffect(() => {
     if (!activeSuggestion) {
@@ -9163,6 +9806,14 @@ const RescuePlanPanel = ({
                           Cần duyệt tay
                         </Badge>
                       )}
+                      {activeSuggestion.errorMessage ? (
+                        <Badge
+                          variant="outline"
+                          className="text-sm px-1.5 py-0 h-5 border-red-300 text-red-700 dark:border-red-700 dark:text-red-300"
+                        >
+                          Lỗi AI
+                        </Badge>
+                      ) : null}
                     </>
                   ) : aiStream.loading ? (
                     <Badge
@@ -9263,7 +9914,11 @@ const RescuePlanPanel = ({
                 },
                 {
                   icon: Clock,
-                  value: `${((activeSuggestion.responseTimeMs || 0) / 1000).toFixed(1)}s`,
+                  value:
+                    typeof activeSuggestion.responseTimeMs === "number" &&
+                    activeSuggestion.responseTimeMs > 0
+                      ? `${(activeSuggestion.responseTimeMs / 1000).toFixed(1)}s`
+                      : "N/A",
                   label: "Thời gian AI",
                   color: "text-orange-500",
                   bg: "bg-orange-500/5 border-orange-500/15",
@@ -11209,6 +11864,22 @@ const RescuePlanPanel = ({
                                               )}
                                             </div>
 
+                                            <ActivityExecutionMeta
+                                              activity={activity}
+                                              className="mt-1"
+                                            />
+                                            <ActivityExecutionWarningBlock
+                                              activity={activity}
+                                              compact
+                                            />
+                                            <TargetVictimsBlock
+                                              activity={activity}
+                                              compact
+                                            />
+                                            <CoordinationNotesBlock
+                                              activity={activity}
+                                            />
+
                                             <div className="space-y-1">
                                               <Label className="block min-h-5 text-sm uppercase tracking-wider text-muted-foreground">
                                                 Thời gian ước tính
@@ -12050,6 +12721,17 @@ const RescuePlanPanel = ({
             >
               <ScrollArea className="h-full">
                 <div className="p-3 space-y-3">
+                  {activeSuggestion &&
+                  !isEditMode &&
+                  activeCoordinationEntries.length > 0 ? (
+                    <>
+                      <CoordinationSummaryPanel
+                        entries={activeCoordinationEntries}
+                      />
+                      <Separator />
+                    </>
+                  ) : null}
+
                   {/* Activity Steps — moved from left column */}
                   {activeSuggestion && !isEditMode && (
                     <>
@@ -12253,6 +12935,20 @@ const RescuePlanPanel = ({
                                             <p className="text-sm leading-relaxed text-foreground/80">
                                               {displayDescription}
                                             </p>
+                                            <ActivityExecutionMeta
+                                              activity={activity}
+                                              className="mt-1.5"
+                                            />
+                                            <ActivityExecutionWarningBlock
+                                              activity={activity}
+                                            />
+                                            <TargetVictimsBlock
+                                              activity={activity}
+                                              className="mt-2"
+                                            />
+                                            <CoordinationNotesBlock
+                                              activity={activity}
+                                            />
 
                                             {(activity.assemblyPointName ||
                                               (activity.assemblyPointLatitude !=
@@ -12379,6 +13075,7 @@ const RescuePlanPanel = ({
                       </section>
 
                       {(activeSuggestion.needsManualReview ||
+                        activeSuggestion.errorMessage ||
                         activeSuggestion.lowConfidenceWarning ||
                         activeSuggestion.multiDepotRecommended ||
                         trimToNull(activeSuggestion.mixedRescueReliefWarning) ||
@@ -12398,6 +13095,16 @@ const RescuePlanPanel = ({
                               <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 rounded-lg p-2.5">
                                 <p className="text-sm text-rose-800 dark:text-rose-300 leading-relaxed">
                                   {activeSuggestion.mixedRescueReliefWarning}
+                                </p>
+                              </div>
+                            ) : null}
+                            {activeSuggestion.errorMessage ? (
+                              <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg p-2.5">
+                                <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                                  Lỗi AI
+                                </p>
+                                <p className="mt-0.5 text-sm text-red-800/80 dark:text-red-300/80 leading-relaxed">
+                                  {activeSuggestion.errorMessage}
                                 </p>
                               </div>
                             ) : null}
@@ -12796,10 +13503,11 @@ const RescuePlanPanel = ({
                                 Phản hồi
                               </p>
                               <p className="font-medium text-foreground/80">
-                                {(
-                                  (activeSuggestion.responseTimeMs || 0) / 1000
-                                ).toFixed(1)}
-                                s
+                                {typeof activeSuggestion.responseTimeMs ===
+                                  "number" &&
+                                activeSuggestion.responseTimeMs > 0
+                                  ? `${(activeSuggestion.responseTimeMs / 1000).toFixed(1)}s`
+                                  : "N/A"}
                               </p>
                             </div>
                           )}

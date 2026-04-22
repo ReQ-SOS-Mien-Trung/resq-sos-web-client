@@ -20,7 +20,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
         <div className="absolute left-12 top-12 z-10">
           <Link
             href="/"
-            aria-label="Trang chu ResQ SOS"
+            aria-label="Trang chủ ResQ SOS"
             className="block transition-transform hover:scale-105"
           >
             <AnimatedLogo className="h-[clamp(5.25rem,7.8vw,8.4rem)] w-[clamp(5.25rem,7.8vw,8.4rem)] drop-shadow-[0_10px_24px_rgba(255,87,34,0.28)]" />
@@ -32,7 +32,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       <div className="lg:hidden w-full p-6 bg-linear-to-r from-orange-500/10 to-orange-400/5">
         <Link
           href="/"
-          aria-label="Trang chu ResQ SOS"
+          aria-label="Trang chủ ResQ SOS"
           className="w-fit rounded-2xl bg-black/5 p-2 transition-transform hover:scale-105"
         >
           <AnimatedLogo className="h-11 w-11" />

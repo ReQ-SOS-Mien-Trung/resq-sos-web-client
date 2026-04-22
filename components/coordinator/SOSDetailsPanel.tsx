@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
@@ -31,6 +31,7 @@ import {
   Info,
 } from "@phosphor-icons/react";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
+import { useSosFormPriorityRuleConfig } from "@/services/config/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import {
   getClothingGenderLabel,
@@ -39,6 +40,7 @@ import {
   getMedicalSupportNeedLabel,
   getSupplyLabel,
   getSituationLabel,
+  getSosTypeLabel,
   getWaterDurationLabel,
   getWaterRemainingLabel,
 } from "@/lib/sos";
@@ -168,6 +170,160 @@ function getMedicalIssueColorClass(code: string): string {
   }
 
   return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+}
+
+function formatScoreValue(value: unknown, fallback = "N/A"): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(1);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  return fallback;
+}
+
+function getBreakdownNumber(
+  breakdown: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback = 0,
+): number {
+  const value = breakdown?.[key];
+
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function compactFormulaDetails(
+  lines: Array<ReactNode | null | undefined | false>,
+): ReactNode[] {
+  return lines.filter((line): line is ReactNode => Boolean(line));
+}
+
+const PRIORITY_SYMBOL_LABELS: Record<string, string> = {
+  K: "hệ số tình huống",
+  M: "điểm y tế",
+  R: "điểm cứu trợ",
+  S: "điểm tổng",
+  T: "điểm loại yêu cầu",
+};
+
+function FormulaVar({
+  name,
+  subscript,
+}: {
+  name: string;
+  subscript?: ReactNode;
+}) {
+  return (
+    <span className="font-serif italic text-foreground">
+      {name}
+      {subscript ? (
+        <sub className="ml-0.5 text-[0.55em] leading-none">{subscript}</sub>
+      ) : null}
+    </span>
+  );
+}
+
+function SigmaSymbol() {
+  return (
+    <span className="relative mx-1 inline-flex h-9 w-8 items-center justify-center align-middle font-serif text-3xl leading-none text-foreground">
+      <span className="absolute -top-0.5 text-[10px] leading-none">n</span>
+      <span>Σ</span>
+      <span className="absolute -bottom-0.5 text-[10px] leading-none">i=1</span>
+    </span>
+  );
+}
+
+function MathWord({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-sans text-[0.78em] not-italic text-foreground">
+      {children}
+    </span>
+  );
+}
+
+function FormulaOperator({ children }: { children: ReactNode }) {
+  return <span className="mx-2 text-muted-foreground">{children}</span>;
+}
+
+function PriorityFormulaNotation({
+  additiveSymbols,
+  includeSituationMultiplier,
+  totalScore,
+}: {
+  additiveSymbols: string[];
+  includeSituationMultiplier: boolean;
+  totalScore: string;
+}) {
+  const symbols = additiveSymbols.length > 0 ? additiveSymbols : ["M", "R"];
+
+  return (
+    <div className="min-w-max font-serif text-2xl leading-none tracking-normal text-foreground">
+      <FormulaVar name="S" />
+      <FormulaOperator>=</FormulaOperator>
+      <MathWord>làm tròn</MathWord>
+      <span className="mx-1">(</span>
+      <span className="mx-1">(</span>
+      {symbols.map((symbol, index) => (
+        <span key={`${symbol}-${index}`} className="inline-flex items-center">
+          {index > 0 ? <FormulaOperator>+</FormulaOperator> : null}
+          <FormulaVar name={symbol} />
+        </span>
+      ))}
+      <span className="mx-1">)</span>
+      {includeSituationMultiplier ? (
+        <>
+          <FormulaOperator>×</FormulaOperator>
+          <FormulaVar name="K" />
+        </>
+      ) : null}
+      <span className="mx-1">)</span>
+      <FormulaOperator>≈</FormulaOperator>
+      <span className="font-sans text-[0.9em] not-italic">{totalScore}</span>
+    </div>
+  );
+}
+
+function InlineMedicalFormula() {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <FormulaVar name="M" />
+      <span>=</span>
+      <SigmaSymbol />
+      <span>(</span>
+      <FormulaVar name="W" subscript="i" />
+      <span>×</span>
+      <FormulaVar name="A" subscript="i" />
+      <span>)</span>
+    </span>
+  );
+}
+
+function InlineReliefFormula() {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <FormulaVar name="R" />
+      <span>=</span>
+      <FormulaVar name="U" />
+      <span>+</span>
+      <FormulaVar name="V" />
+    </span>
+  );
+}
+
+function formatPrioritySymbolValues(
+  values: Array<[symbol: string, value: unknown]>,
+): string {
+  return `Giá trị hiện tại: ${values
+    .map(([symbol, value]) => `${symbol} = ${formatScoreValue(value)}`)
+    .join("; ")}`;
+}
+
+function formatPrioritySymbols(symbols: string[]): string {
+  return symbols
+    .map((symbol) => `${symbol} là ${PRIORITY_SYMBOL_LABELS[symbol]}`)
+    .join(", ");
 }
 
 function ParsedMessage({
@@ -360,24 +516,29 @@ function ParsedMessage({
 function FormulaTooltip({
   title,
   formula,
+  description,
   details,
 }: {
   title: string;
-  formula: string;
-  details?: string[];
+  formula: ReactNode;
+  description?: string;
+  details?: ReactNode[];
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const tooltipWidth = 480;
+  const viewportPadding = 12;
+
+  const getTooltipLeft = (rect: DOMRect) => {
+    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
+    return Math.max(viewportPadding, Math.min(rect.left, maxLeft));
+  };
 
   const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const tooltipWidth = 320;
-    const viewportPadding = 12;
-    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
-    const left = Math.max(viewportPadding, Math.min(rect.left, maxLeft));
     setPos({
       top: rect.bottom + 8,
-      left,
+      left: getTooltipLeft(rect),
     });
     setOpen(true);
   };
@@ -392,7 +553,7 @@ function FormulaTooltip({
         onMouseLeave={() => setOpen(false)}
         onFocus={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
-          setPos({ top: rect.bottom + 8, left: Math.max(12, rect.left) });
+          setPos({ top: rect.bottom + 8, left: getTooltipLeft(rect) });
           setOpen(true);
         }}
         onBlur={() => setOpen(false)}
@@ -403,19 +564,27 @@ function FormulaTooltip({
         open &&
         createPortal(
           <div
-            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-sm leading-relaxed shadow-md"
+            className="fixed z-[9999] w-[30rem] max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-4 text-sm leading-relaxed shadow-md"
             style={{ top: pos.top, left: pos.left }}
             onMouseEnter={() => setOpen(true)}
             onMouseLeave={() => setOpen(false)}
           >
             <p className="font-semibold text-foreground">{title}</p>
-            <p className="mt-1 text-muted-foreground whitespace-normal break-words">
+            {description ? (
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
+            <div className="mt-3 overflow-x-auto rounded-md border bg-background px-4 py-4 shadow-inner">
               {formula}
-            </p>
+            </div>
             {details && details.length > 0 && (
-              <div className="mt-2 space-y-1 text-muted-foreground whitespace-normal break-words">
+              <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
                 {details.map((line, idx) => (
-                  <p key={idx}>- {line}</p>
+                  <div key={idx} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                    <div className="min-w-0">{line}</div>
+                  </div>
                 ))}
               </div>
             )}
@@ -471,6 +640,8 @@ const SOSDetailsPanel = ({
     useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
       enabled: !!sosRequest?.id && open,
     });
+  const { data: priorityRuleConfig, isLoading: isLoadingPriorityRuleConfig } =
+    useSosFormPriorityRuleConfig(open);
 
   if (!sosRequest && !open) return null;
 
@@ -673,7 +844,17 @@ const SOSDetailsPanel = ({
   const displayedTotalScore = ruleEvaluation?.totalScore ?? 0;
 
   const isV3 = ruleEvaluation?.ruleVersion?.startsWith("3");
-
+  const ruleBreakdown = ruleEvaluation?.breakdown ?? null;
+  const medicalScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "medical_score",
+    ruleEvaluation?.medicalScore ?? 0,
+  );
+  const reliefScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "relief_score",
+    ruleEvaluation?.foodScore ?? 0,
+  );
   // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
   let requestTypeScore = 10;
   const sosTypeStr = ((sosRequest as any).sosType || "").toLowerCase();
@@ -697,6 +878,94 @@ const SOSDetailsPanel = ({
   } else if (sitStr.includes("cannot_move") || sosRequest.canMove === false) {
     situationMultiplier = 1.2;
   }
+
+  const requestTypeScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "request_type_score",
+    requestTypeScore,
+  );
+  const situationMultiplierValue = getBreakdownNumber(
+    ruleBreakdown,
+    "situation_multiplier",
+    ruleEvaluation?.environmentScore ?? situationMultiplier,
+  );
+  const priorityConfigFormula =
+    priorityRuleConfig?.priority_score?.formula?.trim() ||
+    (isV3
+      ? "ROUND((request_type_score + medical_score) * situation_multiplier)"
+      : "ROUND((medical_score + relief_score) * situation_multiplier)");
+  const priorityFormulaUsesRequestType =
+    priorityConfigFormula.includes("request_type_score");
+  const priorityFormulaUsesMedical =
+    priorityConfigFormula.includes("medical_score");
+  const priorityFormulaUsesRelief =
+    priorityConfigFormula.includes("relief_score");
+  const priorityFormulaUsesSituation = priorityConfigFormula.includes(
+    "situation_multiplier",
+  );
+  const priorityFormulaSymbols = [
+    priorityFormulaUsesRequestType ? "T" : null,
+    priorityFormulaUsesMedical ? "M" : null,
+    priorityFormulaUsesRelief ? "R" : null,
+  ].filter((symbol): symbol is string => Boolean(symbol));
+  const priorityValueEntries: Array<[symbol: string, value: unknown]> = [
+    priorityFormulaUsesRequestType ? ["T", requestTypeScoreValue] : null,
+    priorityFormulaUsesMedical ? ["M", medicalScoreValue] : null,
+    priorityFormulaUsesRelief ? ["R", reliefScoreValue] : null,
+    priorityFormulaUsesSituation ? ["K", situationMultiplierValue] : null,
+  ].filter((entry): entry is [symbol: string, value: unknown] =>
+    Boolean(entry),
+  );
+  const priorityFormulaContent = (
+    <PriorityFormulaNotation
+      additiveSymbols={priorityFormulaSymbols}
+      includeSituationMultiplier={priorityFormulaUsesSituation}
+      totalScore={displayedTotalScore.toFixed(1)}
+    />
+  );
+  const priorityLevelConfig = priorityRuleConfig?.priority_level;
+  const priorityThresholdText = priorityLevelConfig
+    ? [
+        `Ngưỡng ưu tiên: P1 ≥ ${priorityLevelConfig.P1_THRESHOLD}, P2 ≥ ${priorityLevelConfig.P2_THRESHOLD}, P3 ≥ ${priorityLevelConfig.P3_THRESHOLD}.`,
+        priorityLevelConfig.rule.includes("has_severe_flag")
+          ? "P1/P2 cần có ca nặng để tránh đẩy ưu tiên quá cao."
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null;
+  const priorityReadableSymbols = [
+    "S",
+    ...priorityFormulaSymbols,
+    priorityFormulaUsesSituation ? "K" : null,
+  ].filter((symbol): symbol is string => Boolean(symbol));
+  const priorityFormulaDescription =
+    "Công thức rút gọn để đọc nhanh cách hệ thống cộng điểm và nhân hệ số tình huống.";
+  const priorityFormulaDetails = compactFormulaDetails([
+    priorityRuleConfig?.config_version
+      ? `Phiên bản config: ${priorityRuleConfig.config_version}`
+      : ruleEvaluation?.configVersion
+        ? `Phiên bản config: ${ruleEvaluation.configVersion}`
+        : null,
+    isLoadingPriorityRuleConfig
+      ? "Đang tải công thức active từ backend..."
+      : null,
+    formatPrioritySymbols(priorityReadableSymbols),
+    formatPrioritySymbolValues(priorityValueEntries),
+    priorityFormulaUsesMedical ? (
+      <span>
+        <InlineMedicalFormula />: W là mức độ y tế, A là hệ số tuổi của từng
+        người.
+      </span>
+    ) : null,
+    priorityFormulaUsesRelief ? (
+      <span>
+        <InlineReliefFormula />: điểm cứu trợ gồm nhu yếu phẩm khẩn cấp và mức
+        dễ tổn thương.
+      </span>
+    ) : null,
+    priorityThresholdText,
+  ]);
 
   // Filter out 0-value factors for v3.0
   const displayScoreRows = isV3
@@ -739,13 +1008,16 @@ const SOSDetailsPanel = ({
   const reporterRoleLabel = sosRequest.isSentOnBehalf
     ? "Người gửi hộ"
     : "Người gửi SOS";
+  const sosTypeLabel = sosRequest.sosType
+    ? getSosTypeLabel(sosRequest.sosType)
+    : null;
 
   const renderPanelContent = () => (
     <>
       {/* Header */}
       <div className="p-5 pb-4 border-b shrink-0">
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <div
                 className={cn(
@@ -755,14 +1027,32 @@ const SOSDetailsPanel = ({
               />
               SOS {sosRequest.id}
             </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Chi tiết yêu cầu SOS
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                Chi tiết yêu cầu SOS
+              </p>
+              {sosTypeLabel && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "max-w-46 px-2 py-0 text-[10px] font-semibold leading-4",
+                    sosRequest.sosType.toUpperCase() === "RESCUE"
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"
+                      : sosRequest.sosType.toUpperCase() === "RELIEF"
+                        ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
+                        : "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-400",
+                  )}
+                  title={sosTypeLabel}
+                >
+                  <span className="block truncate">{sosTypeLabel}</span>
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Badge
               variant={PRIORITY_BADGE_VARIANT[sosRequest.priority]}
-              className="text-sm px-3"
+              className="text-sm px-3 whitespace-nowrap"
             >
               {PRIORITY_LABELS[sosRequest.priority]}
             </Badge>
@@ -1329,11 +1619,9 @@ const SOSDetailsPanel = ({
                             Điểm rủi ro tổng hợp:
                             <FormulaTooltip
                               title="Công thức tính chuẩn hóa"
-                              formula={
-                                isV3
-                                  ? `Tổng điểm = (Loại yêu cầu + Điểm y tế) × Hệ số tình trạng = (${requestTypeScore} + ${ruleEvaluation.medicalScore.toFixed(1)}) × ${situationMultiplier} ≈ ${displayedTotalScore.toFixed(1)}`
-                                  : `Tổng điểm = (Y tế × 0.3) + (Chấn thương × 0.25) + (Di chuyển × 0.15) + (Môi trường × 0.20) + (Thực phẩm × 0.10) ≈ ${displayedTotalScore.toFixed(1)}`
-                              }
+                              description={priorityFormulaDescription}
+                              formula={priorityFormulaContent}
+                              details={priorityFormulaDetails}
                             />
                           </span>
                           <div className="flex items-center gap-2">
@@ -1479,6 +1767,10 @@ const SOSDetailsPanel = ({
                               icon: "ph:package",
                             },
                             WATER: { label: "Nước uống", icon: "ph:drop" },
+                            CLOTHING: {
+                              label: "Quần áo",
+                              icon: "ph:t-shirt",
+                            },
                             BLANKETS: { label: "Chăn mền", icon: "ph:bed" },
                             TRANSPORT_VEHICLE: {
                               label: "Phương tiện vận chuyển",

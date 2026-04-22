@@ -7,6 +7,7 @@ import {
   getRescueTeamRadiusConfig,
   getRescuerScoreVisibilityConfig,
   getSosClusterGroupingConfig,
+  getSosFormPriorityRuleConfig,
   getSosPriorityRuleConfig,
   getSosPriorityRuleConfigById,
   getSosPriorityRuleConfigVersions,
@@ -34,6 +35,10 @@ export const SOS_PRIORITY_RULE_CONFIG_QUERY_KEY = [
   "sos-priority-rule-config",
 ] as const;
 
+export const SOS_FORM_PRIORITY_RULE_CONFIG_QUERY_KEY = [
+  "sos-form-priority-rule-config",
+] as const;
+
 export const SOS_PRIORITY_RULE_CONFIG_VERSIONS_QUERY_KEY = [
   "sos-priority-rule-config-versions",
 ] as const;
@@ -55,6 +60,16 @@ export function useSosPriorityRuleConfig(enabled = true) {
     queryKey: SOS_PRIORITY_RULE_CONFIG_QUERY_KEY,
     queryFn: getSosPriorityRuleConfig,
     enabled,
+  });
+}
+
+export function useSosFormPriorityRuleConfig(enabled = true) {
+  return useQuery<SosPriorityRuleConfigEntity>({
+    queryKey: SOS_FORM_PRIORITY_RULE_CONFIG_QUERY_KEY,
+    queryFn: getSosFormPriorityRuleConfig,
+    enabled,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

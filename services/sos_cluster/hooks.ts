@@ -56,8 +56,16 @@ export function useSOSClusters(options?: UseSOSClustersOptions) {
  * Hook to create a new SOS cluster (mutation)
  */
 export function useCreateSOSCluster() {
+  const queryClient = useQueryClient();
+
   return useMutation<CreateSOSClusterResponse, Error, CreateSOSClusterRequest>({
     mutationFn: createSOSCluster,
+    onSuccess: () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: SOS_CLUSTERS_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: SOS_REQUESTS_QUERY_KEY }),
+      ]);
+    },
   });
 }
 
