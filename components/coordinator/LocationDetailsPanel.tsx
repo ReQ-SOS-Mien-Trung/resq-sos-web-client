@@ -7,7 +7,6 @@ import {
   useAssemblyPointById,
   useAssemblyPointEvents,
   useScheduleAssemblyPointGathering,
-  useStartAssemblyPointGathering,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
@@ -1114,9 +1113,6 @@ function AssemblyPointDetails({
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
-  const { mutateAsync: startGathering, isPending: isStartingGathering } =
-    useStartAssemblyPointGathering();
-
   const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
     assemblyPointDetail ?? assemblyPoint;
 
@@ -1217,45 +1213,6 @@ function AssemblyPointDetails({
     }
   };
 
-  const handleStartGathering = async () => {
-    if (selectedEvent?.status === "Gathering") {
-      return;
-    }
-
-    let targetEventId = effectiveSelectedEventId ?? activeEventId;
-
-    if (!targetEventId) {
-      const refreshed = await refetchAssemblyPointDetail();
-      targetEventId = resolveActiveEventId(refreshed.data);
-    }
-
-    if (!targetEventId) {
-      const refreshedEvents = await refetchAssemblyPointEvents();
-      const fallbackEvents = refreshedEvents.data?.items ?? [];
-      targetEventId = getDefaultEventId(fallbackEvents, null);
-    }
-
-    if (!targetEventId) {
-      toast.error(
-        "Chưa có sự kiện tập kết phù hợp để mở check-in. Vui lòng lên lịch trước.",
-      );
-      return;
-    }
-
-    try {
-      await startGathering({
-        eventId: targetEventId,
-        assemblyPointId: assemblyPoint.id,
-      });
-      toast.success(`Đã mở check-in cho sự kiện #${targetEventId}.`);
-      void refetchAssemblyPointEvents();
-      void refetchAssemblyPointDetail();
-    } catch (error) {
-      const backendMessage = extractBackendErrorMessage(error);
-      toast.error(backendMessage || "Yêu cầu thất bại. Vui lòng thử lại.");
-    }
-  };
-
   const selectedEventStatusLabel = selectedEvent
     ? (assemblyEventStatusLabel[selectedEvent.status] ?? selectedEvent.status)
     : "Chưa chọn sự kiện";
@@ -1265,18 +1222,12 @@ function AssemblyPointDetails({
       "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300")
     : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
 
-  const shouldShowOpenCheckIn =
-    hasActiveEvent && selectedEvent?.status !== "Gathering";
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
   const isAssemblyPointAvailable = displayAssemblyPoint.status === "Available";
   const canToggleSchedule = isAssemblyPointAvailable && !hasActiveEvent;
   const effectiveShowScheduleForm = canToggleSchedule && showScheduleForm;
-  const canOpenCheckIn =
-    shouldShowOpenCheckIn && !isStartingGathering && !!effectiveSelectedEventId;
   const canCreateTeam = shouldShowCreateTeam;
-  const checkInActionLabel =
-    selectedEvent?.status === "Gathering" ? "Đang check-in" : "Mở check-in";
   const isRefreshingAssemblyData =
     isAssemblyPointDetailFetching || isAssemblyPointEventsFetching;
   const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
@@ -1409,7 +1360,7 @@ function AssemblyPointDetails({
 
       {/* Quick Actions */}
       <div className="px-5 py-3 border-b shrink-0">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <div className="flex justify-center">
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
@@ -1426,21 +1377,6 @@ function AssemblyPointDetails({
                   ? () => setShowScheduleForm((prev) => !prev)
                   : undefined
               }
-            />
-          </div>
-
-          <div className="flex justify-center">
-            <ActionButton
-              icon={<Hash className="h-5 w-5" weight="bold" />}
-              label={checkInActionLabel}
-              color={
-                canOpenCheckIn
-                  ? "text-[#FF5722]"
-                  : "text-slate-600 dark:text-slate-300"
-              }
-              active={isStartingGathering}
-              disabled={!canOpenCheckIn}
-              onClick={canOpenCheckIn ? handleStartGathering : undefined}
             />
           </div>
 
@@ -1575,7 +1511,7 @@ function AssemblyPointDetails({
                       </p>
                     </div>
                   ) : (
-                    <SelectValue placeholder="Chọn sự kiện để mở check-in" />
+                    <SelectValue placeholder="Chọn sự kiện để xem chi tiết" />
                   )}
                 </SelectTrigger>
                 <SelectContent className="z-1250">
@@ -1646,7 +1582,7 @@ function AssemblyPointDetails({
             </div>
           ) : (
             <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Chưa có sự kiện nào. Hãy tạo lịch triệu tập trước khi mở check-in.
+              Chưa có sự kiện nào. Hãy tạo lịch triệu tập trước.
             </div>
           )}
         </div>

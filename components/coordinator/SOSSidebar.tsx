@@ -5,7 +5,9 @@ import { SOSRequest, SOSSidebarProps } from "@/type";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 import { useRemoveSOSRequestFromCluster } from "@/services/sos_cluster/hooks";
+import { useSOSRequestsByIds } from "@/services/sos_request/hooks";
 import type { SOSRequestStatus } from "@/services/sos_request/type";
+import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import {
   PRIORITY_BADGE_VARIANT,
   PRIORITY_BORDER_COLOR,
@@ -139,7 +141,7 @@ const CLUSTER_STATUS_SORT_ORDER: Record<ClusterLifecycleStatus, number> = {
 };
 
 const CLUSTER_STATUS_LABELS: Record<ClusterLifecycleStatus, string> = {
-  Pending: "Chờ AI phân tích",
+  Pending: "Chờ Xử Lí",
   Suggested: "Đã có gợi ý AI",
   InProgress: "Đang thực hiện",
   Completed: "Đã hoàn thành",
@@ -150,7 +152,7 @@ const CLUSTER_STATUS_BADGE_CLASS_BY_STATUS: Record<
   string
 > = {
   Pending:
-    "text-slate-700 bg-slate-100 dark:text-slate-300 dark:bg-slate-800/50",
+    "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-800/50",
   Suggested:
     "text-violet-700 bg-violet-100 dark:text-violet-300 dark:bg-violet-900/30",
   InProgress:
@@ -345,6 +347,16 @@ const SOS_STATUS_FILTER_OPTIONS: Array<{
   { key: "Cancelled", value: "Đã hủy" },
 ];
 
+const CLUSTER_STATUS_FILTER_OPTIONS: Array<{
+  key: ClusterLifecycleStatus;
+  value: string;
+}> = [
+  { key: "Pending", value: CLUSTER_STATUS_LABELS.Pending },
+  { key: "Suggested", value: CLUSTER_STATUS_LABELS.Suggested },
+  { key: "InProgress", value: CLUSTER_STATUS_LABELS.InProgress },
+  { key: "Completed", value: CLUSTER_STATUS_LABELS.Completed },
+];
+
 function PaginationControls({
   page,
   totalItems,
@@ -448,28 +460,47 @@ const SOSSidebar = ({
     useState<ClusterSOSRemoveCandidate | null>(null);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
+  const [clusterStatusFilterOpen, setClusterStatusFilterOpen] = useState(false);
+  const [selectedClusterStatuses, setSelectedClusterStatuses] = useState<
+    ClusterLifecycleStatus[]
+  >([]);
 
   const {
     mutate: removeSOSRequestFromCluster,
     isPending: isRemovingSOSRequestFromCluster,
   } = useRemoveSOSRequestFromCluster();
   const hasSOSFiltersApplied = selectedStatuses.length > 0;
+  const selectedSOSId = selectedSOS
+    ? normalizeSOSRequestId(selectedSOS.id)
+    : null;
 
   const toggleStatusFilter = (status: SOSRequestStatus) => {
     if (!onSelectedStatusesChange) {
       return;
     }
 
-    onSelectedStatusesChange(
-      selectedStatuses.includes(status)
-        ? selectedStatuses.filter((item) => item !== status)
-        : [...selectedStatuses, status],
-    );
+    onSelectedStatusesChange(selectedStatuses.includes(status) ? [] : [status]);
   };
 
   const clearSOSFilters = () => {
     onSelectedStatusesChange?.([]);
   };
+
+  const toggleClusterStatusFilter = (status: ClusterLifecycleStatus) => {
+    setSelectedClusterStatuses((previousStatuses) =>
+      previousStatuses.includes(status) ? [] : [status],
+    );
+    setClusterPage(1);
+    setManualClusterPageSelectionKey(selectedSOSId);
+  };
+
+  const clearClusterFilters = () => {
+    setSelectedClusterStatuses([]);
+    setClusterSearchTerm("");
+    setClusterPage(1);
+    setManualClusterPageSelectionKey(selectedSOSId);
+  };
+
   const hasIncomingServerPagination = !!incomingPagination;
 
   const openRemoveSOSDialog = (clusterId: number, sos: SOSRequest) => {
@@ -563,7 +594,7 @@ const SOSSidebar = ({
 
   // Merge viewport-bounded sosRequests with sidebar incomingRequests so cluster
   // SOS IDs outside the current viewport can still be resolved.
-  const allKnownSOS = useMemo(() => {
+  const baseKnownSOS = useMemo(() => {
     const byId = new Map<string, SOSRequest>();
     // Map-bound SOS (primary source – most up-to-date)
     for (const sos of sosRequests) {
@@ -581,12 +612,22 @@ const SOSSidebar = ({
     return byId;
   }, [sosRequests, incomingRequests]);
 
-  // Show only clusters that are not completed, sorted by severity (Critical -> Low).
+  const trimmedClusterSearchTerm = clusterSearchTerm.trim();
+  const hasClusterFiltersApplied =
+    selectedClusterStatuses.length > 0 || trimmedClusterSearchTerm.length > 0;
+  const shouldIncludeCompletedClusters =
+    selectedClusterStatuses.includes("Completed");
+
+  // Show operational clusters by default, sorted by severity (Critical -> Low).
+  // Completed clusters are included only when the user explicitly filters them.
   const activeClusters = useMemo(() => {
     return [...backendClusters]
-      .filter((cluster) => resolveClusterStatus(cluster) !== "Completed")
       .filter((cluster) => {
         const clusterStatus = resolveClusterStatus(cluster);
+        if (clusterStatus === "Completed") {
+          return shouldIncludeCompletedClusters;
+        }
+
         if (clusterStatus === "InProgress") {
           // Always keep active clusters visible based on cluster lifecycle status.
           return true;
@@ -633,12 +674,25 @@ const SOSSidebar = ({
 
         return right.id - left.id;
       });
-  }, [backendClusters, hasSOSFiltersApplied, sosStatusById]);
+  }, [
+    backendClusters,
+    hasSOSFiltersApplied,
+    shouldIncludeCompletedClusters,
+    sosStatusById,
+  ]);
 
   const filteredActiveClusters = useMemo(() => {
-    const rawQuery = clusterSearchTerm.trim();
+    const selectedClusterStatusSet = new Set(selectedClusterStatuses);
+    const statusFilteredClusters =
+      selectedClusterStatusSet.size > 0
+        ? activeClusters.filter((cluster) =>
+            selectedClusterStatusSet.has(resolveClusterStatus(cluster)),
+          )
+        : activeClusters;
+
+    const rawQuery = trimmedClusterSearchTerm;
     if (!rawQuery) {
-      return activeClusters;
+      return statusFilteredClusters;
     }
 
     const lowerQuery = rawQuery.toLowerCase();
@@ -656,7 +710,7 @@ const SOSSidebar = ({
       searchTerms.push(normalizedNumericQuery);
     }
 
-    return activeClusters.filter((cluster) => {
+    return statusFilteredClusters.filter((cluster) => {
       const clusterIdLabel = String(cluster.id).toLowerCase();
       const normalizedSosIds = cluster.sosRequestIds
         .map(normalizeSOSRequestId)
@@ -668,11 +722,10 @@ const SOSSidebar = ({
           normalizedSosIds.some((sosId) => sosId.includes(term)),
       );
     });
-  }, [activeClusters, clusterSearchTerm]);
+  }, [activeClusters, selectedClusterStatuses, trimmedClusterSearchTerm]);
 
-  const selectedSOSId = selectedSOS
-    ? normalizeSOSRequestId(selectedSOS.id)
-    : null;
+  const shouldShowBackendClusterControls =
+    activeClusters.length > 0 || hasClusterFiltersApplied;
 
   const selectedClusterId = useMemo(() => {
     if (!selectedSOSId) return null;
@@ -793,6 +846,44 @@ const SOSSidebar = ({
       startIndex + BACKEND_CLUSTERS_PAGE_SIZE,
     );
   }, [currentClusterPage, filteredActiveClusters]);
+
+  const missingClusterSOSIds = useMemo(() => {
+    const missingIds = new Set<number>();
+
+    for (const cluster of paginatedFilteredActiveClusters) {
+      for (const sosId of cluster.sosRequestIds) {
+        const numericId = Number(sosId);
+        if (
+          Number.isFinite(numericId) &&
+          numericId > 0 &&
+          !baseKnownSOS.has(normalizeSOSRequestId(sosId))
+        ) {
+          missingIds.add(numericId);
+        }
+      }
+    }
+
+    return Array.from(missingIds).sort((left, right) => left - right);
+  }, [baseKnownSOS, paginatedFilteredActiveClusters]);
+
+  const clusterSOSDetailsQuery = useSOSRequestsByIds(missingClusterSOSIds, {
+    enabled: missingClusterSOSIds.length > 0,
+  });
+
+  const fetchedClusterSOS = useMemo(
+    () => mapSOSRequestEntitiesToSOS(clusterSOSDetailsQuery.items),
+    [clusterSOSDetailsQuery.items],
+  );
+
+  const allKnownSOS = useMemo(() => {
+    const byId = new Map(baseKnownSOS);
+
+    for (const sos of fetchedClusterSOS) {
+      byId.set(normalizeSOSRequestId(sos.id), sos);
+    }
+
+    return byId;
+  }, [baseKnownSOS, fetchedClusterSOS]);
 
   const autoClustersTotalPages = useMemo(
     () => getTotalPages(autoClusters.length, AUTO_CLUSTERS_PAGE_SIZE),
@@ -1161,7 +1252,7 @@ const SOSSidebar = ({
               )}
 
               {/* Existing backend clusters */}
-              {activeClusters.length > 0 && (
+              {shouldShowBackendClusterControls && (
                 <>
                   <div className="space-y-2">
                     <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide">
@@ -1169,49 +1260,144 @@ const SOSSidebar = ({
                       {activeClusters.length})
                     </div>
 
-                    <div className="relative">
-                      <Icon
-                        icon="ph:magnifying-glass"
-                        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                      />
-                      <Input
-                        value={clusterSearchTerm}
-                        onChange={(event) => {
-                          setClusterSearchTerm(event.target.value);
-                          setClusterPage(1);
-                          setManualClusterPageSelectionKey(selectedSOSId);
-                        }}
-                        placeholder="Tìm theo ID cụm hoặc SOS ID"
-                        className="h-9 pl-8 pr-8 text-[14px]"
-                      />
-                      {clusterSearchTerm.trim().length > 0 ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
-                          onClick={() => {
-                            setClusterSearchTerm("");
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Icon
+                          icon="ph:magnifying-glass"
+                          className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <Input
+                          value={clusterSearchTerm}
+                          onChange={(event) => {
+                            setClusterSearchTerm(event.target.value);
                             setClusterPage(1);
                             setManualClusterPageSelectionKey(selectedSOSId);
                           }}
+                          placeholder="Tìm theo ID cụm hoặc SOS ID"
+                          className="h-9 pl-8 pr-8 text-[14px]"
+                        />
+                        {trimmedClusterSearchTerm.length > 0 ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                            onClick={() => {
+                              setClusterSearchTerm("");
+                              setClusterPage(1);
+                              setManualClusterPageSelectionKey(selectedSOSId);
+                            }}
+                            aria-label="Xóa tìm kiếm cụm"
+                          >
+                            <Icon icon="ph:x" className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Popover
+                          open={clusterStatusFilterOpen}
+                          onOpenChange={setClusterStatusFilterOpen}
                         >
-                          <Icon icon="ph:x" className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : null}
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 gap-1.5 text-[14px] font-normal"
+                            >
+                              Trạng thái cụm
+                              {selectedClusterStatuses.length > 0 ? (
+                                <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                                  {selectedClusterStatuses.length}
+                                </Badge>
+                              ) : (
+                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-60 p-1.5" align="start">
+                            {CLUSTER_STATUS_FILTER_OPTIONS.map((option) => {
+                              const checked = selectedClusterStatuses.includes(
+                                option.key,
+                              );
+
+                              return (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  onClick={() =>
+                                    toggleClusterStatusFilter(option.key)
+                                  }
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                                >
+                                  <span
+                                    className={cn(
+                                      "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                                      checked
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-border bg-background text-transparent",
+                                    )}
+                                  >
+                                    <Check
+                                      className="h-2.5 w-2.5"
+                                      weight="bold"
+                                    />
+                                  </span>
+                                  <span
+                                    className={
+                                      checked ? "font-medium" : undefined
+                                    }
+                                  >
+                                    {option.value}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                            {selectedClusterStatuses.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedClusterStatuses([]);
+                                  setClusterPage(1);
+                                  setManualClusterPageSelectionKey(
+                                    selectedSOSId,
+                                  );
+                                }}
+                                className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                <X className="h-3 w-3" />
+                                Xóa lọc trạng thái cụm
+                              </button>
+                            ) : null}
+                          </PopoverContent>
+                        </Popover>
+
+                        {hasClusterFiltersApplied ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 gap-1.5 px-2 text-[13px] text-muted-foreground"
+                            onClick={clearClusterFilters}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Xóa bộ lọc
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                  <PaginationControls
-                    page={currentClusterPage}
-                    totalItems={filteredActiveClusters.length}
-                    pageSize={BACKEND_CLUSTERS_PAGE_SIZE}
-                    onPageChange={(nextPage) => {
-                      setClusterPage(nextPage);
-                      setManualClusterPageSelectionKey(selectedSOSId);
-                    }}
-                  />
+
                   {filteredActiveClusters.length > 0 ? (
                     <>
+                      <PaginationControls
+                        page={currentClusterPage}
+                        totalItems={filteredActiveClusters.length}
+                        pageSize={BACKEND_CLUSTERS_PAGE_SIZE}
+                        onPageChange={(nextPage) => {
+                          setClusterPage(nextPage);
+                          setManualClusterPageSelectionKey(selectedSOSId);
+                        }}
+                      />
                       {paginatedFilteredActiveClusters.map((cluster) => {
                         const clusterStatus = resolveClusterStatus(cluster);
                         const isAnalyzing =
@@ -1225,7 +1411,9 @@ const SOSSidebar = ({
                           (selectedClusterId === cluster.id &&
                             currentSelectionClusterKey !==
                               collapsedSelectionKey);
-                        const clusterSosIds = cluster.sosRequestIds.map(normalizeSOSRequestId);
+                        const clusterSosIds = cluster.sosRequestIds.map(
+                          normalizeSOSRequestId,
+                        );
                         const clusterSOS = clusterSosIds
                           .map((id) => allKnownSOS.get(id))
                           .filter((s): s is SOSRequest => !!s);
@@ -1505,12 +1693,15 @@ const SOSSidebar = ({
                                             variant="outline"
                                             className="text-[14px] h-6 px-2 leading-none whitespace-nowrap"
                                           >
-                                            Chưa tải chi tiết
+                                            {clusterSOSDetailsQuery.isFetching
+                                              ? "Đang tải chi tiết"
+                                              : "Chưa tải chi tiết"}
                                           </Badge>
                                         </div>
                                         <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
-                                          Dữ liệu SOS chưa đồng bộ trong danh
-                                          sách hiện tại.
+                                          {clusterSOSDetailsQuery.isFetching
+                                            ? "Đang tải dữ liệu SOS theo ID cụm..."
+                                            : "Dữ liệu SOS chưa đồng bộ trong danh sách hiện tại."}
                                         </p>
                                       </div>
                                     ))
@@ -1535,8 +1726,11 @@ const SOSSidebar = ({
                     </>
                   ) : (
                     <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-3 text-[14px] text-muted-foreground">
-                      Không tìm thấy cụm phù hợp với từ khóa "
-                      {clusterSearchTerm.trim()}".
+                      Không tìm thấy cụm phù hợp với{" "}
+                      {trimmedClusterSearchTerm
+                        ? `từ khóa "${trimmedClusterSearchTerm}"`
+                        : "bộ lọc hiện tại"}
+                      .
                     </div>
                   )}
                 </>
@@ -1641,7 +1835,9 @@ const SOSSidebar = ({
                 </>
               )}
 
-              {activeClusters.length === 0 && autoClusters.length === 0 ? (
+              {!hasClusterFiltersApplied &&
+              activeClusters.length === 0 &&
+              autoClusters.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-[15px]">Chưa có cụm SOS nào</p>
@@ -1724,61 +1920,21 @@ function ClusterActionButtons({
   return (
     <div className="px-3 py-2 border-t border-inherit space-y-1.5">
       {hasMission ? (
-        // Mission exists — show view plan + re-analyze
-        <>
-          {canViewPlan && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-9 text-[14px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewClusterPlan?.(clusterId);
-              }}
-            >
-              <Eye className="h-3 w-3 mr-1" />
-              Xem kế hoạch
-            </Button>
-          )}
-          {onManualMission && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-9 text-[14px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                onManualMission(clusterId);
-              }}
-            >
-              <PencilSimpleLine className="h-3 w-3 mr-1" weight="fill" />
-              Tạo nhiệm vụ thủ công
-            </Button>
-          )}
+        // Mission exists — only allow viewing the existing plan.
+        canViewPlan ? (
           <Button
             variant="outline"
             size="sm"
-            className="w-full h-9 text-[14px] border-blue-300/60 dark:border-blue-700/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            className="w-full h-9 text-[14px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
             onClick={(e) => {
               e.stopPropagation();
-              onAnalyzeCluster(clusterId);
+              onViewClusterPlan?.(clusterId);
             }}
-            disabled={isAnalyzingCluster}
           >
-            {isAnalyzing ? (
-              <div className="flex items-center w-full justify-center overflow-hidden">
-                <Spinner className="h-3 w-3 mr-1 shrink-0 animate-spin" />
-                <span className="truncate">
-                  {analyzingStatus || "Đang phân tích..."}
-                </span>
-              </div>
-            ) : (
-              <>
-                <Lightning className="h-3 w-3 mr-1" weight="fill" />
-                Phân tích lại
-              </>
-            )}
+            <Eye className="h-3 w-3 mr-1" />
+            Xem kế hoạch
           </Button>
-        </>
+        ) : null
       ) : (
         // No mission yet — allow either manual creation or AI analysis
         <>

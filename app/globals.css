@@ -540,6 +540,13 @@ body.coordinator-dashboard-readable {
   font-size: 14px;
 }
 
+html.coordinator-dashboard-viewport-lock,
+body.coordinator-dashboard-viewport-lock {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body.coordinator-dashboard-readable
   :where(
     [data-coordinator-dashboard-root],

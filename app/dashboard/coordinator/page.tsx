@@ -72,8 +72,7 @@ import {
   Gear,
   User,
   ArrowsClockwise,
-  WifiHigh,
-  WifiSlash,
+  Broadcast,
   Sun,
   Moon,
   CloudSun,
@@ -347,6 +346,11 @@ function getClusterSOSRequests(
   if (!cluster) return [];
   const idSet = new Set(cluster.sosRequestIds.map(String));
   return sosRequests.filter((s) => idSet.has(s.id));
+}
+
+function isClusterMissionLocked(cluster?: SOSClusterEntity | null): boolean {
+  const status = String(cluster?.status ?? "").toLowerCase();
+  return status === "inprogress" || status === "completed";
 }
 
 function mapTeamTypeToRescuerType(
@@ -680,12 +684,12 @@ const CoordinatorDashboardContent = () => {
   const isReconnecting = operationalConnectionState === "reconnecting";
   const isConnectingLike = isConnecting || isReconnecting;
   const connectionLabel = isConnected
-    ? "Đang kết nối"
+    ? "Realtime đang hoạt động"
     : isConnecting
       ? "Đang kết nối realtime"
       : isReconnecting
-        ? "Đang kết nối lại"
-        : "Mất kết nối";
+        ? "Đang kết nối lại realtime"
+        : "Realtime tạm ngắt";
   const clusterGroupingStatus = sosClusterGroupingConfigQuery.status;
   const maximumAutoClusterDistanceKm =
     sosClusterGroupingConfigQuery.data?.maximumDistanceKm ?? 0;
@@ -1213,6 +1217,14 @@ const CoordinatorDashboardContent = () => {
 
   const handleAnalyzeCluster = useCallback(
     (clusterId: number) => {
+      const cluster = clusters.find((item) => item.id === clusterId);
+      if (isClusterMissionLocked(cluster)) {
+        toast.info(
+          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
+        );
+        return;
+      }
+
       setAnalyzingClusterId(clusterId);
       setActiveClusterId(clusterId);
       setAiStreamClusterId(clusterId);
@@ -1220,7 +1232,7 @@ const CoordinatorDashboardContent = () => {
       setAiStreamOpen(true);
       aiStream.startStream(clusterId);
     },
-    [aiStream],
+    [aiStream, clusters],
   );
 
   // When stream produces a result, cache it and update sidebar state
@@ -1258,6 +1270,14 @@ const CoordinatorDashboardContent = () => {
 
   const handleOpenManualMission = useCallback(
     (clusterId: number) => {
+      const cluster = clusters.find((item) => item.id === clusterId);
+      if (isClusterMissionLocked(cluster)) {
+        toast.info(
+          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
+        );
+        return;
+      }
+
       setManualMissionClusterId(clusterId);
       setExistingMissionId(null);
       setManualMissionOpen(true);
@@ -1266,7 +1286,7 @@ const CoordinatorDashboardContent = () => {
       syncRescuePlanUrlState(false, activeClusterId);
       setLocationPanelOpen(false);
     },
-    [activeClusterId, syncRescuePlanUrlState],
+    [activeClusterId, clusters, syncRescuePlanUrlState],
   );
 
   const handleViewMission = useCallback(
@@ -1290,15 +1310,31 @@ const CoordinatorDashboardContent = () => {
 
   const handleReAnalyze = useCallback(() => {
     if (!activeClusterId) return;
+    const cluster = clusters.find((item) => item.id === activeClusterId);
+    if (isClusterMissionLocked(cluster)) {
+      toast.info("Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.");
+      return;
+    }
+
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
     setRescuePlanOpen(false);
     setRescuePlanPreferSplitSuggestion(false);
     syncRescuePlanUrlState(false, activeClusterId);
     aiStream.startStream(activeClusterId);
-  }, [activeClusterId, aiStream, syncRescuePlanUrlState]);
+  }, [activeClusterId, aiStream, clusters, syncRescuePlanUrlState]);
 
   // ─── Derived data for panels ───
+
+  const activeRescuePlanCluster = useMemo(
+    () =>
+      activeClusterId
+        ? (clusters.find((cluster) => cluster.id === activeClusterId) ?? null)
+        : null,
+    [activeClusterId, clusters],
+  );
+  const isActiveRescuePlanClusterLocked =
+    isClusterMissionLocked(activeRescuePlanCluster);
 
   const rescuePlanSOSRequests = useMemo(
     () => getClusterSOSRequests(activeClusterId, sosRequests, clusters),
@@ -1328,10 +1364,22 @@ const CoordinatorDashboardContent = () => {
   );
 
   useEffect(() => {
-    document.body.classList.add("coordinator-dashboard-readable");
+    document.documentElement.classList.add(
+      "coordinator-dashboard-viewport-lock",
+    );
+    document.body.classList.add(
+      "coordinator-dashboard-readable",
+      "coordinator-dashboard-viewport-lock",
+    );
 
     return () => {
-      document.body.classList.remove("coordinator-dashboard-readable");
+      document.documentElement.classList.remove(
+        "coordinator-dashboard-viewport-lock",
+      );
+      document.body.classList.remove(
+        "coordinator-dashboard-readable",
+        "coordinator-dashboard-viewport-lock",
+      );
     };
   }, []);
 
@@ -1349,7 +1397,7 @@ const CoordinatorDashboardContent = () => {
     <div
       data-coordinator-dashboard-root
       className={cn(
-        "coordinator-dashboard h-screen flex flex-col overflow-hidden",
+        "coordinator-dashboard fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-background",
         isDarkMode && "dark",
       )}
     >
@@ -1449,11 +1497,11 @@ const CoordinatorDashboardContent = () => {
               <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
             {isConnected ? (
-              <WifiHigh className="h-4 w-4" weight="bold" />
+              <Broadcast className="h-4 w-4" weight="fill" />
             ) : isConnectingLike ? (
               <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
-              <WifiSlash className="h-4 w-4" weight="bold" />
+              <Broadcast className="h-4 w-4" weight="bold" />
             )}
             <span className="sr-only">{connectionLabel}</span>
           </div>
@@ -1541,11 +1589,11 @@ const CoordinatorDashboardContent = () => {
       </header>
 
       {/* ━━━ Main Content ━━━ */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside
           className={cn(
-            "shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
+            "h-full min-h-0 shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
             sidebarOpen ? "w-88" : "w-0",
           )}
         >
@@ -1589,7 +1637,7 @@ const CoordinatorDashboardContent = () => {
         </aside>
 
         {/* Map Container */}
-        <main className="flex-1 relative overflow-hidden">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           {isWeatherMode ? (
             <WindyLeafletMap
               sosRequests={sosRequests}
@@ -1683,6 +1731,7 @@ const CoordinatorDashboardContent = () => {
                 isReAnalyzing={isFetchingSuggestion || aiStream.loading}
                 onShowRoute={setRouteOverlay}
                 defaultTab={rescuePlanDefaultTab}
+                readOnly={isActiveRescuePlanClusterLocked}
               />
 
               {/* AI Stream Panel */}
@@ -1769,7 +1818,7 @@ const CoordinatorDashboardPage = () => {
   return (
     <Suspense
       fallback={
-        <div className="h-screen flex flex-col overflow-hidden animate-in fade-in duration-300">
+        <div className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-background animate-in fade-in duration-300">
           {/* Header Skeleton */}
           <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
             <div className="flex items-center gap-4">
@@ -1786,8 +1835,8 @@ const CoordinatorDashboardPage = () => {
             </div>
           </header>
           {/* Body Skeleton */}
-          <div className="flex-1 flex overflow-hidden">
-            <aside className="w-88 shrink-0 border-r bg-background p-4 space-y-4">
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <aside className="w-88 h-full min-h-0 shrink-0 border-r bg-background p-4 space-y-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -1802,7 +1851,7 @@ const CoordinatorDashboardPage = () => {
                 ))}
               </div>
             </aside>
-            <main className="flex-1 relative">
+            <main className="relative min-h-0 min-w-0 flex-1">
               <Skeleton className="w-full h-full rounded-none" />
             </main>
           </div>

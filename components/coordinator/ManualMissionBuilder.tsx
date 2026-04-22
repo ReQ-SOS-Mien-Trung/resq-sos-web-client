@@ -93,6 +93,7 @@ import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useDepotsByCluster } from "@/services/depot";
 import type { DepotByClusterEntity, DepotStatus } from "@/services/depot";
+import type { InventoryItemEntity } from "@/services/inventory/type";
 import type { MissionActivity, MissionType } from "@/services/mission/type";
 
 // ── Types ──
@@ -131,6 +132,7 @@ interface ManualTeamOption {
   id: number;
   name: string;
   teamType: string;
+  assemblyPointId: number | null;
   assemblyPointName: string | null;
   status: string | null;
   distanceKm?: number | null;
@@ -170,6 +172,7 @@ const ACTIVITY_TYPES: ClusterActivityType[] = [
   "DELIVER_SUPPLIES",
   "COLLECT_SUPPLIES",
   "RETURN_SUPPLIES",
+  "RETURN_ASSEMBLY_POINT",
   "MIXED",
 ];
 
@@ -196,6 +199,53 @@ const DEPOT_LINKED_ACTIVITY_TYPES = new Set<ClusterActivityType>([
   "COLLECT_SUPPLIES",
   "RETURN_SUPPLIES",
 ]);
+const CLUSTER_111_DEMO_ID = 111;
+const CLUSTER_111_DEMO_SOS_IDS = ["7", "361"] as const;
+const CLUSTER_111_DEMO_FALLBACK_COORDINATES = {
+  center: { lat: 16.4706395, lng: 107.593927 },
+  sos7: { lat: 16.471658, lng: 107.595076 },
+  sos361: { lat: 16.469621, lng: 107.592778 },
+};
+const CLUSTER_111_CONSUMABLE_KEYWORDS = [
+  "water",
+  "nuoc",
+  "nước",
+  "food",
+  "thuc pham",
+  "thực phẩm",
+  "medicine",
+  "medical",
+  "thuoc",
+  "thuốc",
+  "y tế",
+  "blanket",
+  "chan",
+  "chăn",
+  "clothes",
+  "quan ao",
+  "quần áo",
+  "milk",
+  "sua",
+  "sữa",
+];
+const CLUSTER_111_REUSABLE_KEYWORDS = [
+  "rescue",
+  "cuu ho",
+  "cứu hộ",
+  "medical",
+  "y tế",
+  "transport",
+  "van chuyen",
+  "vận chuyển",
+  "boat",
+  "thuyen",
+  "thuyền",
+  "life",
+  "ao phao",
+  "áo phao",
+  "oxygen",
+  "oxy",
+];
 
 function isSupplyActivityType(activityType: string): boolean {
   return SUPPLY_ACTIVITY_TYPES.has(activityType as ClusterActivityType);
@@ -255,6 +305,37 @@ function mergeManualSupplyItems(
   });
 
   return Array.from(buckets.values());
+}
+
+function subtractManualSupplies(
+  supplies: ManualSupplyItem[],
+  consumedSupplies: ManualSupplyItem[],
+): ManualSupplyItem[] {
+  const remaining = mergeManualSupplyItems(supplies);
+
+  consumedSupplies.forEach((consumedSupply) => {
+    const consumedKey = buildManualSupplyKey(consumedSupply);
+    const remainingIndex = remaining.findIndex(
+      (supply) => buildManualSupplyKey(supply) === consumedKey,
+    );
+    if (remainingIndex < 0) {
+      return;
+    }
+
+    const nextQuantity =
+      remaining[remainingIndex].quantity - Math.max(1, consumedSupply.quantity);
+    if (nextQuantity <= 0) {
+      remaining.splice(remainingIndex, 1);
+      return;
+    }
+
+    remaining[remainingIndex] = {
+      ...remaining[remainingIndex],
+      quantity: nextQuantity,
+    };
+  });
+
+  return remaining;
 }
 
 function haveMatchingManualSupplies(
@@ -326,14 +407,32 @@ function syncManualDeliverActivities(
     const pending = teamId != null ? (pendingByTeam.get(teamId) ?? []) : [];
 
     if (teamId != null && pending.length > 0) {
-      pendingByTeam.delete(teamId);
-      const nextSupplies = mergeManualSupplyItems(pending);
+      const plannedSupplies = activity.isAutoSyncedDeliveryStep
+        ? []
+        : activity.suppliesToCollect.filter(
+            (supply) => !isReusableSupplyItem(supply),
+          );
+      const nextSupplies =
+        plannedSupplies.length > 0
+          ? mergeManualSupplyItems(plannedSupplies)
+          : mergeManualSupplyItems(pending);
+      const remainingSupplies = subtractManualSupplies(pending, nextSupplies);
+
+      if (remainingSupplies.length > 0) {
+        pendingByTeam.set(teamId, remainingSupplies);
+      } else {
+        pendingByTeam.delete(teamId);
+      }
+
       const hasMatchingSupplies = haveMatchingManualSupplies(
         activity.suppliesToCollect,
         nextSupplies,
       );
 
-      if (activity.isAutoSyncedDeliveryStep && hasMatchingSupplies) {
+      if (
+        (activity.isAutoSyncedDeliveryStep || plannedSupplies.length > 0) &&
+        hasMatchingSupplies
+      ) {
         return activity;
       }
 
@@ -341,7 +440,7 @@ function syncManualDeliverActivities(
         ...activity,
         suppliesToCollect: nextSupplies,
         items: buildSupplySummary(nextSupplies),
-        isAutoSyncedDeliveryStep: true,
+        isAutoSyncedDeliveryStep: plannedSupplies.length === 0,
       };
     }
 
@@ -508,6 +607,262 @@ function toValidRescueTeamId(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : null;
+}
+
+function toValidAssemblyPointId(
+  value: number | null | undefined,
+): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : null;
+}
+
+function isCluster111DemoAvailable(
+  clusterId: number | null,
+  sosRequests: SOSRequest[],
+  isEditingExisting: boolean,
+): boolean {
+  if (isEditingExisting || clusterId !== CLUSTER_111_DEMO_ID) {
+    return false;
+  }
+
+  const sosIds = new Set(sosRequests.map((sos) => String(sos.id)));
+  return CLUSTER_111_DEMO_SOS_IDS.every((id) => sosIds.has(id));
+}
+
+function formatDateTimeLocalValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return [
+    date.getFullYear(),
+    "-",
+    pad(date.getMonth() + 1),
+    "-",
+    pad(date.getDate()),
+    "T",
+    pad(date.getHours()),
+    ":",
+    pad(date.getMinutes()),
+  ].join("");
+}
+
+function isPreferredDemoTeam(
+  team: ManualTeamOption,
+  preferredType: "MEDICAL" | "RESCUE",
+): boolean {
+  const normalizedType = (team.teamType ?? "").trim().toUpperCase();
+
+  if (preferredType === "MEDICAL") {
+    return normalizedType.includes("MEDICAL");
+  }
+
+  return normalizedType.includes("RESCUE") || normalizedType.includes("MIXED");
+}
+
+function selectCluster111DemoTeam(
+  teamOptions: ManualTeamOption[],
+  preferredType: "MEDICAL" | "RESCUE",
+): ManualTeamOption | null {
+  return (
+    teamOptions.find((team) => isPreferredDemoTeam(team, preferredType)) ??
+    teamOptions[0] ??
+    null
+  );
+}
+
+function getInventoryItemAvailableQuantity(item: InventoryItemEntity): number {
+  return item.itemType === "Reusable"
+    ? item.availableUnit
+    : item.availableQuantity;
+}
+
+function getInventoryItemUnit(item: InventoryItemEntity): string {
+  const itemWithUnit = item as InventoryItemEntity & {
+    unit?: string | number;
+    unitName?: string;
+  };
+
+  const rawUnit =
+    (typeof itemWithUnit.unit === "string" ? itemWithUnit.unit.trim() : "") ||
+    (typeof itemWithUnit.unitName === "string"
+      ? itemWithUnit.unitName.trim()
+      : "");
+
+  return rawUnit || (item.itemType === "Reusable" ? "thiết bị" : "đơn vị");
+}
+
+function getInventoryItemSearchText(item: InventoryItemEntity): string {
+  return [item.itemModelName, item.categoryName, ...(item.targetGroups ?? [])]
+    .join(" ")
+    .toLowerCase();
+}
+
+function scoreCluster111DemoInventoryItem(
+  item: InventoryItemEntity,
+  keywords: string[],
+): number {
+  const searchText = getInventoryItemSearchText(item);
+  const matchedIndex = keywords.findIndex((keyword) =>
+    searchText.includes(keyword),
+  );
+
+  if (matchedIndex < 0) {
+    return 0;
+  }
+
+  return keywords.length - matchedIndex;
+}
+
+function getCluster111DemoSupplyQuantity(
+  item: InventoryItemEntity,
+  availableQuantity: number,
+): number {
+  const searchText = getInventoryItemSearchText(item);
+
+  if (item.itemType === "Reusable") {
+    return 1;
+  }
+
+  if (searchText.includes("water") || searchText.includes("nước")) {
+    return Math.min(availableQuantity, 14);
+  }
+
+  if (
+    searchText.includes("food") ||
+    searchText.includes("thực phẩm") ||
+    searchText.includes("milk") ||
+    searchText.includes("sữa")
+  ) {
+    return Math.min(availableQuantity, 7);
+  }
+
+  if (
+    searchText.includes("medicine") ||
+    searchText.includes("medical") ||
+    searchText.includes("thuốc") ||
+    searchText.includes("y tế")
+  ) {
+    return Math.min(availableQuantity, 3);
+  }
+
+  if (
+    searchText.includes("blanket") ||
+    searchText.includes("chăn") ||
+    searchText.includes("clothes") ||
+    searchText.includes("quần áo")
+  ) {
+    return Math.min(availableQuantity, 2);
+  }
+
+  return Math.min(availableQuantity, 3);
+}
+
+function createCluster111DemoSupply(
+  item: InventoryItemEntity,
+  depot: DepotByClusterEntity,
+): ManualSupplyItem {
+  const availableQuantity = getInventoryItemAvailableQuantity(item);
+
+  return {
+    itemId: item.itemModelId,
+    itemName: item.itemModelName,
+    quantity: Math.max(
+      1,
+      getCluster111DemoSupplyQuantity(item, availableQuantity),
+    ),
+    unit: getInventoryItemUnit(item),
+    itemType: item.itemType,
+    sourceDepotId: depot.id,
+    sourceDepotName: depot.name,
+    sourceDepotAddress: depot.address,
+    sourceDepotLatitude: depot.latitude,
+    sourceDepotLongitude: depot.longitude,
+  };
+}
+
+function selectCluster111DemoSupplies(
+  inventoryItems: InventoryItemEntity[],
+  depot: DepotByClusterEntity,
+): {
+  consumableSupplies: ManualSupplyItem[];
+  reusableSupply: ManualSupplyItem | null;
+} {
+  const availableItems = inventoryItems.filter(
+    (item) => getInventoryItemAvailableQuantity(item) > 0,
+  );
+  const consumableSupplies = availableItems
+    .filter((item) => item.itemType === "Consumable")
+    .sort((left, right) => {
+      const scoreDelta =
+        scoreCluster111DemoInventoryItem(
+          right,
+          CLUSTER_111_CONSUMABLE_KEYWORDS,
+        ) -
+        scoreCluster111DemoInventoryItem(left, CLUSTER_111_CONSUMABLE_KEYWORDS);
+      if (scoreDelta !== 0) {
+        return scoreDelta;
+      }
+
+      return (
+        getInventoryItemAvailableQuantity(right) -
+        getInventoryItemAvailableQuantity(left)
+      );
+    })
+    .slice(0, 4)
+    .map((item) => createCluster111DemoSupply(item, depot));
+  const reusableItem =
+    availableItems
+      .filter((item) => item.itemType === "Reusable")
+      .sort((left, right) => {
+        const scoreDelta =
+          scoreCluster111DemoInventoryItem(
+            right,
+            CLUSTER_111_REUSABLE_KEYWORDS,
+          ) -
+          scoreCluster111DemoInventoryItem(left, CLUSTER_111_REUSABLE_KEYWORDS);
+        if (scoreDelta !== 0) {
+          return scoreDelta;
+        }
+
+        return (
+          getInventoryItemAvailableQuantity(right) -
+          getInventoryItemAvailableQuantity(left)
+        );
+      })[0] ?? null;
+
+  return {
+    consumableSupplies,
+    reusableSupply: reusableItem
+      ? createCluster111DemoSupply(reusableItem, depot)
+      : null,
+  };
+}
+
+function splitCluster111DemoConsumables(supplies: ManualSupplyItem[]): {
+  sos361Supplies: ManualSupplyItem[];
+  sos7Supplies: ManualSupplyItem[];
+} {
+  const sos361Supplies: ManualSupplyItem[] = [];
+  const sos7Supplies: ManualSupplyItem[] = [];
+
+  supplies.forEach((supply) => {
+    const sos361Quantity = Math.max(1, Math.ceil(supply.quantity * (3 / 7)));
+    const sos7Quantity = Math.max(0, supply.quantity - sos361Quantity);
+
+    sos361Supplies.push({
+      ...supply,
+      quantity: sos361Quantity,
+    });
+
+    if (sos7Quantity > 0) {
+      sos7Supplies.push({
+        ...supply,
+        quantity: sos7Quantity,
+      });
+    }
+  });
+
+  return { sos361Supplies, sos7Supplies };
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -976,8 +1331,8 @@ function SortableActivityCard({
 
       {isAutoReturnStep ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-300">
-          Bước này được tự động tạo khi có bước thu gom vật phẩm và luôn nằm ở
-          cuối.
+          Bước này được tự động tạo khi có bước thu gom vật phẩm reusable và nằm
+          trước bước quay về điểm tập kết nếu có.
         </div>
       ) : null}
 
@@ -1719,6 +2074,7 @@ const ManualMissionBuilder = ({
         id: team.id,
         name: team.name,
         teamType: team.teamType,
+        assemblyPointId: toValidAssemblyPointId(team.assemblyPointId),
         assemblyPointName: team.assemblyPointName,
         status: team.status,
         distanceKm: team.distanceKm,
@@ -1744,6 +2100,10 @@ const ManualMissionBuilder = ({
   );
   const hasNearbyTeams = teamOptions.length > 0;
   const hasNearbyDepots = nearbyDepots.length > 0;
+  const teamOptionById = useMemo(
+    () => new Map(teamOptions.map((team) => [team.id, team])),
+    [teamOptions],
+  );
   const teamNameById = useMemo(
     () => new Map(teamOptions.map((team) => [team.id, team.name])),
     [teamOptions],
@@ -1757,6 +2117,32 @@ const ManualMissionBuilder = ({
   );
 
   const isEditingExisting = !!existingMissionId;
+  const canApplyCluster111DemoPlan = useMemo(
+    () =>
+      isCluster111DemoAvailable(
+        clusterId,
+        clusterSOSRequests,
+        isEditingExisting,
+      ),
+    [clusterId, clusterSOSRequests, isEditingExisting],
+  );
+  const cluster111DemoDepot = canApplyCluster111DemoPlan
+    ? (nearbyDepots[0] ?? null)
+    : null;
+  const {
+    data: cluster111DemoInventoryData,
+    isLoading: isCluster111DemoInventoryLoading,
+  } = useDepotInventory(
+    {
+      depotId: cluster111DemoDepot?.id ?? 0,
+      pageNumber: 1,
+      pageSize: 20,
+    },
+    {
+      enabled:
+        open && canApplyCluster111DemoPlan && cluster111DemoDepot != null,
+    },
+  );
 
   // ── Pre-fill from existing mission ──
   useEffect(() => {
@@ -1930,11 +2316,16 @@ const ManualMissionBuilder = ({
     (activities: ManualActivity[]): ManualActivity[] => {
       const baseActivities = syncManualDeliverActivities(
         activities.filter(
-          (activity) => activity.activityType !== "RETURN_SUPPLIES",
+          (activity) =>
+            activity.activityType !== "RETURN_SUPPLIES" &&
+            activity.activityType !== "RETURN_ASSEMBLY_POINT",
         ),
       );
       const previousReturnActivities = activities.filter(
         (activity) => activity.activityType === "RETURN_SUPPLIES",
+      );
+      const returnAssemblyActivities = activities.filter(
+        (activity) => activity.activityType === "RETURN_ASSEMBLY_POINT",
       );
       const autoReturnGroups = buildAutoReturnGroups(baseActivities);
 
@@ -1981,7 +2372,11 @@ const ManualMissionBuilder = ({
         } satisfies ManualActivity;
       });
 
-      return [...baseActivities, ...autoReturnSteps];
+      return [
+        ...baseActivities,
+        ...autoReturnSteps,
+        ...returnAssemblyActivities,
+      ];
     },
     [createActivity],
   );
@@ -2439,6 +2834,207 @@ const ManualMissionBuilder = ({
     ],
   );
 
+  const handleApplyCluster111DemoPlan = useCallback(() => {
+    if (!canApplyCluster111DemoPlan) {
+      return;
+    }
+
+    if (!cluster111DemoDepot) {
+      toast.error("Cụm #111 chưa có kho gần cụm để điền demo vật phẩm.");
+      return;
+    }
+
+    if (isCluster111DemoInventoryLoading) {
+      toast.info(
+        "Đang tải vật phẩm từ kho gần cụm #111. Thử lại sau giây lát.",
+      );
+      return;
+    }
+
+    const { consumableSupplies, reusableSupply } = selectCluster111DemoSupplies(
+      cluster111DemoInventoryData?.items ?? [],
+      cluster111DemoDepot,
+    );
+
+    if (consumableSupplies.length === 0) {
+      toast.error(
+        "Kho gần cụm #111 chưa có vật phẩm tiêu hao khả dụng để phân phát.",
+      );
+      return;
+    }
+
+    const { sos361Supplies, sos7Supplies } =
+      splitCluster111DemoConsumables(consumableSupplies);
+    const collectSupplies = reusableSupply
+      ? [...consumableSupplies, reusableSupply]
+      : consumableSupplies;
+    const sos7 = clusterSOSRequests.find((sos) => String(sos.id) === "7");
+    const sos361 = clusterSOSRequests.find((sos) => String(sos.id) === "361");
+    const rescueTeam = selectCluster111DemoTeam(teamOptions, "RESCUE");
+    const medicalTeam = selectCluster111DemoTeam(teamOptions, "MEDICAL");
+
+    const clusterCoordinates = {
+      lat:
+        cluster?.centerLatitude ??
+        CLUSTER_111_DEMO_FALLBACK_COORDINATES.center.lat,
+      lng:
+        cluster?.centerLongitude ??
+        CLUSTER_111_DEMO_FALLBACK_COORDINATES.center.lng,
+    };
+    const sos7Coordinates = {
+      lat: sos7?.location.lat ?? CLUSTER_111_DEMO_FALLBACK_COORDINATES.sos7.lat,
+      lng: sos7?.location.lng ?? CLUSTER_111_DEMO_FALLBACK_COORDINATES.sos7.lng,
+    };
+    const sos361Coordinates = {
+      lat:
+        sos361?.location.lat ??
+        CLUSTER_111_DEMO_FALLBACK_COORDINATES.sos361.lat,
+      lng:
+        sos361?.location.lng ??
+        CLUSTER_111_DEMO_FALLBACK_COORDINATES.sos361.lng,
+    };
+    const rescueTeamName = rescueTeam?.name ?? "Đội cứu hộ";
+    const medicalTeamName = medicalTeam?.name ?? rescueTeamName;
+    const evacuationTarget =
+      rescueTeam?.assemblyPointName?.trim() ||
+      medicalTeam?.assemblyPointName?.trim() ||
+      "Điểm tập kết an toàn gần cụm #111";
+
+    const buildDemoActivity = ({
+      activityType,
+      description,
+      target,
+      coordinates,
+      team,
+      depot,
+      supplies,
+    }: {
+      activityType: ClusterActivityType;
+      description: string;
+      target: string;
+      coordinates: { lat: number; lng: number };
+      team: ManualTeamOption | null;
+      depot?: DepotByClusterEntity | null;
+      supplies?: ManualSupplyItem[];
+    }): ManualActivity => {
+      const activity = createActivity(activityType);
+
+      return {
+        ...activity,
+        description,
+        target,
+        targetLatitude: coordinates.lat,
+        targetLongitude: coordinates.lng,
+        rescueTeamId: toValidRescueTeamId(team?.id ?? null),
+        depotId: depot?.id ?? null,
+        depotName: depot?.name ?? null,
+        depotAddress: depot?.address ?? null,
+        suppliesToCollect: supplies ?? [],
+        items: buildSupplySummary(supplies ?? []),
+      };
+    };
+
+    const plannedActivities: ManualActivity[] = [
+      buildDemoActivity({
+        activityType: "COLLECT_SUPPLIES",
+        description: `${rescueTeamName} tiếp nhận vật phẩm tại kho ${cluster111DemoDepot.name}: ${buildSupplySummary(collectSupplies)}.`,
+        target: cluster111DemoDepot.name,
+        coordinates: {
+          lat: cluster111DemoDepot.latitude,
+          lng: cluster111DemoDepot.longitude,
+        },
+        team: rescueTeam,
+        depot: cluster111DemoDepot,
+        supplies: collectSupplies,
+      }),
+      buildDemoActivity({
+        activityType: "DELIVER_SUPPLIES",
+        description: `${rescueTeamName} phân phát vật phẩm ưu tiên cho SOS #361 trước khi xử lý nhóm mắc kẹt có trẻ em, người già và ca gãy xương.`,
+        target: sos361?.address?.trim() || "Vị trí SOS #361",
+        coordinates: sos361Coordinates,
+        team: rescueTeam,
+        depot: cluster111DemoDepot,
+        supplies: sos361Supplies,
+      }),
+      buildDemoActivity({
+        activityType: "RESCUE",
+        description: `${rescueTeamName} tiếp cận SOS #361, ưu tiên Khoa không thể di chuyển/gãy xương/mất phương hướng, trẻ Thảo lạc người thân và người già đang mất nhiệt.`,
+        target: sos361?.address?.trim() || "Vị trí SOS #361",
+        coordinates: sos361Coordinates,
+        team: rescueTeam,
+      }),
+      buildDemoActivity({
+        activityType: "MEDICAL_AID",
+        description: `${medicalTeamName} cố định gãy xương, xử trí hạ thân nhiệt, kiểm tra bệnh nền và ổn định trẻ em tại SOS #361 trước khi di chuyển.`,
+        target: sos361?.address?.trim() || "Vị trí SOS #361",
+        coordinates: sos361Coordinates,
+        team: medicalTeam,
+      }),
+      ...(sos7Supplies.length > 0
+        ? [
+            buildDemoActivity({
+              activityType: "DELIVER_SUPPLIES",
+              description: `${rescueTeamName} phân phát phần vật phẩm còn lại cho SOS #7 trước khi hỗ trợ người già không thể di chuyển và người bị thương nhẹ.`,
+              target: sos7?.address?.trim() || "Vị trí SOS #7",
+              coordinates: sos7Coordinates,
+              team: rescueTeam,
+              depot: cluster111DemoDepot,
+              supplies: sos7Supplies,
+            }),
+          ]
+        : []),
+      buildDemoActivity({
+        activityType: "RESCUE",
+        description: `${rescueTeamName} tiếp cận SOS #7, hỗ trợ người già không thể di chuyển và người bị thương nhẹ vì nước đang lên nhanh.`,
+        target: sos7?.address?.trim() || "Vị trí SOS #7",
+        coordinates: sos7Coordinates,
+        team: rescueTeam,
+      }),
+      buildDemoActivity({
+        activityType: "MEDICAL_AID",
+        description: `${medicalTeamName} sơ cứu người bị thương nhẹ và kiểm tra dấu hiệu sinh tồn của người già tại SOS #7 trước khi sơ tán.`,
+        target: sos7?.address?.trim() || "Vị trí SOS #7",
+        coordinates: sos7Coordinates,
+        team: medicalTeam,
+      }),
+      buildDemoActivity({
+        activityType: "EVACUATE",
+        description: `${rescueTeamName} sơ tán toàn bộ nhóm 7 người về điểm an toàn, bàn giao ca y tế và ghi nhận nhu cầu cứu trợ để tạo mission RELIEF riêng.`,
+        target: evacuationTarget,
+        coordinates: clusterCoordinates,
+        team: rescueTeam,
+      }),
+      buildDemoActivity({
+        activityType: "RETURN_ASSEMBLY_POINT",
+        description: `${rescueTeamName} quay về điểm tập kết của đội, hoàn tất bàn giao thông tin hiện trường và trạng thái vật phẩm.`,
+        target: rescueTeam?.assemblyPointName?.trim() || "Điểm tập kết của đội",
+        coordinates: clusterCoordinates,
+        team: rescueTeam,
+      }),
+    ];
+
+    const now = new Date();
+    const expectedEnd = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+
+    setMissionType("MIXED");
+    setPriorityScore(9);
+    setStartTime(formatDateTimeLocalValue(now));
+    setExpectedEndTime(formatDateTimeLocalValue(expectedEnd));
+    setSelectedSOSId("361");
+    setActivities(normalizeManualActivities(plannedActivities));
+    toast.success("Đã điền demo kho, cứu hộ và hoàn trả cho cụm SOS #111.");
+  }, [
+    canApplyCluster111DemoPlan,
+    cluster,
+    cluster111DemoDepot,
+    cluster111DemoInventoryData?.items,
+    clusterSOSRequests,
+    createActivity,
+    isCluster111DemoInventoryLoading,
+    normalizeManualActivities,
+    teamOptions,
+  ]);
+
   const handleAddActivity = useCallback(() => {
     const newActivity = createActivity("ASSESS");
     setRecentlyInsertedActivityId(newActivity.id);
@@ -2740,6 +3336,22 @@ const ManualMissionBuilder = ({
         return false;
       }
 
+      if (a.activityType === "RETURN_ASSEMBLY_POINT") {
+        const rescueTeamId = toValidRescueTeamId(a.rescueTeamId);
+        const assemblyPointId = toValidAssemblyPointId(
+          rescueTeamId != null
+            ? teamOptionById.get(rescueTeamId)?.assemblyPointId
+            : null,
+        );
+
+        if (!assemblyPointId) {
+          toast.error(
+            `Bước ${i + 1}: Hoạt động quay về điểm tập kết cần đội có điểm tập kết hợp lệ.`,
+          );
+          return false;
+        }
+      }
+
       if (
         isSupplyActivityType(a.activityType) &&
         a.suppliesToCollect.length === 0
@@ -2803,6 +3415,7 @@ const ManualMissionBuilder = ({
     activities,
     expectedEndTime,
     startTime,
+    teamOptionById,
     supplyBalanceAnalysis.firstIssue,
   ]);
 
@@ -2830,12 +3443,20 @@ const ManualMissionBuilder = ({
                 parsedExistingActivityId > 0
                   ? parsedExistingActivityId
                   : 0;
+              const rescueTeamId = toValidRescueTeamId(activity.rescueTeamId);
+              const assignedTeam =
+                rescueTeamId != null ? teamOptionById.get(rescueTeamId) : null;
+              const assemblyPointId =
+                activity.activityType === "RETURN_ASSEMBLY_POINT"
+                  ? toValidAssemblyPointId(assignedTeam?.assemblyPointId)
+                  : null;
 
               return {
                 activityId,
                 step: index + 1,
                 description: activity.description,
                 target: activity.target,
+                assemblyPointId,
                 targetLatitude: activity.targetLatitude,
                 targetLongitude: activity.targetLongitude,
                 items: activity.suppliesToCollect.map((supply) => ({
@@ -2867,12 +3488,29 @@ const ManualMissionBuilder = ({
       }
     } else {
       try {
+        const hasSupplyDistributionActivity = activities.some((activity) =>
+          ["COLLECT_SUPPLIES", "DELIVER_SUPPLIES"].includes(
+            activity.activityType,
+          ),
+        );
+        const hasRescueOrEvacuationActivity = activities.some((activity) =>
+          ["RESCUE", "MEDICAL_AID", "EVACUATE"].includes(activity.activityType),
+        );
+        const shouldIgnoreMixedMissionWarning =
+          clusterId === CLUSTER_111_DEMO_ID &&
+          hasSupplyDistributionActivity &&
+          hasRescueOrEvacuationActivity;
+
         await createMissionAsync({
           clusterId,
           missionType,
           priorityScore,
           startTime: new Date(startTime).toISOString(),
           expectedEndTime: new Date(expectedEndTime).toISOString(),
+          ignoreMixedMissionWarning: shouldIgnoreMixedMissionWarning,
+          overrideReason: shouldIgnoreMixedMissionWarning
+            ? "Demo cụm #111: coordinator chủ động tạo route mixed gồm tiếp nhận/phân phát vật phẩm, cứu hộ, y tế, sơ tán, hoàn trả vật phẩm reusable và quay về điểm tập kết."
+            : null,
           activities: activities.map((a, i) => {
             const isSupplyStep = isSupplyActivityType(a.activityType);
             const matchedSos = isSupplyStep
@@ -2906,6 +3544,16 @@ const ManualMissionBuilder = ({
                 ? a.depotAddress.trim()
                 : null;
             const rescueTeamId = toValidRescueTeamId(a.rescueTeamId);
+            const assignedTeam =
+              rescueTeamId != null ? teamOptionById.get(rescueTeamId) : null;
+            const assemblyPointId =
+              a.activityType === "RETURN_ASSEMBLY_POINT"
+                ? toValidAssemblyPointId(assignedTeam?.assemblyPointId)
+                : null;
+            const assemblyPointName =
+              a.activityType === "RETURN_ASSEMBLY_POINT"
+                ? assignedTeam?.assemblyPointName?.trim() || null
+                : null;
 
             return {
               step: i + 1,
@@ -2918,6 +3566,8 @@ const ManualMissionBuilder = ({
               depotId,
               depotName,
               depotAddress,
+              assemblyPointId,
+              assemblyPointName,
               suppliesToCollect: a.suppliesToCollect.map((supply) => ({
                 id: supply.itemId > 0 ? supply.itemId : null,
                 name: supply.itemName,
@@ -2961,6 +3611,7 @@ const ManualMissionBuilder = ({
     startTime,
     expectedEndTime,
     activities,
+    teamOptionById,
     clusterSOSRequests,
     onOpenChange,
     onCreated,
@@ -3246,6 +3897,18 @@ const ManualMissionBuilder = ({
                           <span className="truncate">{tpl.label}</span>
                         </Button>
                       ))}
+                      {canApplyCluster111DemoPlan ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full justify-start overflow-hidden px-3 py-2 text-left text-sm font-semibold"
+                          onClick={handleApplyCluster111DemoPlan}
+                        >
+                          <Rocket className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Điền demo cụm #111</span>
+                        </Button>
+                      ) : null}
                     </div>
                   </section>
 

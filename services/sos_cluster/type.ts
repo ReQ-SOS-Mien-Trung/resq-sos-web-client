@@ -75,6 +75,7 @@ export type ClusterActivityType =
   | "DELIVER_SUPPLIES"
   | "COLLECT_SUPPLIES"
   | "RETURN_SUPPLIES"
+  | "RETURN_ASSEMBLY_POINT"
   | "MIXED";
 
 // Supply collection details
