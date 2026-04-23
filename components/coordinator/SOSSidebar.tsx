@@ -4,8 +4,20 @@ import { useState, useEffect, useMemo } from "react";
 import { SOSRequest, SOSSidebarProps } from "@/type";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
-import { useRemoveSOSRequestFromCluster } from "@/services/sos_cluster/hooks";
+import { useRemoveSOSRequestFromCluster, useAddSOSRequestToCluster } from "@/services/sos_cluster/hooks";
 import { useSOSRequestsByIds } from "@/services/sos_request/hooks";
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverEvent,
+} from "@dnd-kit/core";
 import type {
   SOSPriorityLevel,
   SOSRequestStatus,
@@ -527,6 +539,80 @@ const SOSSidebar = ({
     mutate: removeSOSRequestFromCluster,
     isPending: isRemovingSOSRequestFromCluster,
   } = useRemoveSOSRequestFromCluster();
+
+  const {
+    mutate: addSOSRequestToCluster,
+    isPending: isAddingSOSRequestToCluster,
+  } = useAddSOSRequestToCluster();
+
+  // Dnd state
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeDragSOS, setActiveDragSOS] = useState<SOSRequest | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+    const sosIdStr = String(event.active.id).replace("sos-", "");
+    const sos = 
+      sosRequests.find((s) => String(s.id) === sosIdStr) || 
+      incomingRequests?.find((s) => String(s.id) === sosIdStr);
+    setActiveDragSOS(sos || null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (over && over.id === "tab-clusters") {
+      setActiveTab("clusters");
+      setManualTabSelectionKey(selectedSOSId);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    setActiveDragSOS(null);
+
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    if (activeId.startsWith("sos-") && overId.startsWith("cluster-")) {
+      const sosId = Number(activeId.replace("sos-", ""));
+      const clusterId = Number(overId.replace("cluster-", ""));
+
+      if (Number.isFinite(sosId) && Number.isFinite(clusterId)) {
+        addSOSRequestToCluster(
+          { clusterId, sosRequestId: sosId },
+          {
+            onSuccess: () => {
+              toast.success(`Đã thêm SOS ${sosId} vào cụm #${clusterId}.`);
+              setExpandedClusters((prev) => {
+                const next = new Set(prev);
+                next.add(clusterId);
+                return next;
+              });
+              setActiveTab("clusters");
+              setManualTabSelectionKey(selectedSOSId);
+            },
+            onError: (error: any) => {
+              const errorMessage =
+                error.response?.data?.message ||
+                "Không thể thêm SOS vào cụm. Vui lòng thử lại.";
+              toast.error(errorMessage);
+            },
+          }
+        );
+      }
+    }
+  };
   const hasSOSFiltersApplied =
     selectedStatuses.length > 0 ||
     selectedPriorities.length > 0 ||
@@ -542,9 +628,7 @@ const SOSSidebar = ({
 
     onSelectedStatusesChange(
       selectedStatuses.includes(status)
-        ? selectedStatuses.filter(
-            (existingStatus) => existingStatus !== status,
-          )
+        ? selectedStatuses.filter((existingStatus) => existingStatus !== status)
         : [...selectedStatuses, status],
     );
   };
@@ -1073,7 +1157,13 @@ const SOSSidebar = ({
       </div>
 
       {/* Tabs */}
-      <Tabs
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <Tabs
         value={currentTab}
         onValueChange={(nextValue) => {
           const normalizedValue: SidebarTabValue =
@@ -1091,12 +1181,12 @@ const SOSSidebar = ({
           >
             SOS Mới
           </TabsTrigger>
-          <TabsTrigger
+          <DroppableTabsTrigger
             value="clusters"
             className="h-10 rounded-xl px-3 text-[15px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             Cụm SOS
-          </TabsTrigger>
+          </DroppableTabsTrigger>
         </TabsList>
 
         {/* Incoming SOS Tab */}
@@ -1327,8 +1417,9 @@ const SOSSidebar = ({
                     }}
                   />
                   {visibleIncomingRequests.map((sos) => (
-                    <div
+                    <DraggableSOSCard
                       key={sos.id}
+                      sos={sos}
                       className={cn(
                         "rounded-xl border overflow-hidden",
                         PRIORITY_BORDER_COLOR[sos.priority],
@@ -1434,7 +1525,7 @@ const SOSSidebar = ({
                           </Button>
                         )}
                       </div>
-                    </div>
+                    </DraggableSOSCard>
                   ))}
                 </>
               )}
@@ -1493,7 +1584,7 @@ const SOSSidebar = ({
                         className="h-3.5 w-3.5 mr-1.5"
                         weight="fill"
                       />
-                      Gom cụm tự động ({autoClusters.length} cụm •{" "}
+                      Gợi ý gom cụm ({autoClusters.length} cụm •{" "}
                       {autoClusters.reduce((sum, c) => sum + c.length, 0)} SOS)
                     </>
                   )}
@@ -1650,9 +1741,8 @@ const SOSSidebar = ({
                           </PopoverTrigger>
                           <PopoverContent className="w-56 p-1.5" align="start">
                             {CLUSTER_PRIORITY_FILTER_OPTIONS.map((option) => {
-                              const checked = selectedClusterPriorities.includes(
-                                option.key,
-                              );
+                              const checked =
+                                selectedClusterPriorities.includes(option.key);
 
                               return (
                                 <button
@@ -1860,8 +1950,9 @@ const SOSSidebar = ({
                         });
 
                         return (
-                          <div
+                          <DroppableClusterCard
                             key={cluster.id}
+                            clusterId={cluster.id}
                             className={cn(
                               "rounded-xl border overflow-hidden",
                               CLUSTER_CONTAINER_CLASS_BY_SEVERITY[
@@ -2130,7 +2221,7 @@ const SOSSidebar = ({
                                 />
                               </>
                             )}
-                          </div>
+                          </DroppableClusterCard>
                         );
                       })}
                     </>
@@ -2149,7 +2240,7 @@ const SOSSidebar = ({
               {autoClusters.length > 0 && (
                 <>
                   <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Cụm tự động phát hiện ({autoClusters.length})
+                    Gợi ý gom cụm ({autoClusters.length})
                   </div>
                   <PaginationControls
                     page={currentAutoClusterPage}
@@ -2293,6 +2384,10 @@ const SOSSidebar = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DragOverlay dropAnimation={null}>
+        <DragOverlaySOSCard sos={activeDragSOS} />
+      </DragOverlay>
+      </DndContext>
     </div>
   );
 };
@@ -2404,6 +2499,105 @@ function ClusterActionButtons({
           </Button>
         </>
       )}
+    </div>
+  );
+}
+
+// ── Dnd Kit Wrapper Components ──
+
+function DraggableSOSCard({
+  sos,
+  children,
+  className,
+}: {
+  sos: SOSRequest;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `sos-${sos.id}`,
+    data: { type: "sos", sos },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(className, isDragging && "opacity-40", "touch-none")}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DroppableClusterCard({
+  clusterId,
+  children,
+  className,
+}: {
+  clusterId: number;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `cluster-${clusterId}`,
+    data: { type: "cluster", clusterId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        className,
+        isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+const DroppableTabsTrigger = ({
+  value,
+  children,
+  className,
+}: {
+  value: string;
+  children: React.ReactNode;
+  className?: string;
+}) => {
+  const { setNodeRef, isOver } = useDroppable({ id: `tab-${value}` });
+  return (
+    <TabsTrigger
+      value={value}
+      ref={setNodeRef}
+      className={cn(className, isOver && "ring-2 ring-primary")}
+    >
+      {children}
+    </TabsTrigger>
+  );
+};
+
+function DragOverlaySOSCard({ sos }: { sos: SOSRequest | null }) {
+  if (!sos) return null;
+
+  return (
+    <div className="w-[300px] rounded-xl border border-border shadow-xl bg-background/90 backdrop-blur-sm p-3 pointer-events-none cursor-grabbing">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[14px] font-mono font-semibold text-foreground/90">
+          SOS {sos.id}
+        </span>
+        <Badge
+          variant={PRIORITY_BADGE_VARIANT[sos.priority]}
+          className="text-[14px] h-6 px-2 leading-none"
+        >
+          {PRIORITY_LABELS[sos.priority]}
+        </Badge>
+      </div>
+      <p className="text-[14px] text-muted-foreground line-clamp-1">
+        {sos.message}
+      </p>
     </div>
   );
 }

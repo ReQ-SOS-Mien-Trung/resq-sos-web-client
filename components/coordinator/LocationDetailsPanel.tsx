@@ -1225,7 +1225,7 @@ function AssemblyPointDetails({
     : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
 
   const shouldShowCreateTeam =
-    hasActiveEvent &&
+    !hasActiveEvent ||
     (selectedEvent?.status === "Scheduled" ||
       selectedEvent?.status === "Gathering");
   const isAssemblyPointAvailable = displayAssemblyPoint.status === "Available";
@@ -1247,9 +1247,7 @@ function AssemblyPointDetails({
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? effectiveSelectedEventId;
-    const query = eventId
-      ? `?assemblyPointId=${assemblyPoint.id}&eventId=${eventId}`
-      : "";
+    const query = `?assemblyPointId=${assemblyPoint.id}${eventId ? `&eventId=${eventId}` : ""}`;
     router.push(`/dashboard/coordinator/rescue-teams/create${query}`);
   };
 

@@ -118,6 +118,7 @@ import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 import MissionTeamReportSheet, {
   getMissionReportStats,
   getMissionReportStatusMeta,
+  normalizeMissionReportStatusKey,
 } from "@/components/coordinator/MissionTeamReportSheet";
 import type {
   RescueTeamByClusterEntity,
@@ -157,6 +158,7 @@ import {
   User,
   Phone,
   FirstAid,
+  ForkKnife,
 } from "@phosphor-icons/react";
 
 // Extract lat/lng from activity description text
@@ -971,171 +973,6 @@ function TargetVictimsBlock({
     </div>
   );
 }
-
-const ClusterSOSOverview = ({ sosRequests }: { sosRequests: SOSRequest[] }) => {
-  const stats = useMemo(() => {
-    const s = {
-      total: sosRequests.length,
-      p1: 0,
-      p2: 0,
-      p3: 0,
-      totalPeople: 0,
-      adults: 0,
-      children: 0,
-      elderly: 0,
-      medical: 0,
-      hasInjured: 0,
-      food: 0,
-      water: 0,
-      isolated: 0,
-    };
-    sosRequests.forEach((sos) => {
-      const priority = sos.priority || (sos as any).priorityLevel;
-      if (priority === "P1" || priority === "Critical") s.p1++;
-      else if (priority === "P2" || priority === "High") s.p2++;
-      else if (priority === "P3" || priority === "Medium") s.p3++;
-
-      const pc = (sos as any).peopleCount || { adult: 0, child: 0, elderly: 0 };
-      s.adults += pc.adult || 0;
-      s.children += pc.child || 0;
-      s.elderly += pc.elderly || 0;
-      s.totalPeople += (pc.adult || 0) + (pc.child || 0) + (pc.elderly || 0);
-
-      if (sos.needs?.medical || (sos as any).need_medical) s.medical++;
-      if (sos.hasInjured || (sos as any).has_injured) s.hasInjured++;
-      if (sos.needs?.food) s.food++;
-      if (sos.needs?.boat) s.isolated++;
-    });
-    return s;
-  }, [sosRequests]);
-
-  if (sosRequests.length === 0) return null;
-
-  const safeTotal = stats.total > 0 ? stats.total : 1;
-
-  return (
-    <section className="rounded-xl border bg-muted/20 p-3 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" weight="fill" />
-          Tổng quan SOS trong cụm
-        </h3>
-        <Badge
-          variant="outline"
-          className="h-5 border-muted-foreground/30 px-1.5 text-[10px] font-bold"
-        >
-          {stats.total} yêu cầu
-        </Badge>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/70">
-            Nhân khẩu
-          </p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-black text-foreground">
-              {stats.totalPeople}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">
-              người
-            </span>
-          </div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {stats.elderly > 0 && (
-              <Badge
-                variant="outline"
-                className="h-4 border-amber-200 bg-amber-50 px-1 text-[9px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-              >
-                Già: {stats.elderly}
-              </Badge>
-            )}
-            {stats.children > 0 && (
-              <Badge
-                variant="outline"
-                className="h-4 border-blue-200 bg-blue-50 px-1 text-[9px] text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-              >
-                Trẻ em: {stats.children}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/70">
-            Độ khẩn cấp
-          </p>
-          <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-muted">
-            {stats.p1 > 0 && (
-              <div
-                className="bg-red-500"
-                style={{ width: `${(stats.p1 / safeTotal) * 100}%` }}
-              />
-            )}
-            {stats.p2 > 0 && (
-              <div
-                className="bg-orange-500"
-                style={{ width: `${(stats.p2 / safeTotal) * 100}%` }}
-              />
-            )}
-            {stats.p3 > 0 && (
-              <div
-                className="bg-yellow-500"
-                style={{ width: `${(stats.p3 / safeTotal) * 100}%` }}
-              />
-            )}
-          </div>
-          <div className="mt-1 flex justify-between text-[9px] font-bold text-muted-foreground">
-            <span className="text-red-600 dark:text-red-400">
-              P1: {stats.p1}
-            </span>
-            <span className="text-orange-600 dark:text-orange-400">
-              P2: {stats.p2}
-            </span>
-            <span className="text-yellow-600 dark:text-yellow-400">
-              P3: {stats.p3}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5 pt-1">
-        {stats.medical > 0 && (
-          <Badge
-            variant="outline"
-            className="h-5 gap-1 border-red-200 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
-          >
-            <FirstAid className="h-3 w-3" weight="fill" />Y tế: {stats.medical}
-          </Badge>
-        )}
-        {stats.hasInjured > 0 && (
-          <Badge
-            variant="outline"
-            className="h-5 border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
-          >
-            Bị thương: {stats.hasInjured}
-          </Badge>
-        )}
-        {stats.food > 0 && (
-          <Badge
-            variant="outline"
-            className="h-5 border-orange-200 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300"
-          >
-            Lương thực: {stats.food}
-          </Badge>
-        )}
-        {stats.isolated > 0 && (
-          <Badge
-            variant="outline"
-            className="h-5 border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-          >
-            Cô lập: {stats.isolated}
-          </Badge>
-        )}
-      </div>
-    </section>
-  );
-};
 
 const severityLabel = (value?: string) => {
   const normalized = (value || "").toLowerCase();
@@ -3582,10 +3419,17 @@ type NormalizedSupplyLotAllocation = {
 type SupplyDisplaySource = {
   itemName?: string | null;
   itemId?: number | null;
+  itemType?: string | null;
   quantity: number;
   unit: string;
   plannedPickupLotAllocations?: SupplyLotAllocationLike[] | null;
+  plannedPickupReusableUnits?: ClusterSupplyCollection["plannedPickupReusableUnits"];
   pickupLotAllocations?: SupplyLotAllocationLike[] | null;
+  pickedReusableUnits?: ClusterSupplyCollection["pickedReusableUnits"];
+  availableDeliveryReusableUnits?: ClusterSupplyCollection["availableDeliveryReusableUnits"];
+  deliveredReusableUnits?: ClusterSupplyCollection["deliveredReusableUnits"];
+  expectedReturnUnits?: ClusterSupplyCollection["expectedReturnUnits"];
+  returnedReusableUnits?: ClusterSupplyCollection["returnedReusableUnits"];
   bufferRatio?: number | null;
   bufferQuantity?: number | null;
   bufferUsedQuantity?: number | null;
@@ -3764,7 +3608,8 @@ function buildSupplyDisplayItem(
   const hasPickupLots = pickupLots.length > 0;
   const isCollectStep = normalizedActivityType === "collectsupplies";
   const isDeliverStep = normalizedActivityType === "deliversupplies";
-  const hasBufferPlanning = isCollectStep;
+  const hasBufferPlanning =
+    isCollectStep && !isReusableSupplyCollection(supply);
 
   const lotRows =
     isCollectStep && (hasPickupLots || plannedLots.length > 0)
@@ -4873,13 +4718,18 @@ function getTeamAssignmentStatusMeta(status: string | null | undefined): {
 }
 
 function isMissionTeamActive(team: MissionTeam): boolean {
-  const normalizedStatus = (team.status ?? "").trim().toLowerCase();
+  const normalizedStatus = (team.status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+
   return (
     (!team.unassignedAt || team.unassignedAt.trim() === "") &&
     (normalizedStatus === "assigned" ||
       normalizedStatus === "inprogress" ||
-      normalizedStatus === "in_progress" ||
-      normalizedStatus === "in progress")
+      normalizedStatus === "reported" ||
+      normalizedStatus === "completed")
   );
 }
 
@@ -8016,7 +7866,8 @@ const SuggestionCard = ({
                           <div className="mt-1 space-y-0.5">
                             {act.suppliesToCollect.map((supply, sIdx) => {
                               const showSupplyBuffer =
-                                act.activityType === "COLLECT_SUPPLIES";
+                                act.activityType === "COLLECT_SUPPLIES" &&
+                                !isReusableSupplyCollection(supply);
 
                               return (
                                 <div
@@ -9107,6 +8958,9 @@ const RescuePlanPanel = ({
             const actualDeliveredQuantity = toFiniteNumber(
               s.actualDeliveredQuantity,
             );
+            const normalizedItemType = isReusableSupplyCollection(s)
+              ? "Reusable"
+              : "Consumable";
 
             return {
               id: typeof s.itemId === "number" ? s.itemId : null,
@@ -9114,9 +8968,11 @@ const RescuePlanPanel = ({
                 typeof s.itemName === "string" && s.itemName.trim()
                   ? s.itemName.trim()
                   : null,
+              itemType: normalizedItemType,
               quantity: s.quantity,
               unit: normalizeSupplyUnit(s.unit),
-              ...(activity.activityType === "COLLECT_SUPPLIES"
+              ...(activity.activityType === "COLLECT_SUPPLIES" &&
+              normalizedItemType === "Consumable"
                 ? { bufferRatio: resolveSupplyBufferRatio(s.bufferRatio) }
                 : {}),
               ...(plannedPickupLotAllocations
@@ -9194,13 +9050,17 @@ const RescuePlanPanel = ({
                     const actualDeliveredQuantity = toFiniteNumber(
                       supply.actualDeliveredQuantity,
                     );
+                    const normalizedItemType =
+                      normalizeInventoryItemType(supply.itemType) ??
+                      "Consumable";
 
                     return {
                       itemId: supply.id,
                       itemName: supply.name,
                       quantity: supply.quantity,
                       unit: normalizeSupplyUnit(supply.unit),
-                      ...(createRequest.activityType === "COLLECT_SUPPLIES"
+                      ...(createRequest.activityType === "COLLECT_SUPPLIES" &&
+                      normalizedItemType === "Consumable"
                         ? {
                             bufferRatio: resolveSupplyBufferRatio(
                               supply.bufferRatio,
@@ -11700,6 +11560,25 @@ const RescuePlanPanel = ({
                                                                                 reportStatusMeta.label
                                                                               }
                                                                             </Badge>
+                                                                            {normalizeMissionReportStatusKey(
+                                                                              team.reportStatus,
+                                                                            ) ===
+                                                                              "submitted" && (
+                                                                              <Button
+                                                                                type="button"
+                                                                                variant="link"
+                                                                                size="sm"
+                                                                                className="h-5 p-0 text-sky-600 dark:text-sky-400 font-bold text-xs"
+                                                                                onClick={() =>
+                                                                                  handleOpenMissionTeamReport(
+                                                                                    mission,
+                                                                                    team,
+                                                                                  )
+                                                                                }
+                                                                              >
+                                                                                [Xem chi tiết]
+                                                                              </Button>
+                                                                            )}
                                                                           </div>
                                                                         </div>
                                                                       );
@@ -11933,11 +11812,6 @@ const RescuePlanPanel = ({
                 {/* ═══ TAB: Plan ═══ */}
                 {activeTab === "plan" && (
                   <>
-                    <div className="mb-4">
-                      <ClusterSOSOverview sosRequests={panelSOSRequests} />
-                    </div>
-
-                    {/* === Edit mode content === */}
                     {isEditMode && (
                       <>
                         {/* Edit mode banner */}
@@ -13126,9 +13000,9 @@ const RescuePlanPanel = ({
                                                           {activity.suppliesToCollect.map(
                                                             (supply, sIdx) => {
                                                               const isReusable =
-                                                                normalizeInventoryItemType(
-                                                                  supply.itemType,
-                                                                ) === "Reusable";
+                                                                isReusableSupplyCollection(
+                                                                  supply,
+                                                                );
                                                               const showBufferInput =
                                                                 isCollectSuppliesActivity &&
                                                                 !isReusable;

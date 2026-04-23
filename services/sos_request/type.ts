@@ -213,6 +213,7 @@ export interface SOSRequestEntity {
   reviewedById: string | null;
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
+  evaluation?: SOSRequestEvaluationSummary | null;
 }
 
 // Paginated Response
@@ -363,8 +364,8 @@ export interface RuleEvaluation {
   itemsNeeded: string[];
   breakdown?: Record<string, unknown> | null;
   createdAt: string;
-  priorityThresholds: PriorityThresholds;
-  scoreWeights: ScoreWeights;
+  priorityThresholds?: PriorityThresholds | null;
+  scoreWeights?: ScoreWeights | null;
 }
 
 export interface AiAnalysisResult {
@@ -396,7 +397,17 @@ export interface AiAnalysis {
   adoptedAt: string | null;
 }
 
-export interface GetSOSRequestAnalysisResponse {
+export interface SOSRequestEvaluationSummary {
+  sosRequestId?: number;
+  sosType?: string;
+  status?: SOSRequestStatus;
+  currentPriorityLevel?: SOSPriorityLevel;
+  ruleEvaluation?: RuleEvaluation | null;
+  aiAnalyses?: AiAnalysis[] | null;
+  hasAiAnalysis?: boolean | null;
+}
+
+export interface GetSOSRequestAnalysisResponse extends SOSRequestEvaluationSummary {
   sosRequestId: number;
   sosType: string;
   status: SOSRequestStatus;

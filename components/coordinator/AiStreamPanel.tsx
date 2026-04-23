@@ -19,6 +19,7 @@ import {
 } from "@/lib/sos";
 import type {
   ClusterRescueSuggestionResponse,
+  ClusterSupplyCollection,
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
   ClusterTargetVictim,
@@ -123,6 +124,54 @@ function trimToNull(value?: string | null): string | null {
 function toFiniteNumber(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isReusableItemType(value: unknown): boolean {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    normalized === "reusable" ||
+    normalized.includes("tai su dung") ||
+    normalized.includes("tái sử dụng")
+  );
+}
+
+function hasReusableUnitMetadata(
+  supply: Pick<
+    ClusterSupplyCollection,
+    | "plannedPickupReusableUnits"
+    | "pickedReusableUnits"
+    | "availableDeliveryReusableUnits"
+    | "deliveredReusableUnits"
+    | "expectedReturnUnits"
+    | "returnedReusableUnits"
+  >,
+): boolean {
+  return (
+    Array.isArray(supply.plannedPickupReusableUnits) ||
+    Array.isArray(supply.pickedReusableUnits) ||
+    Array.isArray(supply.availableDeliveryReusableUnits) ||
+    Array.isArray(supply.deliveredReusableUnits) ||
+    Array.isArray(supply.expectedReturnUnits) ||
+    Array.isArray(supply.returnedReusableUnits)
+  );
+}
+
+function isReusableSupplyCollection(
+  supply: Pick<
+    ClusterSupplyCollection,
+    | "itemType"
+    | "plannedPickupReusableUnits"
+    | "pickedReusableUnits"
+    | "availableDeliveryReusableUnits"
+    | "deliveredReusableUnits"
+    | "expectedReturnUnits"
+    | "returnedReusableUnits"
+  >,
+): boolean {
+  return isReusableItemType(supply.itemType) || hasReusableUnitMetadata(supply);
 }
 
 function formatExecutionModeLabel(value?: string | null): string | null {
@@ -2056,7 +2105,8 @@ function ActivityFlowNode({
                     ×{supply.quantity}
                   </span>
                   <span className="text-primary/40">{supply.unit}</span>
-                  {normalizedActivityType === "COLLECT_SUPPLIES" ? (
+                  {normalizedActivityType === "COLLECT_SUPPLIES" &&
+                  !isReusableSupplyCollection(supply) ? (
                     <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                       Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
                     </span>

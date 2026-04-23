@@ -476,6 +476,19 @@ export async function removeSOSRequestFromCluster(
 }
 
 /**
+ * Add a SOS request to an existing cluster
+ * POST /emergency/sos-clusters/{clusterId}/sos-requests/{sosRequestId}
+ */
+export async function addSOSRequestToCluster(
+  clusterId: number,
+  sosRequestId: number,
+): Promise<void> {
+  await api.post(
+    `/emergency/sos-clusters/${clusterId}/sos-requests/${sosRequestId}`,
+  );
+}
+
+/**
  * Get mission suggestions for a SOS cluster
  * GET /emergency/sos-clusters/{clusterId}/mission-suggestions
  */

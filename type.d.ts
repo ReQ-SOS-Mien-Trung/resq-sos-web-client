@@ -2,6 +2,7 @@ import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
   SOSPriorityLevel,
+  SOSRequestEvaluationSummary,
   SOSRequestStatus,
   SOSClothingPerson,
   SOSSpecialDietPerson,
@@ -118,6 +119,7 @@ export interface SOSRequest {
   reporterIsOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;
+  evaluation?: SOSRequestEvaluationSummary | null;
 }
 
 export interface Rescuer {
