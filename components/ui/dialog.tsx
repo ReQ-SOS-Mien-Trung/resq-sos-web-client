@@ -108,10 +108,11 @@ function DialogContent({
       >
         {children}
         <button
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+          type="button"
+          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground/80 opacity-70 ring-offset-background transition hover:text-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           onClick={() => onOpenChange(false)}
         >
-          <X className="h-5 w-5" />
+          <X className="h-6 w-6" />
           <span className="sr-only">Close</span>
         </button>
       </div>

@@ -5,9 +5,12 @@ import {
   HubConnectionBuilder,
   HubConnectionState,
   HttpTransportType,
-  LogLevel,
 } from "@microsoft/signalr";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  applySignalRConnectionDefaults,
+  SIGNALR_CLIENT_LOG_LEVEL,
+} from "@/lib/signalr";
 import { NOTIFICATION_HUB_CONFIG } from "./config";
 import {
   BroadcastAlertRealtimePayload,
@@ -160,18 +163,20 @@ export class NotificationRealtimeClient {
       throw new Error("Missing NEXT_PUBLIC_BASE_URL for notifications.");
     }
 
-    return new HubConnectionBuilder()
-      .withUrl(`${baseUrl}${NOTIFICATION_HUB_CONFIG.path}`, {
-        accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
-        withCredentials: false,
-        transport:
-          HttpTransportType.WebSockets |
-          HttpTransportType.ServerSentEvents |
-          HttpTransportType.LongPolling,
-      })
-      .withAutomaticReconnect([...NOTIFICATION_HUB_CONFIG.reconnectDelaysMs])
-      .configureLogging(LogLevel.Warning)
-      .build();
+    return applySignalRConnectionDefaults(
+      new HubConnectionBuilder()
+        .withUrl(`${baseUrl}${NOTIFICATION_HUB_CONFIG.path}`, {
+          accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
+          withCredentials: false,
+          transport:
+            HttpTransportType.WebSockets |
+            HttpTransportType.ServerSentEvents |
+            HttpTransportType.LongPolling,
+        })
+        .withAutomaticReconnect([...NOTIFICATION_HUB_CONFIG.reconnectDelaysMs])
+        .configureLogging(SIGNALR_CLIENT_LOG_LEVEL)
+        .build(),
+    );
   }
 
   private getOrCreateConnection(): HubConnection {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -35,7 +35,11 @@ import {
   CaretDown,
   CaretRight,
 } from "@phosphor-icons/react";
-import { useDisposeLot, useExpiringLots } from "@/services/inventory/hooks";
+import {
+  useDisposeLot,
+  useExpiringLots,
+  useInventorySourceTypes,
+} from "@/services/inventory/hooks";
 import type { ExpiringLotItem } from "@/services/inventory/type";
 
 // ─── Constants ───
@@ -71,6 +75,17 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
     depotId,
     daysAhead,
   });
+  const { data: sourceTypes = [] } = useInventorySourceTypes();
+  const sourceTypeLabels = useMemo(
+    () =>
+      new Map(
+        sourceTypes.flatMap((sourceType) => [
+          [sourceType.key, sourceType.value],
+          [sourceType.value, sourceType.value],
+        ]),
+      ),
+    [sourceTypes],
+  );
 
   const [expandedLotId, setExpandedLotId] = useState<number | null>(null);
   const [expandedQuantity, setExpandedQuantity] = useState("");
@@ -140,6 +155,11 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
 
   const expiredCount = lots?.filter((l) => l.isExpired).length ?? 0;
   const expiringCount = (lots?.length ?? 0) - expiredCount;
+
+  const getSourceTypeLabel = useCallback(
+    (sourceType: string) => sourceTypeLabels.get(sourceType) ?? sourceType,
+    [sourceTypeLabels],
+  );
 
   return (
     <div className="space-y-4">
@@ -292,7 +312,7 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
                           </span>
                         </TableCell>
                         <TableCell>Lô số {lot.lotId}</TableCell>
-                        <TableCell>{lot.sourceType}</TableCell>
+                        <TableCell>{getSourceTypeLabel(lot.sourceType)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatNumber(lot.remainingQuantity)}
                         </TableCell>

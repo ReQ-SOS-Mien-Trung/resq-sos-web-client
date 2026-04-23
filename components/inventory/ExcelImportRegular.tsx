@@ -157,7 +157,7 @@ const COL = {
   ANH: "Ảnh",
   DONGIA: "Đơn giá",
   SOLUONG: "Số lượng",
-  THETICH: "Thể tích (dm3)",
+  THETICH: "Thể tích (dm³)",
   CANNANG: "Cân nặng (kg)",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",

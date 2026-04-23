@@ -417,9 +417,11 @@ export function DepotClosurePanel({
     isLoading: transfersLoading,
     isFetching: transfersFetching,
   } = useMyDepotTransfers(depotId, { enabled: !!depotId });
-  const { data: transferStatusMetadata = [] } = useDepotClosureTransferStatuses({
-    enabled: !!depotId,
-  });
+  const { data: transferStatusMetadata = [] } = useDepotClosureTransferStatuses(
+    {
+      enabled: !!depotId,
+    },
+  );
   const transferStatusValueMap = useMemo(
     () => buildDepotClosureTransferStatusValueMap(transferStatusMetadata),
     [transferStatusMetadata],
@@ -553,10 +555,10 @@ export function DepotClosurePanel({
     selectedTransfer?.targetDepotId === depotId;
   const hasExternalResolutionInstruction = Boolean(
     externalResolutionState?.hasActiveExternalResolution ||
-      externalResolutionState?.canDownloadExternalTemplate ||
-      externalResolutionState?.canUploadExternalResolution ||
-      externalResolutionState?.resolutionType === "ExternalResolution" ||
-      activeClosureDetail?.resolutionType === "ExternalResolution",
+    externalResolutionState?.canDownloadExternalTemplate ||
+    externalResolutionState?.canUploadExternalResolution ||
+    externalResolutionState?.resolutionType === "ExternalResolution" ||
+    activeClosureDetail?.resolutionType === "ExternalResolution",
   );
   const canDownloadExternalTemplate =
     externalResolutionState?.canDownloadExternalTemplate ?? false;
@@ -717,9 +719,8 @@ export function DepotClosurePanel({
 
   const handleDownloadExternalResolutionTemplate = useCallback(async () => {
     try {
-      const { blob, filename } = await downloadExternalResolutionTemplate(
-        depotId,
-      );
+      const { blob, filename } =
+        await downloadExternalResolutionTemplate(depotId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1564,117 +1565,118 @@ export function DepotClosurePanel({
             </div>
           )}
 
-          {canUploadExternalResolution && externalResolutionItems.length > 0 && (
-            <div className="rounded-xl border border-amber-200/70 dark:border-amber-800/60 bg-white/70 dark:bg-amber-950/10 overflow-hidden">
-              <div className="px-4 py-3 border-b border-amber-200/70 dark:border-amber-800/60 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <FileXls size={18} className="text-emerald-600" />
-                  <div>
-                    <p className="text-sm font-bold tracking-tighter text-amber-900 dark:text-amber-100">
-                      Xem nhanh dữ liệu đã nạp
-                    </p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 tracking-tighter">
-                      Hiển thị 5 dòng đầu để kiểm tra trước khi gửi.
-                    </p>
+          {canUploadExternalResolution &&
+            externalResolutionItems.length > 0 && (
+              <div className="rounded-xl border border-amber-200/70 dark:border-amber-800/60 bg-white/70 dark:bg-amber-950/10 overflow-hidden">
+                <div className="px-4 py-3 border-b border-amber-200/70 dark:border-amber-800/60 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <FileXls size={18} className="text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-bold tracking-tighter text-amber-900 dark:text-amber-100">
+                        Xem nhanh dữ liệu đã nạp
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 tracking-tighter">
+                        Hiển thị toàn bộ dữ liệu đã đọc từ file trong khung cuộn cố định.
+                      </p>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 tracking-tighter text-amber-700 dark:text-amber-300"
+                    onClick={resetExternalResolutionState}
+                  >
+                    <Trash size={14} />
+                    Bỏ file
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 tracking-tighter text-amber-700 dark:text-amber-300"
-                  onClick={resetExternalResolutionState}
-                >
-                  <Trash size={14} />
-                  Bỏ file
-                </Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-375 w-full text-sm">
-                  <thead className="bg-amber-50/80 dark:bg-amber-950/20">
-                    <tr className="border-b border-amber-200/70 dark:border-amber-800/60">
-                      {[
-                        "Dòng",
-                        "Vật phẩm",
-                        "Danh mục",
-                        "Đối tượng",
-                        "Loại vật phẩm",
-                        "Đơn vị",
-                        "Ngày nhập",
-                        "Hạn sử dụng",
-                        "Số lượng",
-                        "Đơn giá",
-                        "Thành tiền",
-                        "Cách xử lý",
-                        "Người nhận / đơn vị nhận",
-                        "Ghi chú",
-                      ].map((label) => (
-                        <th
-                          key={label}
-                          className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-amber-700 dark:text-amber-300 whitespace-nowrap"
-                        >
-                          {label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {externalResolutionItems.slice(0, 5).map((item) => (
-                      <tr
-                        key={`${item.rowNumber}-${item.itemName}`}
-                        className="border-b border-amber-200/70 dark:border-amber-800/60 align-top"
-                      >
-                        <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
-                          #{item.rowNumber}
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-foreground min-w-44">
-                          {item.itemName || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground min-w-32">
-                          {item.categoryName || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground min-w-64">
-                          {item.targetGroup || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {getInventoryItemTypeLabel(
-                            item.itemType,
-                            itemTypeValueMap,
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {item.unit || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {formatExcelPreviewDate(item.receivedDate)}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {formatExcelPreviewDate(item.expiredDate)}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {item.quantity.toLocaleString("vi-VN")}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {item.unitPrice.toLocaleString("vi-VN")}
-                        </td>
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {item.totalPrice.toLocaleString("vi-VN")}
-                        </td>
-                        <td className="px-4 py-3 text-foreground min-w-72">
-                          {formatHandlingMethodLabel(item.handlingMethod)}
-                        </td>
-                        <td className="px-4 py-3 text-foreground min-w-64">
-                          {item.recipient || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground min-w-40">
-                          {item.note || "—"}
-                        </td>
+                <div className="h-[420px] overflow-auto">
+                  <table className="min-w-375 w-full text-sm">
+                    <thead className="sticky top-0 bg-amber-50/95 dark:bg-amber-950/95">
+                      <tr className="border-b border-amber-200/70 dark:border-amber-800/60">
+                        {[
+                          "Dòng",
+                          "Vật phẩm",
+                          "Danh mục",
+                          "Đối tượng",
+                          "Loại vật phẩm",
+                          "Đơn vị",
+                          "Ngày nhập",
+                          "Hạn sử dụng",
+                          "Số lượng",
+                          "Đơn giá",
+                          "Thành tiền",
+                          "Cách xử lý",
+                          "Người nhận / đơn vị nhận",
+                          "Ghi chú",
+                        ].map((label) => (
+                          <th
+                            key={label}
+                            className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-amber-700 dark:text-amber-300 whitespace-nowrap"
+                          >
+                            {label}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {externalResolutionItems.map((item) => (
+                        <tr
+                          key={`${item.rowNumber}-${item.itemName}`}
+                          className="border-b border-amber-200/70 dark:border-amber-800/60 align-top"
+                        >
+                          <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
+                            #{item.rowNumber}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-foreground min-w-44">
+                            {item.itemName || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-foreground min-w-32">
+                            {item.categoryName || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-foreground min-w-64">
+                            {item.targetGroup || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {getInventoryItemTypeLabel(
+                              item.itemType,
+                              itemTypeValueMap,
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {item.unit || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {formatExcelPreviewDate(item.receivedDate)}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {formatExcelPreviewDate(item.expiredDate)}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {item.quantity.toLocaleString("vi-VN")}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {item.unitPrice.toLocaleString("vi-VN")}
+                          </td>
+                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            {item.totalPrice.toLocaleString("vi-VN")}
+                          </td>
+                          <td className="px-4 py-3 text-foreground min-w-72">
+                            {formatHandlingMethodLabel(item.handlingMethod)}
+                          </td>
+                          <td className="px-4 py-3 text-foreground min-w-64">
+                            {item.recipient || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-foreground min-w-40">
+                            {item.note || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {canUploadExternalResolution && (
             <div className="flex flex-wrap items-center justify-end gap-2">

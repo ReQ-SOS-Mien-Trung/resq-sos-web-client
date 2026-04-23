@@ -5,9 +5,12 @@ import {
   HubConnectionBuilder,
   HubConnectionState,
   HttpTransportType,
-  LogLevel,
 } from "@microsoft/signalr";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  applySignalRConnectionDefaults,
+  SIGNALR_CLIENT_LOG_LEVEL,
+} from "@/lib/signalr";
 import {
   CHAT_EVENTS,
   CHAT_METHODS,
@@ -34,6 +37,18 @@ function toConnectionLabel(
 
 export class ChatTransportService {
   private connection: HubConnection | null = null;
+  private startPromise: Promise<void> | null = null;
+
+  private isNegotiationAbortError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message : String(error ?? "");
+    const normalized = message.toLowerCase();
+
+    return (
+      normalized.includes("stopped during negotiation") ||
+      normalized.includes("aborterror")
+    );
+  }
 
   private async waitForDisconnected(
     connection: HubConnection,
@@ -57,18 +72,20 @@ export class ChatTransportService {
       throw new Error("Missing NEXT_PUBLIC_BASE_URL for chat transport.");
     }
 
-    return new HubConnectionBuilder()
-      .withUrl(`${baseUrl}/hubs/chat`, {
-        accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
-        withCredentials: false,
-        transport:
-          HttpTransportType.WebSockets |
-          HttpTransportType.ServerSentEvents |
-          HttpTransportType.LongPolling,
-      })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
+    return applySignalRConnectionDefaults(
+      new HubConnectionBuilder()
+        .withUrl(`${baseUrl}/hubs/chat`, {
+          accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
+          withCredentials: false,
+          transport:
+            HttpTransportType.WebSockets |
+            HttpTransportType.ServerSentEvents |
+            HttpTransportType.LongPolling,
+        })
+        .withAutomaticReconnect()
+        .configureLogging(SIGNALR_CLIENT_LOG_LEVEL)
+        .build(),
+    );
   }
 
   private getOrCreateConnection(): HubConnection {
@@ -80,6 +97,11 @@ export class ChatTransportService {
   }
 
   async start(): Promise<void> {
+    if (this.startPromise) {
+      await this.startPromise;
+      return;
+    }
+
     const connection = this.getOrCreateConnection();
 
     if (connection.state === HubConnectionState.Connected) {
@@ -101,12 +123,29 @@ export class ChatTransportService {
       }
     }
 
-    await connection.start();
+    this.startPromise = connection
+      .start()
+      .catch((error) => {
+        if (this.isNegotiationAbortError(error)) {
+          return;
+        }
+
+        throw error;
+      })
+      .finally(() => {
+        this.startPromise = null;
+      });
+
+    await this.startPromise;
   }
 
   async stop(): Promise<void> {
     if (!this.connection) {
       return;
+    }
+
+    if (this.startPromise) {
+      await this.startPromise.catch(() => null);
     }
 
     if (this.connection.state === HubConnectionState.Disconnected) {

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -49,6 +50,7 @@ import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import DepotChartsSection from "@/components/inventory/DepotChartsSection";
 import { DepotClosureTransferTable } from "@/components/inventory/DepotClosureTransferTable";
+import { InventoryExportReportCards } from "@/components/inventory/InventoryExportReportCards";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -266,6 +268,18 @@ const InventoryDashboardPage = () => {
     },
     [activeTab, router],
   );
+
+  const scrollToExportReports = useCallback(() => {
+    if (activeTab !== "inventory") {
+      router.replace("/dashboard/inventory");
+    }
+
+    window.setTimeout(() => {
+      document
+        .getElementById("inventory-export-report")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [activeTab, router]);
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -719,12 +733,10 @@ const InventoryDashboardPage = () => {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() =>
-              navigateFromInventory("/dashboard/inventory/export-report")
-            }
+            onClick={scrollToExportReports}
           >
             <FileArrowDownIcon className="h-4 w-4" />
             Xuất báo cáo
@@ -732,7 +744,7 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2"
+            className="hidden md:flex gap-2 border-slate-300 text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900/40"
             onClick={() =>
               navigateFromInventory("/dashboard/inventory/stock-movements")
             }
@@ -787,7 +799,13 @@ const InventoryDashboardPage = () => {
           </Button>
 
           {/* Settings */}
-          <Button variant="ghost" size="icon">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/threshold-config")
+            }
+          >
             <Gear className="h-5 w-5" />
           </Button>
 
@@ -795,9 +813,18 @@ const InventoryDashboardPage = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <div className="h-8 w-8 rounded-full bg-linear-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
-                  {userInitials}
-                </div>
+                <Avatar className="h-8 w-8 ring-2 ring-border">
+                  {userMe?.avatarUrl ? (
+                    <AvatarImage
+                      src={userMe.avatarUrl}
+                      alt={displayName}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-linear-to-br from-red-400 to-orange-500 text-sm font-semibold text-white">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -1111,6 +1138,8 @@ const InventoryDashboardPage = () => {
                 {selectedDepotId && (
                   <DepotChartsSection depotId={selectedDepotId} />
                 )}
+
+                <InventoryExportReportCards depotId={selectedDepotId} />
               </>
             )}
           </motion.div>

@@ -1086,6 +1086,11 @@ export function VatTuDetailsSheet({
                               sortedReusableUnits.map((unit) => {
                                 const normalizedStatus =
                                   normalizeReusableStatusKey(unit.status);
+                                const isActionLocked =
+                                  normalizedStatus.includes("reserv") ||
+                                  normalizedStatus.includes("transit") ||
+                                  normalizedStatus.includes("inuse") ||
+                                  normalizedStatus.includes("in use");
                                 const canMarkAvailable =
                                   normalizedStatus.includes("maint");
 
@@ -1139,77 +1144,79 @@ export function VatTuDetailsSheet({
                                         {formatDate(unit.createdAt)}
                                       </td>
                                       <td className="p-3">
-                                        <div
-                                          className="flex justify-end"
-                                          onClick={(event) =>
-                                            event.stopPropagation()
-                                          }
-                                        >
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                              >
-                                                <DotsThreeVertical size={16} />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuPortal>
-                                              <DropdownMenuContent align="end">
-                                                {canMarkAvailable ? (
-                                                  <DropdownMenuItem
-                                                    className="text-emerald-700 focus:text-emerald-700 data-[highlighted]:bg-emerald-50 data-[highlighted]:text-emerald-700"
-                                                    onClick={() =>
-                                                      openReusableActionDialog(
-                                                        "available",
-                                                        unit,
-                                                      )
-                                                    }
-                                                  >
-                                                    <CheckCircle
-                                                      size={16}
-                                                      className="mr-1 text-emerald-600"
-                                                    />
-                                                    Hoàn tất bảo trì
-                                                  </DropdownMenuItem>
-                                                ) : (
-                                                  <DropdownMenuItem
-                                                    className="text-amber-700 focus:text-amber-700 data-[highlighted]:bg-amber-50 data-[highlighted]:text-amber-700"
-                                                    onClick={() =>
-                                                      openReusableActionDialog(
-                                                        "maintenance",
-                                                        unit,
-                                                      )
-                                                    }
-                                                  >
-                                                    <MaintenanceIcon
-                                                      size={16}
-                                                      className="mr-1 text-amber-600"
-                                                    />
-                                                    Bảo trì vật phẩm
-                                                  </DropdownMenuItem>
-                                                )}
-                                                {!canMarkAvailable && (
-                                                  <DropdownMenuItem
-                                                    variant="destructive"
-                                                    onClick={() =>
-                                                      openReusableActionDialog(
-                                                        "decommission",
-                                                        unit,
-                                                      )
-                                                    }
-                                                  >
-                                                    <Recycle
-                                                      size={16}
-                                                      className="mr-1"
-                                                    />
-                                                    Tiêu hủy vật phẩm
-                                                  </DropdownMenuItem>
-                                                )}
-                                              </DropdownMenuContent>
-                                            </DropdownMenuPortal>
-                                          </DropdownMenu>
-                                        </div>
+                                        {!isActionLocked ? (
+                                          <div
+                                            className="flex justify-end"
+                                            onClick={(event) =>
+                                              event.stopPropagation()
+                                            }
+                                          >
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                >
+                                                  <DotsThreeVertical size={16} />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuPortal>
+                                                <DropdownMenuContent align="end">
+                                                  {canMarkAvailable ? (
+                                                    <DropdownMenuItem
+                                                      className="text-emerald-700 focus:text-emerald-700 data-[highlighted]:bg-emerald-50 data-[highlighted]:text-emerald-700"
+                                                      onClick={() =>
+                                                        openReusableActionDialog(
+                                                          "available",
+                                                          unit,
+                                                        )
+                                                      }
+                                                    >
+                                                      <CheckCircle
+                                                        size={16}
+                                                        className="mr-1 text-emerald-600"
+                                                      />
+                                                      Hoàn tất bảo trì
+                                                    </DropdownMenuItem>
+                                                  ) : (
+                                                    <DropdownMenuItem
+                                                      className="text-amber-700 focus:text-amber-700 data-[highlighted]:bg-amber-50 data-[highlighted]:text-amber-700"
+                                                      onClick={() =>
+                                                        openReusableActionDialog(
+                                                          "maintenance",
+                                                          unit,
+                                                        )
+                                                      }
+                                                    >
+                                                      <MaintenanceIcon
+                                                        size={16}
+                                                        className="mr-1 text-amber-600"
+                                                      />
+                                                      Bảo trì vật phẩm
+                                                    </DropdownMenuItem>
+                                                  )}
+                                                  {!canMarkAvailable && (
+                                                    <DropdownMenuItem
+                                                      variant="destructive"
+                                                      onClick={() =>
+                                                        openReusableActionDialog(
+                                                          "decommission",
+                                                          unit,
+                                                        )
+                                                      }
+                                                    >
+                                                      <Recycle
+                                                        size={16}
+                                                        className="mr-1"
+                                                      />
+                                                      Tiêu hủy vật phẩm
+                                                    </DropdownMenuItem>
+                                                  )}
+                                                </DropdownMenuContent>
+                                              </DropdownMenuPortal>
+                                            </DropdownMenu>
+                                          </div>
+                                        ) : null}
                                       </td>
                                     </tr>
                                     <AnimatePresence initial={false}>

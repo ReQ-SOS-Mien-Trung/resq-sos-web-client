@@ -134,7 +134,7 @@ const COL = {
   GHICHU: "Mô tả vật phẩm",
   SOLUONG: "Số lượng (*)",
   DONGIA: "Đơn giá (VNĐ)",
-  THETICH: "Thể tích / đơn vị (dm3)",
+  THETICH: "Thể tích / đơn vị (dm³)",
   CANNANG: "Cân nặng / đơn vị (kg)",
 } as const;
 

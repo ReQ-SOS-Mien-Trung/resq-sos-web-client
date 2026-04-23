@@ -5,9 +5,12 @@ import {
   HubConnectionBuilder,
   HubConnectionState,
   HttpTransportType,
-  LogLevel,
 } from "@microsoft/signalr";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  applySignalRConnectionDefaults,
+  SIGNALR_CLIENT_LOG_LEVEL,
+} from "@/lib/signalr";
 import {
   OPERATIONAL_REALTIME_EVENTS,
   OPERATIONAL_REALTIME_METHODS,
@@ -168,18 +171,20 @@ export class OperationalRealtimeClient {
       throw new Error("Missing NEXT_PUBLIC_BASE_URL for operational realtime.");
     }
 
-    return new HubConnectionBuilder()
-      .withUrl(`${baseUrl}/hubs/operational`, {
-        accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
-        withCredentials: false,
-        transport:
-          HttpTransportType.WebSockets |
-          HttpTransportType.ServerSentEvents |
-          HttpTransportType.LongPolling,
-      })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.None)
-      .build();
+    return applySignalRConnectionDefaults(
+      new HubConnectionBuilder()
+        .withUrl(`${baseUrl}/hubs/operational`, {
+          accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
+          withCredentials: false,
+          transport:
+            HttpTransportType.WebSockets |
+            HttpTransportType.ServerSentEvents |
+            HttpTransportType.LongPolling,
+        })
+        .withAutomaticReconnect()
+        .configureLogging(SIGNALR_CLIENT_LOG_LEVEL)
+        .build(),
+    );
   }
 
   private getOrCreateConnection(): HubConnection {
@@ -427,10 +432,11 @@ export class OperationalRealtimeClient {
       .catch((error) => {
         this.setConnectionState("disconnected");
 
-        if (
-          this.shouldMaintainConnection &&
-          !this.isNegotiationAbortError(error)
-        ) {
+        if (this.isNegotiationAbortError(error)) {
+          return;
+        }
+
+        if (this.shouldMaintainConnection) {
           this.scheduleRetryStart();
         }
 
@@ -449,6 +455,14 @@ export class OperationalRealtimeClient {
     if (!this.connection) {
       this.setConnectionState("disconnected");
       return;
+    }
+
+    if (this.startPromise) {
+      await this.startPromise.catch(() => null);
+
+      if (this.shouldMaintainConnection) {
+        return;
+      }
     }
 
     if (this.connection.state === HubConnectionState.Disconnected) {

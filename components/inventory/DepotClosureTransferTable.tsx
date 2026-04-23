@@ -541,10 +541,8 @@ function TransferDetailPanel({
         {transferSteps.map((step, i) => {
           const cur = stepOrder.indexOf(currentStatus);
           const me = stepOrder.indexOf(step.key);
-          const isTerminal =
-            currentStatus === "Received" || currentStatus === "Cancelled";
-          const done = me < cur || (isTerminal && me === cur);
-          const active = me === cur && !isTerminal;
+          const done = me < cur;
+          const active = me === cur;
           return (
             <React.Fragment key={step.key}>
               {i > 0 && (
@@ -1169,7 +1167,7 @@ export function DepotClosureTransferTable({
       </div>
 
       {hasExternalResolutionInstruction && (
-        <Card className="border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20">
+        <Card className="border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20 py-0">
           <CardContent className="p-5 space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1.5">
@@ -1179,18 +1177,20 @@ export function DepotClosureTransferTable({
                     className="text-amber-500 shrink-0"
                     weight="fill"
                   />
-                  <p className="text-base font-bold tracking-tighter text-amber-800 dark:text-amber-300">
-                    Admin đã chọn xử lý tồn kho bên ngoài hệ thống
+                  <p className="text-base font-semibold tracking-tighter text-amber-800 dark:text-amber-300">
+                    Quản trị viên đã chọn xử lý tồn kho bên ngoài hệ thống
                   </p>
                 </div>
                 <p className="text-sm text-amber-700 dark:text-amber-300 tracking-tighter">
                   Dùng file mẫu Excel để cập nhật kết quả xử lý ngoài cho kho
-                  hiện tại. Trạng thái hiển thị được đồng bộ trực tiếp từ
-                  backend.
+                  hiện tại.
                 </p>
                 {externalResolutionNote && (
                   <p className="text-sm text-amber-800 dark:text-amber-200 tracking-tighter whitespace-pre-wrap">
-                    {externalResolutionNote}
+                    Note:{" "}
+                    <span className="font-semibold">
+                      {externalResolutionNote}
+                    </span>
                   </p>
                 )}
               </div>
@@ -1203,7 +1203,7 @@ export function DepotClosureTransferTable({
                     disabled={isDownloadingExternalResolutionTemplate}
                   >
                     <DownloadSimple size={16} />
-                    Tải file mẫu
+                    Tải danh sách vật phẩm cần xử lý
                   </Button>
                 )}
                 {canUploadExternalResolution && (
@@ -1214,9 +1214,7 @@ export function DepotClosureTransferTable({
                     disabled={isParsingExternalFile}
                   >
                     <UploadSimple size={16} />
-                    {isParsingExternalFile
-                      ? "Đang đọc file..."
-                      : "Tải file kết quả"}
+                    {isParsingExternalFile ? "Đang đọc file..." : "Upload file"}
                   </Button>
                 )}
                 <input
@@ -1235,11 +1233,11 @@ export function DepotClosureTransferTable({
                   label: "Tồn kho cần xử lý",
                   value:
                     externalResolutionRemainingItemCount != null
-                      ? `${externalResolutionRemainingItemCount.toLocaleString("vi-VN")} dòng`
+                      ? `${externalResolutionRemainingItemCount.toLocaleString("vi-VN")} vật phẩm`
                       : "—",
                 },
                 {
-                  label: "File đã nạp",
+                  label: "File đã nhập",
                   value: externalResolutionFileName || "Chưa chọn file",
                   small: true,
                 },
@@ -1252,13 +1250,13 @@ export function DepotClosureTransferTable({
                   key={item.label}
                   className="rounded-xl border border-amber-200/70 bg-white/70 p-3 dark:border-amber-800/60 dark:bg-amber-950/10"
                 >
-                  <p className="text-sm text-amber-700 dark:text-amber-300 tracking-tighter">
+                  <p className="text-sm font-medium tracking-tighter mb-1">
                     {item.label}
                   </p>
                   <p
                     className={cn(
-                      "font-bold tracking-tighter text-amber-900 dark:text-amber-100",
-                      item.small ? "text-base break-all" : "text-xl",
+                      "font-semibold tracking-tighter text-amber-900 dark:text-amber-100",
+                      item.small ? "text-sm break-all" : "text-base",
                     )}
                   >
                     {item.value}
@@ -1269,35 +1267,36 @@ export function DepotClosureTransferTable({
 
             {canUploadExternalResolution &&
               externalResolutionItems.length > 0 && (
-                <div className="rounded-xl border border-amber-200/70 bg-white/70 overflow-hidden dark:border-amber-800/60 dark:bg-amber-950/10">
-                  <div className="px-4 py-3 border-b border-amber-200/70 dark:border-amber-800/60 flex items-center justify-between gap-3">
+                <div className="rounded-xl border border-blue-200/70 bg-white/70 overflow-hidden dark:border-blue-800/60 dark:bg-blue-950/10">
+                  <div className="px-4 py-3 border-b border-blue-200/70 dark:border-blue-800/60 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <FileXls size={18} className="text-emerald-600" />
+                      <FileXls size={18} className="text-blue-600" />
                       <div>
-                        <p className="text-sm font-bold tracking-tighter text-amber-900 dark:text-amber-100">
-                          Xem nhanh dữ liệu đã nạp
+                        <p className="text-sm font-semibold tracking-tighter text-blue-900 dark:text-blue-100">
+                          Xem nhanh dữ liệu đã nhập
                         </p>
-                        <p className="text-xs text-amber-700 dark:text-amber-300 tracking-tighter">
-                          Hiển thị 5 dòng đầu để kiểm tra trước khi gửi.
+                        <p className="text-xs text-blue-700 dark:text-blue-300 tracking-tighter">
+                          Hiển thị toàn bộ dữ liệu đã đọc từ file trong khung
+                          cuộn cố định.
                         </p>
                       </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="gap-1.5 tracking-tighter text-amber-700 dark:text-amber-300"
+                      className="gap-1.5 tracking-tighter text-blue-700 dark:text-blue-300"
                       onClick={resetExternalResolutionState}
                     >
                       <Trash size={14} />
                       Bỏ file
                     </Button>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="h-[420px] overflow-auto">
                     <table className="min-w-375 w-full text-sm">
-                      <thead className="bg-amber-50/80 dark:bg-amber-950/20">
-                        <tr className="border-b border-amber-200/70 dark:border-amber-800/60">
+                      <thead className="sticky top-0 bg-blue-50/95 dark:bg-blue-950/95">
+                        <tr className="border-b border-blue-200/70 dark:border-blue-800/60">
                           {[
-                            "Dòng",
+                            "STT",
                             "Vật phẩm",
                             "Danh mục",
                             "Đối tượng",
@@ -1314,7 +1313,7 @@ export function DepotClosureTransferTable({
                           ].map((label) => (
                             <th
                               key={label}
-                              className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-amber-700 dark:text-amber-300 whitespace-nowrap"
+                              className="px-4 py-3 text-left text-xs font-semibold tracking-tighter text-blue-700 dark:text-blue-300 whitespace-nowrap"
                             >
                               {label}
                             </th>
@@ -1322,54 +1321,54 @@ export function DepotClosureTransferTable({
                         </tr>
                       </thead>
                       <tbody>
-                        {externalResolutionItems.slice(0, 5).map((item) => (
+                        {externalResolutionItems.map((item) => (
                           <tr
                             key={`${item.rowNumber}-${item.itemName}`}
-                            className="border-b border-amber-200/70 dark:border-amber-800/60 align-top"
+                            className="border-b border-blue-200/70 dark:border-blue-800/60 align-top"
                           >
-                            <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
-                              #{item.rowNumber}
+                            <td className="px-4 py-3 font-medium text-foreground tracking-tighter whitespace-nowrap">
+                              {item.rowNumber}
                             </td>
-                            <td className="px-4 py-3 font-semibold text-foreground min-w-44">
+                            <td className="px-4 py-3 font-medium text-foreground tracking-tighter  min-w-64">
                               {item.itemName || "—"}
                             </td>
-                            <td className="px-4 py-3 text-foreground min-w-32">
+                            <td className="px-4 py-3 text-foreground tracking-tighter min-w-48">
                               {item.categoryName || "—"}
                             </td>
-                            <td className="px-4 py-3 text-foreground min-w-64">
+                            <td className="px-4 py-3 text-foreground tracking-tighter min-w-64">
                               {item.targetGroup || "—"}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {getInventoryItemTypeLabel(
                                 item.itemType,
                                 itemTypeValueMap,
                               )}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {item.unit || "—"}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {formatExcelPreviewDate(item.receivedDate)}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {formatExcelPreviewDate(item.expiredDate)}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {item.quantity.toLocaleString("vi-VN")}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {item.unitPrice.toLocaleString("vi-VN")}
                             </td>
-                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {item.totalPrice.toLocaleString("vi-VN")}
                             </td>
-                            <td className="px-4 py-3 text-foreground min-w-72">
+                            <td className="px-4 py-3 text-foreground tracking-tighter min-w-72">
                               {formatHandlingMethodLabel(item.handlingMethod)}
                             </td>
-                            <td className="px-4 py-3 text-foreground min-w-64">
+                            <td className="px-4 py-3 text-foreground tracking-tighter min-w-64">
                               {item.recipient || "—"}
                             </td>
-                            <td className="px-4 py-3 text-foreground min-w-40">
+                            <td className="px-4 py-3 text-foreground tracking-tighter min-w-40">
                               {item.note || "—"}
                             </td>
                           </tr>

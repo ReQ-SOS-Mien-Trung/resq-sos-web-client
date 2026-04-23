@@ -51,6 +51,7 @@ import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -96,6 +97,7 @@ import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
+import { useUserMe } from "@/services/user/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
@@ -795,8 +797,27 @@ const CoordinatorDashboardContent = () => {
   // ─── Auth ───
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
-  const userDisplayName = getUserDisplayName(user);
-  const userInitials = getUserAvatarInitials(user);
+  const { data: userMe } = useUserMe();
+  const userDisplayName = userMe
+    ? getUserDisplayName(
+        {
+          firstName: userMe.firstName,
+          lastName: userMe.lastName,
+          username: userMe.username,
+        },
+        getUserDisplayName(user),
+      )
+    : getUserDisplayName(user);
+  const userInitials = userMe
+    ? getUserAvatarInitials(
+        {
+          firstName: userMe.firstName,
+          lastName: userMe.lastName,
+          username: userMe.username,
+        },
+        getUserAvatarInitials(user),
+      )
+    : getUserAvatarInitials(user);
 
   // ─── Mutations ───
   const { mutate: createCluster, isPending: isCreatingCluster } =
@@ -1612,9 +1633,18 @@ const CoordinatorDashboardContent = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
-                  {userInitials}
-                </div>
+                <Avatar className="h-8 w-8 ring-2 ring-border">
+                  {userMe?.avatarUrl ? (
+                    <AvatarImage
+                      src={userMe.avatarUrl}
+                      alt={userDisplayName}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-br from-red-400 to-orange-500 text-sm font-semibold text-white">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 z-[1200]">
