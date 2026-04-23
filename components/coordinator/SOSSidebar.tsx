@@ -556,10 +556,11 @@ const SOSSidebar = ({
           setRemoveDialogOpen(false);
           setRemoveCandidate(null);
         },
-        onError: (error) => {
-          toast.error(
-            error?.message || "Không thể tách SOS khỏi cụm. Vui lòng thử lại.",
-          );
+        onError: (error: any) => {
+          const errorMessage =
+            error.response?.data?.message ||
+            "Không thể tách SOS khỏi cụm. Vui lòng thử lại.";
+          toast.error(errorMessage);
         },
       },
     );

@@ -21,8 +21,13 @@ import {
 } from "@/lib/constants";
 import {
   getClothingGenderLabel,
+  getFoodDurationLabel,
   getMedicalIssueLabel,
+  getMedicalSupportNeedLabel,
   getPersonTypeLabel,
+  getSituationLabel,
+  getSupplyLabel,
+  getWaterDurationLabel,
 } from "@/lib/sos";
 import { analyzeMissionSupplyBalance } from "@/lib/mission-supply-balance";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
@@ -59,6 +64,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   useCreateMission,
   useMissions,
@@ -960,6 +971,577 @@ function TargetVictimsBlock({
     </div>
   );
 }
+
+const ClusterSOSOverview = ({ sosRequests }: { sosRequests: SOSRequest[] }) => {
+  const stats = useMemo(() => {
+    const s = {
+      total: sosRequests.length,
+      p1: 0,
+      p2: 0,
+      p3: 0,
+      totalPeople: 0,
+      adults: 0,
+      children: 0,
+      elderly: 0,
+      medical: 0,
+      hasInjured: 0,
+      food: 0,
+      water: 0,
+      isolated: 0,
+    };
+    sosRequests.forEach((sos) => {
+      const priority = sos.priority || (sos as any).priorityLevel;
+      if (priority === "P1" || priority === "Critical") s.p1++;
+      else if (priority === "P2" || priority === "High") s.p2++;
+      else if (priority === "P3" || priority === "Medium") s.p3++;
+
+      const pc = (sos as any).peopleCount || { adult: 0, child: 0, elderly: 0 };
+      s.adults += pc.adult || 0;
+      s.children += pc.child || 0;
+      s.elderly += pc.elderly || 0;
+      s.totalPeople += (pc.adult || 0) + (pc.child || 0) + (pc.elderly || 0);
+
+      if (sos.needs?.medical || (sos as any).need_medical) s.medical++;
+      if (sos.hasInjured || (sos as any).has_injured) s.hasInjured++;
+      if (sos.needs?.food) s.food++;
+      if (sos.needs?.boat) s.isolated++;
+    });
+    return s;
+  }, [sosRequests]);
+
+  if (sosRequests.length === 0) return null;
+
+  const safeTotal = stats.total > 0 ? stats.total : 1;
+
+  return (
+    <section className="rounded-xl border bg-muted/20 p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5" weight="fill" />
+          Tổng quan SOS trong cụm
+        </h3>
+        <Badge
+          variant="outline"
+          className="h-5 border-muted-foreground/30 px-1.5 text-[10px] font-bold"
+        >
+          {stats.total} yêu cầu
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/70">
+            Nhân khẩu
+          </p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-black text-foreground">
+              {stats.totalPeople}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">
+              người
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {stats.elderly > 0 && (
+              <Badge
+                variant="outline"
+                className="h-4 border-amber-200 bg-amber-50 px-1 text-[9px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+              >
+                Già: {stats.elderly}
+              </Badge>
+            )}
+            {stats.children > 0 && (
+              <Badge
+                variant="outline"
+                className="h-4 border-blue-200 bg-blue-50 px-1 text-[9px] text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+              >
+                Trẻ em: {stats.children}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/70">
+            Độ khẩn cấp
+          </p>
+          <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            {stats.p1 > 0 && (
+              <div
+                className="bg-red-500"
+                style={{ width: `${(stats.p1 / safeTotal) * 100}%` }}
+              />
+            )}
+            {stats.p2 > 0 && (
+              <div
+                className="bg-orange-500"
+                style={{ width: `${(stats.p2 / safeTotal) * 100}%` }}
+              />
+            )}
+            {stats.p3 > 0 && (
+              <div
+                className="bg-yellow-500"
+                style={{ width: `${(stats.p3 / safeTotal) * 100}%` }}
+              />
+            )}
+          </div>
+          <div className="mt-1 flex justify-between text-[9px] font-bold text-muted-foreground">
+            <span className="text-red-600 dark:text-red-400">
+              P1: {stats.p1}
+            </span>
+            <span className="text-orange-600 dark:text-orange-400">
+              P2: {stats.p2}
+            </span>
+            <span className="text-yellow-600 dark:text-yellow-400">
+              P3: {stats.p3}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 pt-1">
+        {stats.medical > 0 && (
+          <Badge
+            variant="outline"
+            className="h-5 gap-1 border-red-200 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
+          >
+            <FirstAid className="h-3 w-3" weight="fill" />Y tế: {stats.medical}
+          </Badge>
+        )}
+        {stats.hasInjured > 0 && (
+          <Badge
+            variant="outline"
+            className="h-5 border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
+          >
+            Bị thương: {stats.hasInjured}
+          </Badge>
+        )}
+        {stats.food > 0 && (
+          <Badge
+            variant="outline"
+            className="h-5 border-orange-200 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300"
+          >
+            Lương thực: {stats.food}
+          </Badge>
+        )}
+        {stats.isolated > 0 && (
+          <Badge
+            variant="outline"
+            className="h-5 border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+          >
+            Cô lập: {stats.isolated}
+          </Badge>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const severityLabel = (value?: string) => {
+  const normalized = (value || "").toLowerCase();
+  if (normalized === "none" || !normalized) return "Chưa đánh giá";
+  if (normalized.includes("high") || normalized.includes("cao")) return "Cao";
+  if (normalized.includes("critical") || normalized.includes("nghiêm"))
+    return "Nghiêm trọng";
+  if (normalized.includes("severe") || normalized.includes("nặng"))
+    return "Nghiêm trọng";
+  if (normalized.includes("moderate") || normalized.includes("trung"))
+    return "Trung bình";
+  if (normalized.includes("low") || normalized.includes("nhẹ")) return "Nhẹ";
+  return value || "Chưa rõ";
+};
+
+const severityBadgeClass = (value?: string) => {
+  const normalized = (value || "").toLowerCase();
+  if (
+    normalized.includes("critical") ||
+    normalized.includes("nghiêm") ||
+    normalized.includes("severe") ||
+    normalized.includes("nặng")
+  ) {
+    return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+  }
+  if (normalized.includes("high") || normalized.includes("cao")) {
+    return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+  }
+  if (normalized.includes("moderate") || normalized.includes("trung")) {
+    return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+  }
+  if (normalized.includes("low") || normalized.includes("nhẹ")) {
+    return "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+  }
+  return "bg-muted text-muted-foreground border-border";
+};
+
+const getMedicalIssueColorClass = (code: string): string => {
+  const normalized = code
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  const critical = [
+    "UNCONSCIOUS",
+    "BREATHING_DIFFICULTY",
+    "CHEST_PAIN_STROKE",
+    "DROWNING",
+  ];
+  const severe = [
+    "SEVERELY_BLEEDING",
+    "BLEEDING",
+    "BURNS",
+    "HEAD_INJURY",
+    "CANNOT_MOVE",
+  ];
+  const moderate = [
+    "HIGH_FEVER",
+    "DEHYDRATION",
+    "FRACTURE",
+    "INFANT_NEEDS_MILK",
+    "LOST_PARENT",
+    "SHOCK",
+    "FEVER",
+  ];
+  const low = [
+    "CHRONIC_DISEASE",
+    "CONFUSION",
+    "NEEDS_MEDICAL_DEVICE",
+    "PREGNANCY",
+    "MINOR_WOUND",
+    "INFECTION",
+    "HYPOTHERMIA",
+  ];
+
+  if (critical.includes(normalized))
+    return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
+  if (severe.includes(normalized))
+    return "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400";
+  if (moderate.includes(normalized))
+    return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400";
+  if (low.includes(normalized))
+    return "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+};
+
+const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
+  const { data: analysisData } = useSOSRequestAnalysis(Number(sos.id), {
+    enabled: !!sos.id && !isNaN(Number(sos.id)),
+  });
+
+  const ruleScore = analysisData?.ruleEvaluation?.totalScore;
+
+  // Robust data extraction (handling multiple schema versions)
+  const structured = (sos as any).structuredData;
+  const v3Incident = structured?.incident;
+  const v3GroupNeeds = structured?.group_needs;
+  const v3Victims = structured?.victims || [];
+
+  const pc = v3Incident?.people_count ||
+    sos.peopleCount ||
+    structured?.people_count || { adult: 0, child: 0, elderly: 0 };
+  const totalPeople = pc.adult + pc.child + pc.elderly;
+
+  const situation =
+    v3Incident?.situation || (sos as any).situation || structured?.situation;
+  const additionalDesc =
+    v3Incident?.additional_description ||
+    (sos as any).additionalDescription ||
+    structured?.additional_description;
+  const address = v3Incident?.address || sos.address || structured?.address;
+
+  const supplies =
+    v3GroupNeeds?.supplies ||
+    (sos as any).supplies ||
+    structured?.supplies ||
+    [];
+  const otherSupplies =
+    v3GroupNeeds?.other_supply_description ||
+    (sos as any).otherSupplyDescription ||
+    structured?.other_supply_description;
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border bg-card shadow-sm overflow-hidden",
+        sos.priority === "P1"
+          ? "border-red-200 dark:border-red-900/50"
+          : sos.priority === "P2"
+            ? "border-orange-200 dark:border-orange-900/50"
+            : "border-border",
+      )}
+    >
+      {/* Header */}
+      <div
+        className={cn(
+          "px-4 py-3 flex items-center justify-between border-b",
+          sos.priority === "P1"
+            ? "bg-red-50/50 dark:bg-red-900/10"
+            : sos.priority === "P2"
+              ? "bg-orange-50/50 dark:bg-orange-900/10"
+              : "bg-muted/30",
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "p-2 rounded-lg bg-background border shadow-sm",
+              sos.priority === "P1"
+                ? "text-red-600"
+                : sos.priority === "P2"
+                  ? "text-orange-600"
+                  : "text-muted-foreground",
+            )}
+          >
+            <MapPin className="h-5 w-5" weight="fill" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-black text-foreground">SOS #{sos.id}</h4>
+              <Badge
+                variant={PRIORITY_BADGE_VARIANT[sos.priority]}
+                className="h-5 px-1.5 text-[10px] font-black uppercase"
+              >
+                {PRIORITY_LABELS[sos.priority]}
+              </Badge>
+            </div>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter truncate max-w-[300px]">
+              {address || "Không rõ địa chỉ"}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          {ruleScore !== undefined && (
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">
+                Điểm ưu tiên AI
+              </span>
+              <span className="text-xl font-black text-primary leading-none">
+                {ruleScore.toFixed(1)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Situation & Message */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-1 space-y-3">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                Tình trạng
+              </p>
+              <Badge
+                variant="outline"
+                className="bg-background font-bold border-muted-foreground/30"
+              >
+                {getSituationLabel(situation)}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                Nhân khẩu
+              </p>
+              <div className="flex flex-wrap gap-1">
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                >
+                  Già: {pc.elderly}
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                >
+                  Trẻ em: {pc.child}
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  Lớn: {pc.adult}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          <div className="md:col-span-2 space-y-1">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+              Nội dung yêu cầu
+            </p>
+            <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-sm leading-relaxed text-foreground/90 italic">
+              {sos.message}
+            </div>
+            {additionalDesc && (
+              <div className="mt-2 text-[11px] text-muted-foreground bg-amber-50/50 dark:bg-amber-900/10 p-2 rounded border border-amber-200/50">
+                <span className="font-bold uppercase text-amber-700 dark:text-amber-400 mr-1">
+                  Ghi chú thêm:
+                </span>
+                {additionalDesc}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Victims List (Detailed) */}
+        {v3Victims.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+              <Users className="h-3 w-3" />
+              Danh sách nạn nhân chi tiết
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {v3Victims.map((v: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border bg-background p-2.5 space-y-2 text-xs shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-foreground flex items-center gap-1">
+                      {v.person_type === "CHILD"
+                        ? "👶"
+                        : v.person_type === "ELDERLY"
+                          ? "👴"
+                          : "🧑"}
+                      {v.custom_name || `Nạn nhân ${idx + 1}`}
+                    </span>
+                    {v.incident_status?.severity && (
+                      <Badge
+                        className={cn(
+                          "text-[9px] h-4 px-1",
+                          severityBadgeClass(v.incident_status.severity),
+                        )}
+                      >
+                        {severityLabel(v.incident_status.severity)}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {v.incident_status?.medical_issues?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {v.incident_status.medical_issues.map(
+                        (issue: string, i: number) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className={cn(
+                              "text-[9px] h-4 px-1 border-transparent font-medium",
+                              getMedicalIssueColorClass(issue),
+                            )}
+                          >
+                            {getMedicalIssueLabel(issue)}
+                          </Badge>
+                        ),
+                      )}
+                    </div>
+                  )}
+
+                  {(v.personal_needs?.diet?.has_special_diet ||
+                    v.personal_needs?.clothing?.needed) && (
+                    <div className="pt-1.5 border-t border-dashed mt-1 space-y-1">
+                      {v.personal_needs.diet?.has_special_diet && (
+                        <div className="text-[9px] text-muted-foreground flex items-start gap-1">
+                          <ForkKnife className="h-2.5 w-2.5 mt-0.5 shrink-0" />
+                          <span>
+                            Ăn đặc biệt: {v.personal_needs.diet.description}
+                          </span>
+                        </div>
+                      )}
+                      {v.personal_needs.clothing?.needed && (
+                        <div className="text-[9px] text-muted-foreground flex items-start gap-1">
+                          <Info className="h-2.5 w-2.5 mt-0.5 shrink-0" />
+                          <span>
+                            Cần quần áo{" "}
+                            {v.personal_needs.clothing.gender === "MALE"
+                              ? "(Nam)"
+                              : "(Nữ)"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Needs & Supplies */}
+        <div className="space-y-2 border-t pt-4">
+          <p className="text-[10px] font-bold uppercase text-muted-foreground">
+            Nhu yếu phẩm & Vật tư cần thiết
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {supplies.map((s: string, idx: number) => (
+              <Badge
+                key={idx}
+                variant="outline"
+                className="bg-blue-50/50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 font-bold text-[10px]"
+              >
+                {getSupplyLabel(s)}
+              </Badge>
+            ))}
+            {otherSupplies && (
+              <Badge
+                variant="outline"
+                className="bg-indigo-50/50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 font-bold text-[10px]"
+              >
+                Khác: {otherSupplies}
+              </Badge>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+            {v3GroupNeeds?.water?.duration && (
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-bold uppercase">
+                  Nước uống còn lại
+                </p>
+                <p className="text-xs font-medium">
+                  {getWaterDurationLabel(v3GroupNeeds.water.duration)}
+                </p>
+              </div>
+            )}
+            {v3GroupNeeds?.food?.duration && (
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-bold uppercase">
+                  Thực phẩm còn lại
+                </p>
+                <p className="text-xs font-medium">
+                  {getFoodDurationLabel(v3GroupNeeds.food.duration)}
+                </p>
+              </div>
+            )}
+            {v3GroupNeeds?.medicine?.needs_urgent_medicine && (
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-bold uppercase underline decoration-red-400">
+                  Cần thuốc khẩn cấp
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {v3GroupNeeds.medicine.medical_needs?.map(
+                    (m: string, i: number) => (
+                      <span
+                        key={i}
+                        className="text-[10px] bg-red-100 text-red-700 px-1 rounded font-medium"
+                      >
+                        {getMedicalSupportNeedLabel(m)}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+            {v3GroupNeeds?.blanket?.is_cold_or_wet && (
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-bold uppercase text-blue-600">
+                  Đang bị lạnh/ướt
+                </p>
+                <p className="text-xs font-medium">Cần chăn mền/đồ giữ ấm</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 type CoordinationSummaryEntry = {
   key: string;
@@ -9094,7 +9676,7 @@ const RescuePlanPanel = ({
   );
 
   // ── Active tab: "plan" for AI plan view, "missions" for existing missions ──
-  const [activeTab, setActiveTab] = useState<"plan" | "missions">(
+  const [activeTab, setActiveTab] = useState<"plan" | "missions" | "sos_list">(
     defaultTab ?? "missions",
   );
   const [expandedMissionSupplyKeys, setExpandedMissionSupplyKeys] = useState<
@@ -10109,6 +10691,22 @@ const RescuePlanPanel = ({
             type="button"
             className={cn(
               "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              activeTab === "sos_list"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setActiveTab("sos_list")}
+          >
+            <Info className="h-3.5 w-3.5 inline mr-1.5" weight="fill" />
+            Thông tin SOS
+            <Badge variant="secondary" className="text-sm h-5 px-1.5 ml-1.5">
+              {panelSOSRequests.length}
+            </Badge>
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
               activeTab === "plan"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -10300,26 +10898,90 @@ const RescuePlanPanel = ({
                                           )
                                           .join(" • ")}
                                       </p>
-                                      <div className="mt-2 flex flex-wrap gap-1.5">
-                                        <Badge
-                                          variant="outline"
-                                          className="h-5 border-emerald-300/80 px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
-                                        >
-                                          Đã gửi: {missionReportStats.submitted}
-                                        </Badge>
-                                        <Badge
-                                          variant="outline"
-                                          className="h-5 border-amber-300/80 px-1.5 text-sm text-amber-700 dark:border-amber-700 dark:text-amber-300"
-                                        >
-                                          Nháp: {missionReportStats.draft}
-                                        </Badge>
-                                        <Badge
-                                          variant="outline"
-                                          className="h-5 border-slate-300/80 px-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                                        >
-                                          Chưa báo cáo:{" "}
-                                          {missionReportStats.notStarted}
-                                        </Badge>
+                                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          <Badge
+                                            variant="outline"
+                                            className="h-5 border-emerald-300/80 px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
+                                          >
+                                            Đã gửi:{" "}
+                                            {missionReportStats.submitted}
+                                          </Badge>
+                                          <Badge
+                                            variant="outline"
+                                            className="h-5 border-amber-300/80 px-1.5 text-sm text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                                          >
+                                            Nháp: {missionReportStats.draft}
+                                          </Badge>
+                                          <Badge
+                                            variant="outline"
+                                            className="h-5 border-slate-300/80 px-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                                          >
+                                            Chưa báo cáo:{" "}
+                                            {missionReportStats.notStarted}
+                                          </Badge>
+                                        </div>
+
+                                        {activeMissionTeams.length > 0 && (
+                                          <div className="shrink-0">
+                                            {activeMissionTeams.length === 1 ? (
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 gap-1 px-2.5 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20 shadow-sm"
+                                                onClick={() =>
+                                                  handleOpenMissionTeamReport(
+                                                    mission,
+                                                    activeMissionTeams[0],
+                                                  )
+                                                }
+                                              >
+                                                <Info
+                                                  className="h-3.5 w-3.5"
+                                                  weight="fill"
+                                                />
+                                                Xem báo cáo
+                                              </Button>
+                                            ) : (
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 gap-1 px-2.5 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20 shadow-sm"
+                                                  >
+                                                    <Info
+                                                      className="h-3.5 w-3.5"
+                                                      weight="fill"
+                                                    />
+                                                    Xem báo cáo
+                                                    <CaretDown className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  {activeMissionTeams.map(
+                                                    (team) => (
+                                                      <DropdownMenuItem
+                                                        key={team.missionTeamId}
+                                                        onClick={() =>
+                                                          handleOpenMissionTeamReport(
+                                                            mission,
+                                                            team,
+                                                          )
+                                                        }
+                                                      >
+                                                        {team.teamName ||
+                                                          `Đội #${team.rescueTeamId}`}
+                                                      </DropdownMenuItem>
+                                                    ),
+                                                  )}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     </>
                                   )}
@@ -11038,26 +11700,6 @@ const RescuePlanPanel = ({
                                                                                 reportStatusMeta.label
                                                                               }
                                                                             </Badge>
-                                                                            <Button
-                                                                              type="button"
-                                                                              variant="outline"
-                                                                              size="sm"
-                                                                              className="h-6 gap-1 px-2 text-sm border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20"
-                                                                              onClick={() =>
-                                                                                handleOpenMissionTeamReport(
-                                                                                  mission,
-                                                                                  team,
-                                                                                )
-                                                                              }
-                                                                            >
-                                                                              <Info
-                                                                                className="h-3 w-3"
-                                                                                weight="fill"
-                                                                              />
-                                                                              Xem
-                                                                              báo
-                                                                              cáo
-                                                                            </Button>
                                                                           </div>
                                                                         </div>
                                                                       );
@@ -11268,9 +11910,33 @@ const RescuePlanPanel = ({
                   </section>
                 )}
 
+                {/* ═══ TAB: SOS List ═══ */}
+                {activeTab === "sos_list" && (
+                  <ScrollArea className="h-full">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <ListChecks className="h-4 w-4" />
+                          Danh sách yêu cầu SOS trong cụm
+                        </h3>
+                      </div>
+
+                      <div className="space-y-4">
+                        {panelSOSRequests.map((sos) => (
+                          <SOSRequestDetailedCard key={sos.id} sos={sos} />
+                        ))}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                )}
+
                 {/* ═══ TAB: Plan ═══ */}
                 {activeTab === "plan" && (
                   <>
+                    <div className="mb-4">
+                      <ClusterSOSOverview sosRequests={panelSOSRequests} />
+                    </div>
+
                     {/* === Edit mode content === */}
                     {isEditMode && (
                       <>

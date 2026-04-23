@@ -807,6 +807,7 @@ const CoordinatorDashboardContent = () => {
   // ─── AI Stream ───
   const aiStream = useAiMissionStream();
   const [aiStreamOpen, setAiStreamOpen] = useState(false);
+  const [aiStreamMinimized, setAiStreamMinimized] = useState(false);
   const [aiStreamClusterId, setAiStreamClusterId] = useState<number | null>(
     null,
   );
@@ -1050,6 +1051,7 @@ const CoordinatorDashboardContent = () => {
 
       setMixedWarningDialogOpen(false);
       setAiStreamOpen(false);
+      setAiStreamMinimized(false);
       if (latestSuggestion) {
         setRescueSuggestion(latestSuggestion);
         suggestionCacheRef.current.set(targetClusterId, latestSuggestion);
@@ -1215,7 +1217,7 @@ const CoordinatorDashboardContent = () => {
                 toast.success(`Đã gom thành công ${created} cụm SOS`);
               }
             },
-            onError: (error) => {
+            onError: (error: any) => {
               failed++;
               console.error("Failed to create cluster:", error);
               if (created + failed === total) {
@@ -1224,7 +1226,10 @@ const CoordinatorDashboardContent = () => {
                     `Gom được ${created}/${total} cụm. ${failed} cụm thất bại.`,
                   );
                 } else {
-                  toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
+                  const errorMessage =
+                    error.response?.data?.message ||
+                    "Không thể gom cụm SOS. Vui lòng thử lại.";
+                  toast.error(errorMessage);
                 }
               }
             },
@@ -1263,13 +1268,17 @@ const CoordinatorDashboardContent = () => {
             setAiStreamClusterId(clusterData.clusterId);
             setRescuePlanPreferSplitSuggestion(false);
             setAiStreamOpen(true);
+            setAiStreamMinimized(false);
             aiStream.startStream(clusterData.clusterId);
             setProcessingClusterIndex(null);
             setProcessingSosId(null);
           },
-          onError: (error) => {
+          onError: (error: any) => {
             console.error("Failed to create cluster:", error);
-            toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
+            const errorMessage =
+              error.response?.data?.message ||
+              "Không thể gom cụm SOS. Vui lòng thử lại.";
+            toast.error(errorMessage);
             setProcessingClusterIndex(null);
             setProcessingSosId(null);
           },
@@ -1300,6 +1309,7 @@ const CoordinatorDashboardContent = () => {
       setAiStreamClusterId(clusterId);
       setRescuePlanPreferSplitSuggestion(false);
       setAiStreamOpen(true);
+      setAiStreamMinimized(false);
       aiStream.startStream(clusterId);
     },
     [aiStream, clusters],
@@ -1388,6 +1398,7 @@ const CoordinatorDashboardContent = () => {
 
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
+    setAiStreamMinimized(false);
     setRescuePlanOpen(false);
     setRescuePlanPreferSplitSuggestion(false);
     syncRescuePlanUrlState(false, activeClusterId);
@@ -1744,7 +1755,7 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
-                panelOpen={aiStreamOpen}
+                panelOpen={aiStreamOpen && !aiStreamMinimized}
                 onViewChange={handleCoordinatorMapViewChange}
                 routeOverlay={routeOverlay}
                 risingSOSMarkerIds={risingSOSMarkerIds}
@@ -1807,12 +1818,20 @@ const CoordinatorDashboardContent = () => {
               {/* AI Stream Panel */}
               <AiStreamPanel
                 open={aiStreamOpen}
+                minimized={aiStreamMinimized}
+                onMinimize={() => setAiStreamMinimized(true)}
+                onRestore={() => {
+                  setAiStreamOpen(true);
+                  setAiStreamMinimized(false);
+                }}
                 onClose={() => {
                   if (aiStream.loading) {
+                    setAiStreamMinimized(true);
                     return;
                   }
 
                   setAiStreamOpen(false);
+                  setAiStreamMinimized(false);
                   aiStream.stopStream();
                 }}
                 clusterId={aiStreamClusterId}
@@ -1826,6 +1845,8 @@ const CoordinatorDashboardContent = () => {
                 onStop={() => aiStream.stopStream()}
                 onRetry={() => {
                   if (aiStreamClusterId) {
+                    setAiStreamOpen(true);
+                    setAiStreamMinimized(false);
                     aiStream.startStream(aiStreamClusterId);
                   }
                 }}
