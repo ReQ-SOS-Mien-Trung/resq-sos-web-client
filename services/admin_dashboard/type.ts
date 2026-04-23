@@ -49,6 +49,16 @@ export interface MissionSuccessRateSummaryResponse {
   comparisonLabel: string;
 }
 
+// ─── Personnel Dashboard: Mission Team Reports Summary ───
+
+export interface MissionTeamReportsSummaryResponse {
+  totalCompletedTeams: number;
+  notStartedCount: number;
+  draftCount: number;
+  submittedCount: number;
+  submissionRate: number;
+}
+
 // ─── Personnel Dashboard: SOS Requests Summary ───
 
 export interface SosRequestsSummaryResponse {

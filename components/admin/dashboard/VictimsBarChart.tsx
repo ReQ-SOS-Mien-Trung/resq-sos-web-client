@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-} from "recharts";
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip as ChartTooltip,
+  Legend,
+  type ChartOptions,
+  type TooltipItem,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,6 +25,15 @@ import {
 import { useVictimsByPeriod } from "@/services/admin_dashboard";
 import type { VictimsByPeriodParams } from "@/services/admin_dashboard";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  ChartTooltip,
+  Legend,
+);
 
 /* ─── helpers ─── */
 
@@ -49,54 +61,13 @@ function formatPeriodLabel(period: string, granularity: Granularity): string {
   }
 }
 
-/* ─── Tooltip ─── */
-
-const CustomTooltip = ({
-  active,
-  payload,
-  granularity,
-}: {
-  active?: boolean;
-  payload?: Array<{
-    payload: { label: string; totalVictims: number; period: string };
-  }>;
-  granularity: Granularity;
-}) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    const granLabel =
-      granularity === "day"
-        ? "Ngày"
-        : granularity === "week"
-          ? "Tuần"
-          : "Tháng";
-
-    return (
-      <div className="bg-white dark:bg-zinc-800 border border-border/60 rounded-xl px-4 py-3 shadow-xl backdrop-blur-sm">
-        <p className="text-sm tracking-tighter font-medium text-muted-foreground mb-0.5">
-          {granLabel}
-        </p>
-        <p className="text-sm font-semibold text-foreground">{data.label}</p>
-        <div className="flex items-baseline gap-1.5 mt-1.5">
-          <span className="text-xl font-bold text-rose-500">
-            {data.totalVictims.toLocaleString("vi-VN")}
-          </span>
-          <span className="text-sm tracking-tighter text-muted-foreground">
-            nạn nhân
-          </span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
 /* ─── Main Component ─── */
 
 const VictimsBarChart = () => {
   const [granularity, setGranularity] = useState<Granularity>("month");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const chartRef = useRef(null);
 
   // Build query params
   const params = useMemo<VictimsByPeriodParams>(() => {
@@ -113,7 +84,7 @@ const VictimsBarChart = () => {
     isFetching: chartFetching,
   } = useVictimsByPeriod(params);
 
-  // Format data for recharts
+  // Format data
   const formattedData = useMemo(
     () =>
       chartData.map((item) => ({
@@ -127,6 +98,84 @@ const VictimsBarChart = () => {
   const totalVictims = useMemo(
     () => chartData.reduce((sum, item) => sum + item.totalVictims, 0),
     [chartData],
+  );
+
+  const granLabel =
+    granularity === "day" ? "Ngày" : granularity === "week" ? "Tuần" : "Tháng";
+
+  const chartJsData = useMemo(
+    () => ({
+      labels: formattedData.map((d) => d.label),
+      datasets: [
+        {
+          label: "Nạn nhân",
+          data: formattedData.map((d) => d.totalVictims),
+          backgroundColor: (ctx: { chart: ChartJS }) => {
+            const canvas = ctx.chart.ctx;
+            const gradient = canvas.createLinearGradient(0, 0, 0, 380);
+            gradient.addColorStop(0, "rgba(239,68,68,0.85)");
+            gradient.addColorStop(0.6, "rgba(249,115,22,0.5)");
+            gradient.addColorStop(1, "rgba(254,243,199,0.2)");
+            return gradient;
+          },
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 48,
+        },
+      ],
+    }),
+    [formattedData],
+  );
+
+  const options = useMemo<ChartOptions<"bar">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 800,
+        easing: "easeInOutQuart",
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "white",
+          titleColor: "#6b7280",
+          bodyColor: "#111827",
+          borderColor: "rgba(0,0,0,0.08)",
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 12,
+          callbacks: {
+            title: (items: TooltipItem<"bar">[]) =>
+              `${granLabel}: ${items[0]?.label ?? ""}`,
+            label: (item: TooltipItem<"bar">) =>
+              ` ${Number(item.raw).toLocaleString("vi-VN")} nạn nhân`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: {
+            color: "rgba(100,116,139,0.8)",
+            font: { size: 11, weight: "500" },
+          },
+        },
+        y: {
+          grid: {
+            color: "rgba(100,116,139,0.1)",
+          },
+          border: { display: false, dash: [4, 4] },
+          ticks: {
+            color: "rgba(100,116,139,0.8)",
+            font: { size: 11, weight: "500" },
+            precision: 0,
+          },
+        },
+      },
+    }),
+    [granLabel],
   );
 
   return (
@@ -217,62 +266,9 @@ const VictimsBarChart = () => {
             Không có dữ liệu cho khoảng thời gian này
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={380}>
-            <BarChart data={formattedData}>
-              <defs>
-                <linearGradient
-                  id="colorBarVictims"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="#ef4444" stopOpacity={0.85} />
-                  <stop offset="60%" stopColor="#f97316" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#fef3c7" stopOpacity={0.2} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                className="stroke-muted/30"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="label"
-                tick={{
-                  fill: "hsl(var(--foreground) / 0.8)",
-                  fontSize: 11,
-                  fontWeight: 500,
-                }}
-                axisLine={false}
-                tickLine={false}
-                dy={10}
-              />
-              <YAxis
-                allowDecimals={false}
-                tick={{
-                  fill: "hsl(var(--foreground) / 0.8)",
-                  fontSize: 11,
-                  fontWeight: 500,
-                }}
-                axisLine={false}
-                tickLine={false}
-                dx={-10}
-              />
-              <Tooltip
-                content={<CustomTooltip granularity={granularity} />}
-                cursor={{ fill: "rgba(0,0,0,0.04)" }}
-              />
-              <Bar
-                dataKey="totalVictims"
-                fill="url(#colorBarVictims)"
-                radius={[6, 6, 0, 0]}
-                maxBarSize={48}
-                animationDuration={800}
-                animationEasing="ease-out"
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <div style={{ height: 380 }}>
+            <Bar ref={chartRef} data={chartJsData} options={options} />
+          </div>
         )}
       </CardContent>
     </Card>

@@ -6,7 +6,7 @@ import { Check } from "@phosphor-icons/react";
 import {
   CalendarWidget,
   DashboardLayout,
-  LeadsManagement,
+  MissionReportComplianceChart,
   RetentionRate,
   RescuerOverview,
   SOSOverview,
@@ -98,12 +98,12 @@ const AdminDashboardPage = () => {
         </div>
         {/* Second Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Leads Management */}
+          {/* Mission Report Compliance */}
           <div
             className="lg:col-span-1 animate-in fade-in slide-in-from-bottom-4 duration-500"
             style={{ animationDelay: "400ms" }}
           >
-            <LeadsManagement data={data.leads} />
+            <MissionReportComplianceChart />
           </div>
 
           {/* Top Countries */}
