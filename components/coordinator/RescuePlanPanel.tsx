@@ -13125,6 +13125,14 @@ const RescuePlanPanel = ({
                                                         <div className="space-y-1">
                                                           {activity.suppliesToCollect.map(
                                                             (supply, sIdx) => {
+                                                              const isReusable =
+                                                                normalizeInventoryItemType(
+                                                                  supply.itemType,
+                                                                ) === "Reusable";
+                                                              const showBufferInput =
+                                                                isCollectSuppliesActivity &&
+                                                                !isReusable;
+
                                                               const supplyDisplay =
                                                                 buildSupplyDisplayItem(
                                                                   activity.activityType,
@@ -13147,7 +13155,7 @@ const RescuePlanPanel = ({
                                                                 >
                                                                   <div
                                                                     className={cn(
-                                                                      isCollectSuppliesActivity
+                                                                      showBufferInput
                                                                         ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
                                                                         : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
                                                                       hasActivityError
@@ -13211,7 +13219,7 @@ const RescuePlanPanel = ({
                                                                         supply.unit,
                                                                       )}
                                                                     </span>
-                                                                    {isCollectSuppliesActivity ? (
+                                                                    {showBufferInput ? (
                                                                       <div className="relative min-w-0">
                                                                         <Input
                                                                           type="number"

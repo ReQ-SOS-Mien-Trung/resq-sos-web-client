@@ -24,7 +24,11 @@ import {
   useSOSRequests,
   useSOSRequestsInBounds,
 } from "@/services/sos_request/hooks";
-import type { SOSRequestStatus } from "@/services/sos_request/type";
+import type {
+  SOSPriorityLevel,
+  SOSRequestStatus,
+  SOSRequestTypeFilter,
+} from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -33,7 +37,10 @@ import {
 } from "@/services/sos_cluster/hooks";
 import { useTeamIncidents } from "@/services/team_incidents/hooks";
 import type {
+  ClusterLifecycleStatus,
+  ClusterPriorityLevel,
   ClusterRescueSuggestionResponse,
+  ClusterSOSType,
   SOSClusterEntity,
 } from "@/services/sos_cluster/type";
 import { useDepots } from "@/services/depot/hooks";
@@ -148,6 +155,21 @@ function haversine(
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function normalizeSOSRequestTypeFilterValue(
+  value?: string | null,
+): SOSRequestTypeFilter | null {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+
+  if (normalized === "rescue") return "Rescue";
+  if (normalized === "relief") return "Relief";
+  if (normalized === "both") return "Both";
+
+  return null;
 }
 
 const AUTO_CLUSTER_MAX_SIZE = 3;
@@ -441,6 +463,21 @@ const CoordinatorDashboardContent = () => {
   const [selectedSOSStatuses, setSelectedSOSStatuses] = useState<
     SOSRequestStatus[]
   >([]);
+  const [selectedSOSPriorities, setSelectedSOSPriorities] = useState<
+    SOSPriorityLevel[]
+  >([]);
+  const [selectedSosTypes, setSelectedSosTypes] = useState<
+    SOSRequestTypeFilter[]
+  >([]);
+  const [selectedClusterStatuses, setSelectedClusterStatuses] = useState<
+    ClusterLifecycleStatus[]
+  >([]);
+  const [selectedClusterPriorities, setSelectedClusterPriorities] = useState<
+    ClusterPriorityLevel[]
+  >([]);
+  const [selectedClusterSosTypes, setSelectedClusterSosTypes] = useState<
+    ClusterSOSType[]
+  >([]);
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -518,6 +555,51 @@ const CoordinatorDashboardContent = () => {
     () => (selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined),
     [selectedSOSStatuses],
   );
+  const priorityQueryFilter = useMemo(
+    () =>
+      selectedSOSPriorities.length > 0 ? selectedSOSPriorities : undefined,
+    [selectedSOSPriorities],
+  );
+  const sosTypeQueryFilter = useMemo(
+    () => (selectedSosTypes.length > 0 ? selectedSosTypes : undefined),
+    [selectedSosTypes],
+  );
+  const hasSidebarClusterBackendFilters = useMemo(
+    () =>
+      selectedClusterStatuses.length > 0 ||
+      selectedClusterPriorities.length > 0 ||
+      selectedClusterSosTypes.length > 0,
+    [
+      selectedClusterPriorities.length,
+      selectedClusterSosTypes.length,
+      selectedClusterStatuses.length,
+    ],
+  );
+  const sidebarClusterQueryParams = useMemo(
+    () =>
+      hasSidebarClusterBackendFilters
+        ? {
+            statuses:
+              selectedClusterStatuses.length > 0
+                ? selectedClusterStatuses
+                : undefined,
+            priorities:
+              selectedClusterPriorities.length > 0
+                ? selectedClusterPriorities
+                : undefined,
+            sosTypes:
+              selectedClusterSosTypes.length > 0
+                ? selectedClusterSosTypes
+                : undefined,
+          }
+        : undefined,
+    [
+      hasSidebarClusterBackendFilters,
+      selectedClusterPriorities,
+      selectedClusterSosTypes,
+      selectedClusterStatuses,
+    ],
+  );
 
   // ─── Data Fetching ───
   const { data: sidebarSosData, isLoading: isSidebarSosLoading } =
@@ -526,6 +608,8 @@ const CoordinatorDashboardContent = () => {
         pageNumber: sidebarSOSPage,
         pageSize: SIDEBAR_SOS_PAGE_SIZE,
         Statuses: statusQueryFilter,
+        Priorities: priorityQueryFilter,
+        SosTypes: sosTypeQueryFilter,
       },
     });
   const { data: mapSosData } = useSOSRequestsInBounds({
@@ -536,6 +620,8 @@ const CoordinatorDashboardContent = () => {
           MinLng: mapFetchBounds.west,
           MaxLng: mapFetchBounds.east,
           Statuses: statusQueryFilter,
+          Priorities: priorityQueryFilter,
+          SosTypes: sosTypeQueryFilter,
         }
       : undefined,
     enabled: !isWeatherMode && !!mapFetchBounds,
@@ -549,6 +635,10 @@ const CoordinatorDashboardContent = () => {
     params: { pageSize: 200 },
   });
   const { data: clustersData } = useSOSClusters();
+  const { data: sidebarFilteredClustersData } = useSOSClusters({
+    params: sidebarClusterQueryParams,
+    enabled: hasSidebarClusterBackendFilters,
+  });
   const sosClusterGroupingConfigQuery = useSosClusterGroupingConfig();
   const { data: serviceZonesData } = useAllServiceZones({
     enabled: !isWeatherMode,
@@ -618,23 +708,43 @@ const CoordinatorDashboardContent = () => {
       return;
     }
 
-    if (selectedSOSStatuses.length === 0) {
+    if (
+      selectedSOSStatuses.length === 0 &&
+      selectedSOSPriorities.length === 0 &&
+      selectedSosTypes.length === 0
+    ) {
       return;
     }
 
     const matchesStatus =
-      selectedSOS.rawStatus != null &&
-      selectedSOSStatuses.includes(selectedSOS.rawStatus);
+      selectedSOSStatuses.length === 0 ||
+      (selectedSOS.rawStatus != null &&
+        selectedSOSStatuses.includes(selectedSOS.rawStatus));
+    const matchesPriority =
+      selectedSOSPriorities.length === 0 ||
+      (selectedSOS.rawPriorityLevel != null &&
+        selectedSOSPriorities.includes(selectedSOS.rawPriorityLevel));
+    const selectedSosType = normalizeSOSRequestTypeFilterValue(
+      selectedSOS.sosType,
+    );
+    const matchesSosType =
+      selectedSosTypes.length === 0 ||
+      (selectedSosType != null && selectedSosTypes.includes(selectedSosType));
 
-    if (!matchesStatus) {
+    if (!matchesStatus || !matchesPriority || !matchesSosType) {
       setSelectedSOS(null);
       setSOSDetailOpen(false);
     }
-  }, [selectedSOS, selectedSOSStatuses]);
+  }, [
+    selectedSOS,
+    selectedSOSPriorities,
+    selectedSOSStatuses,
+    selectedSosTypes,
+  ]);
 
   useEffect(() => {
     setSidebarSOSPage(1);
-  }, [selectedSOSStatuses]);
+  }, [selectedSOSPriorities, selectedSOSStatuses, selectedSosTypes]);
   const depots = useMemo<DepotEntity[]>(
     () => depotsData?.items ?? [],
     [depotsData],
@@ -662,6 +772,13 @@ const CoordinatorDashboardContent = () => {
   const clusters = useMemo<SOSClusterEntity[]>(
     () => clustersData?.clusters ?? [],
     [clustersData],
+  );
+  const filteredSidebarClusters = useMemo<SOSClusterEntity[] | undefined>(
+    () =>
+      hasSidebarClusterBackendFilters
+        ? (sidebarFilteredClustersData?.clusters ?? clusters)
+        : undefined,
+    [clusters, hasSidebarClusterBackendFilters, sidebarFilteredClustersData],
   );
   useEffect(() => {
     if (recentlyClusteredSOSIds.size === 0) {
@@ -1704,6 +1821,7 @@ const CoordinatorDashboardContent = () => {
               processingClusterIndex={processingClusterIndex}
               processingSosId={processingSosId}
               backendClusters={clusters}
+              filteredBackendClusters={filteredSidebarClusters}
               onAnalyzeCluster={handleAnalyzeCluster}
               isAnalyzingCluster={aiStream.loading || isFetchingSuggestion}
               analyzingClusterId={analyzingClusterId}
@@ -1713,6 +1831,16 @@ const CoordinatorDashboardContent = () => {
               onViewMission={handleViewMission}
               selectedStatuses={selectedSOSStatuses}
               onSelectedStatusesChange={setSelectedSOSStatuses}
+              selectedPriorities={selectedSOSPriorities}
+              onSelectedPrioritiesChange={setSelectedSOSPriorities}
+              selectedSosTypes={selectedSosTypes}
+              onSelectedSosTypesChange={setSelectedSosTypes}
+              selectedClusterStatuses={selectedClusterStatuses}
+              onSelectedClusterStatusesChange={setSelectedClusterStatuses}
+              selectedClusterPriorities={selectedClusterPriorities}
+              onSelectedClusterPrioritiesChange={setSelectedClusterPriorities}
+              selectedClusterSosTypes={selectedClusterSosTypes}
+              onSelectedClusterSosTypesChange={setSelectedClusterSosTypes}
             />
           )}
         </aside>

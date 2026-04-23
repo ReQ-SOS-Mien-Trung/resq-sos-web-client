@@ -66,10 +66,17 @@ export function useSOSRequests(options?: UseSOSRequestsOptions) {
   );
   const normalizedPriorityLevels = useMemo(
     () =>
-      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+      Array.from(new Set((params?.Priorities ?? []).filter(Boolean))).sort(
         (left, right) => left.localeCompare(right),
       ),
-    [params?.PriorityLevels],
+    [params?.Priorities],
+  );
+  const normalizedSosTypes = useMemo(
+    () =>
+      Array.from(new Set((params?.SosTypes ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.SosTypes],
   );
 
   return useQuery<GetSOSRequestsResponse>({
@@ -79,6 +86,7 @@ export function useSOSRequests(options?: UseSOSRequestsOptions) {
       params?.pageSize ?? 10,
       normalizedStatuses.join(","),
       normalizedPriorityLevels.join(","),
+      normalizedSosTypes.join(","),
     ],
     queryFn: () => getSOSRequests(params),
   });
@@ -107,10 +115,17 @@ export function useSOSRequestsInBounds(
   );
   const normalizedPriorityLevels = useMemo(
     () =>
-      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+      Array.from(new Set((params?.Priorities ?? []).filter(Boolean))).sort(
         (left, right) => left.localeCompare(right),
       ),
-    [params?.PriorityLevels],
+    [params?.Priorities],
+  );
+  const normalizedSosTypes = useMemo(
+    () =>
+      Array.from(new Set((params?.SosTypes ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.SosTypes],
   );
 
   return useQuery<SOSRequestEntity[]>({
@@ -120,6 +135,7 @@ export function useSOSRequestsInBounds(
       boundsKey,
       normalizedStatuses.join(","),
       normalizedPriorityLevels.join(","),
+      normalizedSosTypes.join(","),
     ],
     queryFn: () => getSOSRequestsInBounds(params!),
     enabled:

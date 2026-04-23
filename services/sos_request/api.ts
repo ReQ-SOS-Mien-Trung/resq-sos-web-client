@@ -23,7 +23,8 @@ export async function getSOSRequests(
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
       Statuses: params?.Statuses,
-      PriorityLevels: params?.PriorityLevels,
+      Priorities: params?.Priorities,
+      SosTypes: params?.SosTypes,
     },
     paramsSerializer: {
       indexes: null,
@@ -50,7 +51,8 @@ export async function getSOSRequestsInBounds(
     params: {
       ...boundsParams,
       Statuses: params.Statuses,
-      PriorityLevels: params.PriorityLevels,
+      Priorities: params.Priorities,
+      SosTypes: params.SosTypes,
     },
     paramsSerializer: {
       indexes: null, // ?Statuses=Pending&Statuses=Assigned

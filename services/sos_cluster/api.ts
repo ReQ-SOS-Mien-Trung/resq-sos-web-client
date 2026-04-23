@@ -348,11 +348,31 @@ export async function getSOSClusters(
         .filter((status) => status.length > 0),
     ),
   );
+  const requestedPriorities = Array.from(
+    new Set(
+      (params?.priorities ?? [])
+        .filter((priority): priority is string => typeof priority === "string")
+        .map((priority) => priority.trim())
+        .filter((priority) => priority.length > 0),
+    ),
+  );
+  const requestedSOSTypes = Array.from(
+    new Set(
+      (params?.sosTypes ?? [])
+        .filter((sosType): sosType is string => typeof sosType === "string")
+        .map((sosType) => sosType.trim())
+        .filter((sosType) => sosType.length > 0),
+    ),
+  );
   const shouldUseSinglePageRequest =
-    requestedPageNumber != null ||
-    requestedPageSize != null ||
-    requestedSOSRequestId != null ||
-    requestedStatuses.length > 0;
+    requestedPageNumber != null || requestedPageSize != null;
+  const requestFilters = {
+    sosRequestId: requestedSOSRequestId,
+    statuses: requestedStatuses.length > 0 ? requestedStatuses : undefined,
+    priorities:
+      requestedPriorities.length > 0 ? requestedPriorities : undefined,
+    sosTypes: requestedSOSTypes.length > 0 ? requestedSOSTypes : undefined,
+  };
 
   if (shouldUseSinglePageRequest) {
     const pageNumber = requestedPageNumber ?? 1;
@@ -361,8 +381,7 @@ export async function getSOSClusters(
       params: {
         pageNumber,
         pageSize,
-        sosRequestId: requestedSOSRequestId,
-        statuses: requestedStatuses.length > 0 ? requestedStatuses : undefined,
+        ...requestFilters,
       },
       paramsSerializer: { indexes: null },
     });
@@ -388,7 +407,9 @@ export async function getSOSClusters(
       params: {
         pageNumber: nextPageNumber,
         pageSize: AGGREGATED_PAGE_SIZE,
+        ...requestFilters,
       },
+      paramsSerializer: { indexes: null },
     });
 
     const payload = data as RawSOSClustersResponse;

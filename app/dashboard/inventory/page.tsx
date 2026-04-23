@@ -24,6 +24,7 @@ import {
   Gear,
   User,
   ArrowsClockwise,
+  Broadcast,
   WifiHigh,
   WifiSlash,
   Plus,
@@ -415,7 +416,7 @@ const InventoryDashboardPage = () => {
     [allRequestsPagedData, trackerRequestId],
   );
 
-  useInventoryOperationalRealtime({
+  const operationalConnectionState = useInventoryOperationalRealtime({
     supplyRequests: {
       depotId: selectedDepotId,
       requestId: trackerOpen ? trackerRequestId : null,
@@ -425,6 +426,17 @@ const InventoryDashboardPage = () => {
     },
     enabled: Boolean(selectedDepotId),
   });
+
+  const isConnected = operationalConnectionState === "connected";
+  const isConnectingLike =
+    operationalConnectionState === "connecting" ||
+    operationalConnectionState === "reconnecting";
+
+  const connectionLabel = isConnected
+    ? "Đã kết nối trực tiếp"
+    : isConnectingLike
+      ? "Đang kết nối..."
+      : "Mất kết nối trực tiếp";
 
   // Use the first depot as the current managed depot
   const currentDepot =
@@ -656,30 +668,37 @@ const InventoryDashboardPage = () => {
           </div>
           <div
             className={cn(
-              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex",
-              currentDepot
+              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex transition-colors duration-300",
+              isConnected
                 ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
-                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+                : isConnectingLike
+                  ? "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-400"
+                  : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
             )}
-            title={currentDepot ? "Đang kết nối" : "Mất kết nối"}
-            aria-label={currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            title={connectionLabel}
+            aria-label={connectionLabel}
           >
-            {currentDepot ? (
+            {isConnected ? (
               <>
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
               </>
+            ) : isConnectingLike ? (
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-amber-500 dark:border-zinc-900/70" />
+              </>
             ) : (
               <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
-            {currentDepot ? (
-              <WifiHigh className="h-4 w-4" weight="bold" />
+            {isConnected ? (
+              <Broadcast className="h-4 w-4" weight="fill" />
+            ) : isConnectingLike ? (
+              <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
-              <WifiSlash className="h-4 w-4" weight="bold" />
+              <Broadcast className="h-4 w-4" weight="bold" />
             )}
-            <span className="sr-only">
-              {currentDepot ? "Đang kết nối" : "Mất kết nối"}
-            </span>
+            <span className="sr-only">{connectionLabel}</span>
           </div>
         </div>
 
