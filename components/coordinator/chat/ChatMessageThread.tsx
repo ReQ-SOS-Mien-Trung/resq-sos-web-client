@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowSquareOut, Package } from "@phosphor-icons/react";
 import {
   Dialog,
@@ -387,11 +387,47 @@ export default function ChatMessageThread({
     alt: string;
     src: string;
   } | null>(null);
-  const visibleMessages = messages.filter((message) => {
-    const sosCards = parseSosCards(message.content);
-    const isAiMessage = message.messageType === "AiMessage";
-    return !isAiMessage || sosCards.length > 0;
-  });
+  const latestMessageRef = useRef<HTMLDivElement | null>(null);
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter((message) => {
+        const sosCards = parseSosCards(message.content);
+        const isAiMessage = message.messageType === "AiMessage";
+        return !isAiMessage || sosCards.length > 0;
+      }),
+    [messages],
+  );
+  const latestMessageKey = useMemo(() => {
+    const latestMessage = visibleMessages.at(-1);
+
+    if (!latestMessage) {
+      return null;
+    }
+
+    return [
+      latestMessage.id,
+      latestMessage.conversationId,
+      latestMessage.createdAt,
+      latestMessage.content,
+    ].join("|");
+  }, [visibleMessages]);
+
+  useEffect(() => {
+    if (!latestMessageKey) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      latestMessageRef.current?.scrollIntoView({
+        block: "end",
+        behavior: "smooth",
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [latestMessageKey]);
 
   if (isLoading) {
     return (
@@ -515,6 +551,11 @@ export default function ChatMessageThread({
                                   alt={alt}
                                   className="max-h-64 w-auto max-w-full rounded-lg border border-black/10 object-cover"
                                   loading="lazy"
+                                  onLoad={() => {
+                                    latestMessageRef.current?.scrollIntoView({
+                                      block: "end",
+                                    });
+                                  }}
                                 />
                               </button>
                             );
@@ -544,6 +585,7 @@ export default function ChatMessageThread({
               </div>
             );
           })}
+          <div ref={latestMessageRef} aria-hidden="true" />
         </div>
       </ScrollArea>
 

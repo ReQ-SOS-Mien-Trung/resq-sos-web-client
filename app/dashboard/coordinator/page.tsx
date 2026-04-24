@@ -430,6 +430,53 @@ function mapRescueTeamToRescuer(
 
 const SIDEBAR_SOS_PAGE_SIZE = 8;
 
+// ── Legend Component ──
+
+const MapLegend = () => {
+  return (
+    <div className="absolute bottom-6 left-6 z-[40] pointer-events-none select-none">
+      <div className="bg-background/85 backdrop-blur-md border border-border/60 shadow-xl rounded-2xl p-3 flex flex-col gap-3 min-w-[160px] animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">Mức độ SOS</p>
+          <div className="grid grid-cols-1 gap-1.5">
+            {[
+              { label: "P1: Rất nghiêm trọng", color: "bg-[#ef4444]" },
+              { label: "P2: Nghiêm trọng", color: "bg-[#f97316]" },
+              { label: "P3: Trung bình", color: "bg-[#eab308]" },
+              { label: "P4: Thấp", color: "bg-[#14b8a6]" },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
+                <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm shrink-0", item.color)} />
+                <span className="text-[11px] font-medium text-foreground/90">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-px bg-border/40" />
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">Địa điểm</p>
+          <div className="grid grid-cols-1 gap-1.5">
+            <div className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
+              <div className="w-5 h-5 rounded-md bg-purple-100 border border-purple-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
+                📍
+              </div>
+              <span className="text-[11px] font-medium text-foreground/90">Điểm tập kết</span>
+            </div>
+            <div className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
+              <div className="w-5 h-5 rounded-md bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
+                📦
+              </div>
+              <span className="text-[11px] font-medium text-foreground/90">Kho vật phẩm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Main Dashboard Content ──
 
 const CoordinatorDashboardContent = () => {
@@ -1888,6 +1935,8 @@ const CoordinatorDashboardContent = () => {
                 routeOverlay={routeOverlay}
                 risingSOSMarkerIds={risingSOSMarkerIds}
               />
+
+              <MapLegend />
 
               {/* Floating Action Buttons */}
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40] flex items-center gap-3">

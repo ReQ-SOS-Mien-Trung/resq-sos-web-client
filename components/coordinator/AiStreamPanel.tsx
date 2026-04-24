@@ -471,6 +471,61 @@ function getLatestStatusMessage(statusLog: StreamLogEntry[]): string | null {
   return null;
 }
 
+const AI_STEP_TRANSLATIONS: Record<string, string> = {
+  COLLECT_SUPPLIES: "Tiếp nhận vật phẩm",
+  DELIVER_SUPPLIES: "Phân phát vật phẩm",
+  RESCUE: "Cứu hộ",
+  EVACUATE: "Sơ tán",
+  RETURN_SUPPLIES: "Hoàn trả vật phẩm",
+  MOVE_TO_LOCATION: "Di chuyển",
+  SOS_SUPPORT: "Hỗ trợ SOS",
+};
+
+function translateAIText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(
+      /Activity step (\d+) \(([^)]+)\)/g,
+      (match, step, type) => `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`
+    )
+    .replace(/team_id=(\d+)/g, "đội ID $1")
+    .replace(/pool nearby teams/g, "danh sách đội cứu hộ được quét xung quanh khu vực");
+}
+
+function FormattedAINotes({ text, textClassName }: { text: string; textClassName?: string }) {
+  if (!text) return null;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  return (
+    <div className="space-y-3">
+      {lines.map((line, idx) => {
+        if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
+          const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
+          const items = content.split("|").map(i => i.trim()).filter(Boolean);
+          return (
+            <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3">
+              <h5 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2.5 flex items-center gap-1.5">
+                <Warning className="w-4 h-4" weight="fill" />
+                CẦN XEM LẠI THỦ CÔNG
+              </h5>
+              <ul className="list-disc list-inside space-y-1.5 text-sm text-red-600/90 dark:text-red-400/90 leading-relaxed">
+                {items.map((item, i) => (
+                  <li key={i}>{translateAIText(item)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return (
+          <p key={idx} className={textClassName || "text-sm text-foreground/80 leading-relaxed"}>
+            {translateAIText(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ═══ Main Component ═══ */
 
 export default function AiStreamPanel({
@@ -1689,7 +1744,7 @@ function MissionBanner({
                 : "Chưa rõ mức độ"}
             </Badge>
             <span className="text-sm font-mono text-muted-foreground">
-              {(result.modelName || "AI")} • {result.responseTimeMs}ms
+              {result.modelName || "AI"}
             </span>
           </div>
         </div>
@@ -1724,12 +1779,6 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
 
   const stats = [
     {
-      icon: ShieldCheck,
-      label: "Độ tin cậy",
-      value: `${(result.confidenceScore * 100).toFixed(0)}%`,
-      color: "text-emerald-400",
-    },
-    {
       icon: Lightning,
       label: "Ưu tiên",
       value:
@@ -1759,7 +1808,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
   ];
 
   return (
-    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-5">
+    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-4">
       {stats.map((s) => {
         const Icon = s.icon;
         return (
@@ -2234,7 +2283,6 @@ function WarningsBlock({
     !result.needsManualReview &&
     !result.multiDepotRecommended &&
     !result.specialNotes &&
-    !(result.mixedRescueReliefWarning || "").trim() &&
     !result.needsAdditionalDepot &&
     (result.supplyShortages?.length ?? 0) === 0
   )
@@ -2242,19 +2290,6 @@ function WarningsBlock({
 
   return (
     <div className="space-y-2">
-      {(result.mixedRescueReliefWarning || "").trim() ? (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/[0.06] border border-rose-500/15">
-          <Warning className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" weight="fill" />
-          <div>
-            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-0.5">
-              Cảnh báo tách nhiệm vụ
-            </p>
-            <p className="text-sm text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
-              {result.mixedRescueReliefWarning}
-            </p>
-          </div>
-        </div>
-      ) : null}
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
@@ -2318,9 +2353,7 @@ function WarningsBlock({
             <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
-              {result.specialNotes}
-            </p>
+            <FormattedAINotes text={result.specialNotes} textClassName="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed" />
           </div>
         </div>
       )}
