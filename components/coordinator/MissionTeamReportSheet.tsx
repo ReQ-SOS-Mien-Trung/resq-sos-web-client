@@ -191,10 +191,10 @@ function JsonValueView({ value }: { value: JsonValue }) {
             key={key}
             className="rounded-md border border-border/70 bg-background px-2 py-1.5"
           >
-            <p className="text-xs font-semibold uppercase text-muted-foreground">
+            <p className="text-sm font-semibold uppercase text-muted-foreground">
               {key}
             </p>
-            <div className="mt-1 text-sm font-medium text-foreground/85">
+            <div className="mt-1 text-base font-medium text-foreground/85">
               <JsonValueView value={item} />
             </div>
           </div>
@@ -204,7 +204,7 @@ function JsonValueView({ value }: { value: JsonValue }) {
   }
 
   return (
-    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+    <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground/85">
       {formatJsonScalar(value)}
     </p>
   );
@@ -225,7 +225,7 @@ function JsonSection({
       <SectionTitle icon={<FileText className="h-4 w-4" />} title={title} />
       <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
         {parsed.kind === "text" ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground/85">
             {parsed.text}
           </p>
         ) : (
@@ -252,7 +252,7 @@ function TextSection({
     <section className="space-y-2">
       <SectionTitle icon={icon} title={title} />
       <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+        <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground/85">
           {trimmed}
         </p>
       </div>
@@ -268,7 +268,7 @@ function SectionTitle({
   title: string;
 }) {
   return (
-    <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+    <h3 className="flex items-center gap-2 text-base font-bold uppercase tracking-wider text-muted-foreground">
       <span className="text-primary">{icon}</span>
       {title}
     </h3>
@@ -278,10 +278,10 @@ function SectionTitle({
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
-      <p className="text-xs font-semibold uppercase text-muted-foreground">
+      <p className="text-sm font-semibold uppercase text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm font-bold text-foreground">{value}</p>
+      <p className="mt-1 text-lg font-bold text-foreground">{value}</p>
     </div>
   );
 }
@@ -351,18 +351,18 @@ function ActivityReportList({
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground">
+                  <p className="text-lg font-bold text-foreground">
                     {getActivityLabel(activity, sourceActivity)}
                   </p>
                   {sourceActivity?.description ? (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    <p className="mt-1 line-clamp-2 text-base text-muted-foreground">
                       {sourceActivity.description}
                     </p>
                   ) : null}
                 </div>
                 <Badge
                   variant="outline"
-                  className={cn("shrink-0 text-sm", statusMeta.className)}
+                  className={cn("shrink-0 text-base py-1 px-3", statusMeta.className)}
                 >
                   {activity.executionStatus ||
                     activity.activityStatus ||
@@ -416,16 +416,16 @@ function MemberEvaluationList({
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-foreground">
+                <p className="truncate text-lg font-bold text-foreground">
                   {member.fullName || member.username || "Thành viên"}
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-base text-muted-foreground">
                   {[member.roleInTeam, member.rescuerType, member.phone]
                     .filter(Boolean)
                     .join(" • ")}
                 </p>
               </div>
-              <Badge variant="outline" className="text-sm">
+              <Badge variant="outline" className="text-base py-1 px-3">
                 Tổng: {formatScore(member.overallScore)}
               </Badge>
             </div>
@@ -491,10 +491,10 @@ export default function MissionTeamReportSheet({
         <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <SheetTitle className="truncate text-xl font-black tracking-tight">
+              <SheetTitle className="truncate text-2xl font-black tracking-tight">
                 Báo cáo {teamName}
               </SheetTitle>
-              <SheetDescription className="mt-1">
+              <SheetDescription className="mt-1 text-base">
                 Mission #{mission?.id ?? "-"}
                 {team?.teamCode ? ` • ${team.teamCode}` : ""}
               </SheetDescription>

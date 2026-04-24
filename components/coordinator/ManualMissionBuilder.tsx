@@ -622,12 +622,8 @@ function isCluster111DemoAvailable(
   sosRequests: SOSRequest[],
   isEditingExisting: boolean,
 ): boolean {
-  if (isEditingExisting || clusterId !== CLUSTER_111_DEMO_ID) {
-    return false;
-  }
-
-  const sosIds = new Set(sosRequests.map((sos) => String(sos.id)));
-  return CLUSTER_111_DEMO_SOS_IDS.every((id) => sosIds.has(id));
+  // Luôn cho phép hiển thị nút Demo để coordinator có thể điền mẫu nhanh theo yêu cầu
+  return true;
 }
 
 function formatDateTimeLocalValue(date: Date): string {
@@ -2840,13 +2836,13 @@ const ManualMissionBuilder = ({
     }
 
     if (!cluster111DemoDepot) {
-      toast.error("Cụm #111 chưa có kho gần cụm để điền demo vật phẩm.");
+      toast.error("Chưa có kho nào gần cụm để điền demo vật phẩm.");
       return;
     }
 
     if (isCluster111DemoInventoryLoading) {
       toast.info(
-        "Đang tải vật phẩm từ kho gần cụm #111. Thử lại sau giây lát.",
+        "Đang tải vật phẩm từ kho gần cụm. Thử lại sau giây lát.",
       );
       return;
     }
@@ -2858,7 +2854,7 @@ const ManualMissionBuilder = ({
 
     if (consumableSupplies.length === 0) {
       toast.error(
-        "Kho gần cụm #111 chưa có vật phẩm tiêu hao khả dụng để phân phát.",
+        "Kho gần cụm chưa có vật phẩm tiêu hao khả dụng để phân phát.",
       );
       return;
     }
@@ -3906,7 +3902,7 @@ const ManualMissionBuilder = ({
                           onClick={handleApplyCluster111DemoPlan}
                         >
                           <Rocket className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">Điền demo cụm #111</span>
+                          <span className="truncate">Điền demo mẫu nhiệm vụ</span>
                         </Button>
                       ) : null}
                     </div>

@@ -115,6 +115,7 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
       reporterInfo?.is_online ?? entity.senderInfo?.is_online ?? undefined,
     hopCount: networkMetadata?.hop_count,
     locationAccuracy: entity.locationAccuracy,
+    evaluation: entity.evaluation ?? null,
   };
 }
 

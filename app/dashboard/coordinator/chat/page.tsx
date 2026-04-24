@@ -85,6 +85,9 @@ export default function CoordinatorChatPage() {
   const [lastReadAtByConversation, setLastReadAtByConversation] = useState<
     Record<number, number>
   >({});
+  const [roomActivityByConversation, setRoomActivityByConversation] = useState<
+    Record<number, string>
+  >({});
   const [realtimeMessages, setRealtimeMessages] = useState<
     ReceiveMessageEvent[]
   >([]);
@@ -190,9 +193,36 @@ export default function CoordinatorChatPage() {
     }));
   }, []);
 
+  const bumpConversationActivity = useCallback(
+    (conversationId: number, updatedAt = new Date().toISOString()) => {
+      const nextTime = new Date(updatedAt).getTime();
+
+      if (!Number.isFinite(nextTime)) {
+        return;
+      }
+
+      setRoomActivityByConversation((prev) => {
+        const currentTime = prev[conversationId]
+          ? new Date(prev[conversationId]).getTime()
+          : 0;
+
+        if (Number.isFinite(currentTime) && currentTime >= nextTime) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [conversationId]: updatedAt,
+        };
+      });
+    },
+    [],
+  );
+
   const handleRealtimeMessage = useCallback(
     (message: ReceiveMessageEvent) => {
       setRealtimeMessages((prev) => [...prev, message]);
+      bumpConversationActivity(message.conversationId, message.createdAt);
 
       if (!knownConversationIdsRef.current.has(message.conversationId)) {
         void refetchRooms();
@@ -210,7 +240,12 @@ export default function CoordinatorChatPage() {
         markConversationAsRead(message.conversationId);
       }
     },
-    [activeConversationId, markConversationAsRead, refetchRooms],
+    [
+      activeConversationId,
+      bumpConversationActivity,
+      markConversationAsRead,
+      refetchRooms,
+    ],
   );
 
   const handleResyncRequested = useCallback(() => {
@@ -223,7 +258,6 @@ export default function CoordinatorChatPage() {
     transportError,
     retryAttempts,
     retryConnection,
-    disconnect,
     leaveConversationGroup,
   } = useCoordinatorChatConnection({
     enabled: true,
@@ -232,11 +266,13 @@ export default function CoordinatorChatPage() {
       void refetchRooms();
     },
     onReceiveMessage: handleRealtimeMessage,
-    onCoordinatorJoined: () => {
+    onCoordinatorJoined: (event) => {
+      bumpConversationActivity(event.conversationId);
       setActiveStatus("CoordinatorActive");
       void refetchRooms();
     },
     onCoordinatorLeft: (event) => {
+      bumpConversationActivity(event.conversationId);
       if (event.conversationId === activeConversationId) {
         setActiveStatus("WaitingCoordinator");
       }
@@ -258,13 +294,31 @@ export default function CoordinatorChatPage() {
     onResyncRequested: handleResyncRequested,
   });
 
-  useEffect(() => {
-    return () => {
-      void disconnect();
+  const roomsForView = useMemo(() => {
+    const toTime = (value: string) => {
+      const time = new Date(value).getTime();
+      return Number.isFinite(time) ? time : 0;
     };
-  }, [disconnect]);
 
-  const roomsForView = rooms;
+    return rooms
+      .map((room) => {
+        const activityAt = roomActivityByConversation[room.conversationId];
+
+        if (!activityAt || toTime(activityAt) <= toTime(room.updatedAt)) {
+          return room;
+        }
+
+        return {
+          ...room,
+          updatedAt: activityAt,
+        };
+      })
+      .sort(
+        (left, right) =>
+          toTime(right.updatedAt) - toTime(left.updatedAt) ||
+          right.conversationId - left.conversationId,
+      );
+  }, [roomActivityByConversation, rooms]);
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -479,6 +533,8 @@ export default function CoordinatorChatPage() {
       return;
     }
 
+    const conversationId = activeConversationId;
+
     if (connectionState !== "connected") {
       toast.error("Kết nối realtime chưa sẵn sàng. Vui lòng thử lại sau.");
       return;
@@ -486,9 +542,10 @@ export default function CoordinatorChatPage() {
 
     try {
       await sendMessageMutation.mutateAsync({
-        conversationId: activeConversationId,
+        conversationId,
         content,
       });
+      bumpConversationActivity(conversationId);
     } catch (error: unknown) {
       toast.error(
         error instanceof Error ? error.message : "Không thể gửi tin nhắn.",
@@ -501,6 +558,8 @@ export default function CoordinatorChatPage() {
       toast.error("Vui lòng chọn một cuộc trò chuyện trước.");
       return;
     }
+
+    const conversationId = activeConversationId;
 
     if (connectionState !== "connected") {
       toast.error("Kết nối realtime chưa sẵn sàng. Vui lòng thử lại sau.");
@@ -524,9 +583,10 @@ export default function CoordinatorChatPage() {
       const imageUrl = await uploadMessageImageToCloudinary(file);
       const safeAlt = file.name.replace(/[\[\]\(\)]/g, "").trim() || "image";
       await sendMessageMutation.mutateAsync({
-        conversationId: activeConversationId,
+        conversationId,
         content: `![${safeAlt}](${imageUrl})`,
       });
+      bumpConversationActivity(conversationId);
       toast.success("Đã gửi ảnh.", { id: toastId });
     } catch (error: unknown) {
       toast.error(

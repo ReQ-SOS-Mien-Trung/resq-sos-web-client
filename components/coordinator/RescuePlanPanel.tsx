@@ -21,8 +21,13 @@ import {
 } from "@/lib/constants";
 import {
   getClothingGenderLabel,
+  getFoodDurationLabel,
   getMedicalIssueLabel,
+  getMedicalSupportNeedLabel,
   getPersonTypeLabel,
+  getSituationLabel,
+  getSupplyLabel,
+  getWaterDurationLabel,
 } from "@/lib/sos";
 import { analyzeMissionSupplyBalance } from "@/lib/mission-supply-balance";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
@@ -59,6 +64,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   useCreateMission,
   useMissions,
@@ -107,6 +118,7 @@ import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 import MissionTeamReportSheet, {
   getMissionReportStats,
   getMissionReportStatusMeta,
+  normalizeMissionReportStatusKey,
 } from "@/components/coordinator/MissionTeamReportSheet";
 import type {
   RescueTeamByClusterEntity,
@@ -146,6 +158,7 @@ import {
   User,
   Phone,
   FirstAid,
+  ForkKnife,
 } from "@phosphor-icons/react";
 
 // Extract lat/lng from activity description text
@@ -281,6 +294,61 @@ function formatMissionTimeRangeLabel(
   }
 
   return `${startDateLabel}, ${startTimeLabel} - ${endDateLabel}, ${endTimeLabel}`;
+}
+
+const AI_STEP_TRANSLATIONS: Record<string, string> = {
+  COLLECT_SUPPLIES: "Tiếp nhận vật phẩm",
+  DELIVER_SUPPLIES: "Phân phát vật phẩm",
+  RESCUE: "Cứu hộ",
+  EVACUATE: "Sơ tán",
+  RETURN_SUPPLIES: "Hoàn trả vật phẩm",
+  MOVE_TO_LOCATION: "Di chuyển",
+  SOS_SUPPORT: "Hỗ trợ SOS",
+};
+
+function translateAIText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(
+      /Activity step (\d+) \(([^)]+)\)/g,
+      (match, step, type) => `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`
+    )
+    .replace(/team_id=(\d+)/g, "đội ID $1")
+    .replace(/pool nearby teams/g, "danh sách đội cứu hộ được quét xung quanh khu vực");
+}
+
+function FormattedAINotes({ text, textClassName }: { text: string; textClassName?: string }) {
+  if (!text) return null;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  return (
+    <div className="space-y-3">
+      {lines.map((line, idx) => {
+        if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
+          const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
+          const items = content.split("|").map(i => i.trim()).filter(Boolean);
+          return (
+            <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3">
+              <h5 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2.5 flex items-center gap-1.5">
+                <Warning className="w-4 h-4" weight="fill" />
+                CẦN XEM LẠI THỦ CÔNG
+              </h5>
+              <ul className="list-disc list-inside space-y-1.5 text-sm text-red-600/90 dark:text-red-400/90 leading-relaxed">
+                {items.map((item, i) => (
+                  <li key={i}>{translateAIText(item)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return (
+          <p key={idx} className={textClassName || "text-sm text-foreground/80 leading-relaxed"}>
+            {translateAIText(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function normalizeErrorLookupValue(value?: string | null): string {
@@ -960,6 +1028,412 @@ function TargetVictimsBlock({
     </div>
   );
 }
+
+const severityLabel = (value?: string) => {
+  const normalized = (value || "").toLowerCase();
+  if (normalized === "none" || !normalized) return "Chưa đánh giá";
+  if (normalized.includes("high") || normalized.includes("cao")) return "Cao";
+  if (normalized.includes("critical") || normalized.includes("nghiêm"))
+    return "Nghiêm trọng";
+  if (normalized.includes("severe") || normalized.includes("nặng"))
+    return "Nghiêm trọng";
+  if (normalized.includes("moderate") || normalized.includes("trung"))
+    return "Trung bình";
+  if (normalized.includes("low") || normalized.includes("nhẹ")) return "Nhẹ";
+  return value || "Chưa rõ";
+};
+
+const severityBadgeClass = (value?: string) => {
+  const normalized = (value || "").toLowerCase();
+  if (
+    normalized.includes("critical") ||
+    normalized.includes("nghiêm") ||
+    normalized.includes("severe") ||
+    normalized.includes("nặng")
+  ) {
+    return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+  }
+  if (normalized.includes("high") || normalized.includes("cao")) {
+    return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+  }
+  if (normalized.includes("moderate") || normalized.includes("trung")) {
+    return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+  }
+  if (normalized.includes("low") || normalized.includes("nhẹ")) {
+    return "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+  }
+  return "bg-muted text-muted-foreground border-border";
+};
+
+const getMedicalIssueColorClass = (code: string): string => {
+  const normalized = code
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  const critical = [
+    "UNCONSCIOUS",
+    "BREATHING_DIFFICULTY",
+    "CHEST_PAIN_STROKE",
+    "DROWNING",
+  ];
+  const severe = [
+    "SEVERELY_BLEEDING",
+    "BLEEDING",
+    "BURNS",
+    "HEAD_INJURY",
+    "CANNOT_MOVE",
+  ];
+  const moderate = [
+    "HIGH_FEVER",
+    "DEHYDRATION",
+    "FRACTURE",
+    "INFANT_NEEDS_MILK",
+    "LOST_PARENT",
+    "SHOCK",
+    "FEVER",
+  ];
+  const low = [
+    "CHRONIC_DISEASE",
+    "CONFUSION",
+    "NEEDS_MEDICAL_DEVICE",
+    "PREGNANCY",
+    "MINOR_WOUND",
+    "INFECTION",
+    "HYPOTHERMIA",
+  ];
+
+  if (critical.includes(normalized))
+    return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
+  if (severe.includes(normalized))
+    return "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400";
+  if (moderate.includes(normalized))
+    return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400";
+  if (low.includes(normalized))
+    return "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+};
+
+const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
+  const { data: analysisData } = useSOSRequestAnalysis(Number(sos.id), {
+    enabled: !!sos.id && !isNaN(Number(sos.id)),
+  });
+
+  const ruleScore = analysisData?.ruleEvaluation?.totalScore;
+
+  // Robust data extraction (handling multiple schema versions)
+  const structured = (sos as any).structuredData;
+  const v3Incident = structured?.incident;
+  const v3GroupNeeds = structured?.group_needs;
+  const v3Victims = structured?.victims || [];
+
+  const pc = v3Incident?.people_count ||
+    sos.peopleCount ||
+    structured?.people_count || { adult: 0, child: 0, elderly: 0 };
+  const totalPeople = pc.adult + pc.child + pc.elderly;
+
+  const situation =
+    v3Incident?.situation || (sos as any).situation || structured?.situation;
+  const additionalDesc =
+    v3Incident?.additional_description ||
+    (sos as any).additionalDescription ||
+    structured?.additional_description;
+  const address = v3Incident?.address || sos.address || structured?.address;
+
+  const supplies =
+    v3GroupNeeds?.supplies ||
+    (sos as any).supplies ||
+    structured?.supplies ||
+    [];
+  const otherSupplies =
+    v3GroupNeeds?.other_supply_description ||
+    (sos as any).otherSupplyDescription ||
+    structured?.other_supply_description;
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border bg-card shadow-sm overflow-hidden",
+        sos.priority === "P1"
+          ? "border-red-200 dark:border-red-900/50"
+          : sos.priority === "P2"
+            ? "border-orange-200 dark:border-orange-900/50"
+            : "border-border",
+      )}
+    >
+      {/* Header */}
+      <div
+        className={cn(
+          "px-4 py-3 flex items-center justify-between border-b",
+          sos.priority === "P1"
+            ? "bg-red-50/50 dark:bg-red-900/10"
+            : sos.priority === "P2"
+              ? "bg-orange-50/50 dark:bg-orange-900/10"
+              : "bg-muted/30",
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "p-2 rounded-lg bg-background border shadow-sm",
+              sos.priority === "P1"
+                ? "text-red-600"
+                : sos.priority === "P2"
+                  ? "text-orange-600"
+                  : "text-muted-foreground",
+            )}
+          >
+            <MapPin className="h-5 w-5" weight="fill" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-black text-foreground">SOS #{sos.id}</h4>
+              <Badge
+                variant={PRIORITY_BADGE_VARIANT[sos.priority]}
+                className="h-5 px-1.5 text-sm font-black uppercase"
+              >
+                {PRIORITY_LABELS[sos.priority]}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground font-bold uppercase tracking-tighter truncate max-w-[300px]">
+              {address || "Không rõ địa chỉ"}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          {ruleScore !== undefined && (
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">
+                Điểm ưu tiên AI
+              </span>
+              <span className="text-xl font-black text-primary leading-none">
+                {ruleScore.toFixed(1)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Situation & Message */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-1 space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-bold uppercase text-muted-foreground">
+                Tình trạng
+              </p>
+              <Badge
+                variant="outline"
+                className="bg-background font-bold border-muted-foreground/30"
+              >
+                {getSituationLabel(situation)}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold uppercase text-muted-foreground">
+                Nhân khẩu
+              </p>
+              <div className="flex flex-wrap gap-1">
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                >
+                  Già: {pc.elderly}
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-sm bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                >
+                  Trẻ em: {pc.child}
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-sm bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  Lớn: {pc.adult}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <p className="text-sm font-bold uppercase text-muted-foreground">
+              Nội dung yêu cầu
+            </p>
+            <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-base leading-relaxed text-foreground/90 italic">
+              {sos.message}
+            </div>
+            {additionalDesc && (
+              <div className="mt-2 text-sm text-muted-foreground bg-amber-50/50 dark:bg-amber-900/10 p-2.5 rounded border border-amber-200/50">
+                <span className="font-bold uppercase text-amber-700 dark:text-amber-400 mr-1">
+                  Ghi chú thêm:
+                </span>
+                {additionalDesc}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Victims List (Detailed) */}
+        {v3Victims.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-base font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+              <Users className="h-4 w-4" />
+              Danh sách nạn nhân chi tiết
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {v3Victims.map((v: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border bg-background p-3.5 space-y-3 text-sm shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-bold text-foreground flex items-center gap-1">
+                      {v.person_type === "CHILD"
+                        ? "👶"
+                        : v.person_type === "ELDERLY"
+                          ? "👴"
+                          : "🧑"}
+                      {v.custom_name || `Nạn nhân ${idx + 1}`}
+                    </span>
+                    {v.incident_status?.severity && (
+                      <Badge
+                        className={cn(
+                          "text-sm h-6 px-2",
+                          severityBadgeClass(v.incident_status.severity),
+                        )}
+                      >
+                        {severityLabel(v.incident_status.severity)}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {v.incident_status?.medical_issues?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {v.incident_status.medical_issues.map(
+                        (issue: string, i: number) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className={cn(
+                              "text-sm h-6 px-2 border-transparent font-medium",
+                              getMedicalIssueColorClass(issue),
+                            )}
+                          >
+                            {getMedicalIssueLabel(issue)}
+                          </Badge>
+                        ),
+                      )}
+                    </div>
+                  )}
+
+                  {(v.personal_needs?.diet?.has_special_diet ||
+                    v.personal_needs?.clothing?.needed) && (
+                    <div className="pt-2 border-t border-dashed mt-1 space-y-1.5">
+                      {v.personal_needs.diet?.has_special_diet && (
+                        <div className="text-sm text-muted-foreground flex items-start gap-1.5">
+                          <ForkKnife className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            Ăn đặc biệt: {v.personal_needs.diet.description}
+                          </span>
+                        </div>
+                      )}
+                      {v.personal_needs.clothing?.needed && (
+                        <div className="text-sm text-muted-foreground flex items-start gap-1.5">
+                          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            Cần quần áo{" "}
+                            {v.personal_needs.clothing.gender === "MALE"
+                              ? "(Nam)"
+                              : "(Nữ)"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Needs & Supplies */}
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-base font-bold uppercase text-muted-foreground">
+            Nhu yếu phẩm & Vật tư cần thiết
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {supplies.map((s: string, idx: number) => (
+              <Badge
+                key={idx}
+                variant="outline"
+                className="bg-blue-50/50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 font-bold text-sm px-2 py-1"
+              >
+                {getSupplyLabel(s)}
+              </Badge>
+            ))}
+            {otherSupplies && (
+              <Badge
+                variant="outline"
+                className="bg-indigo-50/50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 font-bold text-sm px-2 py-1"
+              >
+                Khác: {otherSupplies}
+              </Badge>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+            {v3GroupNeeds?.water?.duration && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground font-bold uppercase">
+                  Nước uống còn lại
+                </p>
+                <p className="text-base font-medium">
+                  {getWaterDurationLabel(v3GroupNeeds.water.duration)}
+                </p>
+              </div>
+            )}
+            {v3GroupNeeds?.food?.duration && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground font-bold uppercase">
+                  Thực phẩm còn lại
+                </p>
+                <p className="text-base font-medium">
+                  {getFoodDurationLabel(v3GroupNeeds.food.duration)}
+                </p>
+              </div>
+            )}
+            {v3GroupNeeds?.medicine?.needs_urgent_medicine && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground font-bold uppercase underline decoration-red-400">
+                  Cần thuốc khẩn cấp
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {v3GroupNeeds.medicine.medical_needs?.map(
+                    (m: string, i: number) => (
+                      <span
+                        key={i}
+                        className="text-sm bg-red-100 text-red-700 px-1 rounded font-medium"
+                      >
+                        {getMedicalSupportNeedLabel(m)}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+            {v3GroupNeeds?.blanket?.is_cold_or_wet && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground font-bold uppercase text-blue-600">
+                  Đang bị lạnh/ướt
+                </p>
+                <p className="text-sm font-medium">Cần chăn mền/đồ giữ ấm</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 type CoordinationSummaryEntry = {
   key: string;
@@ -2171,7 +2645,7 @@ const DepotInventoryCard = ({
         <Badge
           variant="outline"
           className={cn(
-            "h-5 shrink-0 rounded-full px-2 text-xs font-semibold",
+            "h-5 shrink-0 rounded-full px-2 text-sm font-semibold",
             kind === "alternative"
               ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-blue-300"
               : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300",
@@ -3000,10 +3474,17 @@ type NormalizedSupplyLotAllocation = {
 type SupplyDisplaySource = {
   itemName?: string | null;
   itemId?: number | null;
+  itemType?: string | null;
   quantity: number;
   unit: string;
   plannedPickupLotAllocations?: SupplyLotAllocationLike[] | null;
+  plannedPickupReusableUnits?: ClusterSupplyCollection["plannedPickupReusableUnits"];
   pickupLotAllocations?: SupplyLotAllocationLike[] | null;
+  pickedReusableUnits?: ClusterSupplyCollection["pickedReusableUnits"];
+  availableDeliveryReusableUnits?: ClusterSupplyCollection["availableDeliveryReusableUnits"];
+  deliveredReusableUnits?: ClusterSupplyCollection["deliveredReusableUnits"];
+  expectedReturnUnits?: ClusterSupplyCollection["expectedReturnUnits"];
+  returnedReusableUnits?: ClusterSupplyCollection["returnedReusableUnits"];
   bufferRatio?: number | null;
   bufferQuantity?: number | null;
   bufferUsedQuantity?: number | null;
@@ -3182,7 +3663,8 @@ function buildSupplyDisplayItem(
   const hasPickupLots = pickupLots.length > 0;
   const isCollectStep = normalizedActivityType === "collectsupplies";
   const isDeliverStep = normalizedActivityType === "deliversupplies";
-  const hasBufferPlanning = isCollectStep;
+  const hasBufferPlanning =
+    isCollectStep && !isReusableSupplyCollection(supply);
 
   const lotRows =
     isCollectStep && (hasPickupLots || plannedLots.length > 0)
@@ -4291,13 +4773,18 @@ function getTeamAssignmentStatusMeta(status: string | null | undefined): {
 }
 
 function isMissionTeamActive(team: MissionTeam): boolean {
-  const normalizedStatus = (team.status ?? "").trim().toLowerCase();
+  const normalizedStatus = (team.status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+
   return (
     (!team.unassignedAt || team.unassignedAt.trim() === "") &&
     (normalizedStatus === "assigned" ||
       normalizedStatus === "inprogress" ||
-      normalizedStatus === "in_progress" ||
-      normalizedStatus === "in progress")
+      normalizedStatus === "reported" ||
+      normalizedStatus === "completed")
   );
 }
 
@@ -7434,7 +7921,8 @@ const SuggestionCard = ({
                           <div className="mt-1 space-y-0.5">
                             {act.suppliesToCollect.map((supply, sIdx) => {
                               const showSupplyBuffer =
-                                act.activityType === "COLLECT_SUPPLIES";
+                                act.activityType === "COLLECT_SUPPLIES" &&
+                                !isReusableSupplyCollection(supply);
 
                               return (
                                 <div
@@ -7589,8 +8077,28 @@ const RescuePlanPanel = ({
 
   const syncReturnActivitiesWithCollectors = useCallback(
     (activities: EditableActivity[]): EditableActivity[] => {
-      const normalizedActivities =
+      let normalizedActivities =
         syncDeliveryActivitiesWithCollectors(activities);
+
+      // Auto-fill DELIVER_SUPPLIES from COLLECT_SUPPLIES if empty
+      let lastCollectSupplies: any[] = [];
+      for (const activity of normalizedActivities) {
+        if (activity.activityType === "COLLECT_SUPPLIES") {
+          lastCollectSupplies = activity.suppliesToCollect ?? [];
+        }
+      }
+
+      const distributableSupplies = lastCollectSupplies.filter(
+        (s) => !isReusableSupplyCollection(s)
+      );
+
+      normalizedActivities = normalizedActivities.map((activity) => {
+        if (activity.activityType === "DELIVER_SUPPLIES") {
+          return { ...activity, suppliesToCollect: distributableSupplies.length > 0 ? distributableSupplies : null };
+        }
+        return activity;
+      });
+
       const nextActivities: EditableActivity[] = [];
 
       for (const activity of normalizedActivities) {
@@ -8003,6 +8511,19 @@ const RescuePlanPanel = ({
         return;
       }
 
+      const isDistributionStep = targetActivity?.activityType === "DELIVER_SUPPLIES";
+      // We pass the incoming item to isReusableSupplyCollection. 
+      // It might lack metadata, but it's the safest heuristic we have.
+      const isReusable = isReusableSupplyCollection(item as any);
+
+      if (isDistributionStep && isReusable) {
+        toast.info(
+          "Không thể thêm vật phẩm tái sử dụng (Reusable) vào bước phân phát này. Vật phẩm loại này chỉ dành cho đội cứu hộ.",
+        );
+        return;
+      }
+
+
       clearEditActivityErrors();
       setExpandedEditSupplyKeys((previous) => ({
         ...previous,
@@ -8149,7 +8670,7 @@ const RescuePlanPanel = ({
             if (next[supplyIndex]) {
               next[supplyIndex] = {
                 ...next[supplyIndex],
-                quantity: Math.max(1, quantity),
+                quantity: quantity,
               };
             }
             return { ...a, suppliesToCollect: next };
@@ -8525,6 +9046,9 @@ const RescuePlanPanel = ({
             const actualDeliveredQuantity = toFiniteNumber(
               s.actualDeliveredQuantity,
             );
+            const normalizedItemType = isReusableSupplyCollection(s)
+              ? "Reusable"
+              : "Consumable";
 
             return {
               id: typeof s.itemId === "number" ? s.itemId : null,
@@ -8532,9 +9056,11 @@ const RescuePlanPanel = ({
                 typeof s.itemName === "string" && s.itemName.trim()
                   ? s.itemName.trim()
                   : null,
+              itemType: normalizedItemType,
               quantity: s.quantity,
               unit: normalizeSupplyUnit(s.unit),
-              ...(activity.activityType === "COLLECT_SUPPLIES"
+              ...(activity.activityType === "COLLECT_SUPPLIES" &&
+              normalizedItemType === "Consumable"
                 ? { bufferRatio: resolveSupplyBufferRatio(s.bufferRatio) }
                 : {}),
               ...(plannedPickupLotAllocations
@@ -8612,13 +9138,17 @@ const RescuePlanPanel = ({
                     const actualDeliveredQuantity = toFiniteNumber(
                       supply.actualDeliveredQuantity,
                     );
+                    const normalizedItemType =
+                      normalizeInventoryItemType(supply.itemType) ??
+                      "Consumable";
 
                     return {
                       itemId: supply.id,
                       itemName: supply.name,
                       quantity: supply.quantity,
                       unit: normalizeSupplyUnit(supply.unit),
-                      ...(createRequest.activityType === "COLLECT_SUPPLIES"
+                      ...(createRequest.activityType === "COLLECT_SUPPLIES" &&
+                      normalizedItemType === "Consumable"
                         ? {
                             bufferRatio: resolveSupplyBufferRatio(
                               supply.bufferRatio,
@@ -9094,7 +9624,7 @@ const RescuePlanPanel = ({
   );
 
   // ── Active tab: "plan" for AI plan view, "missions" for existing missions ──
-  const [activeTab, setActiveTab] = useState<"plan" | "missions">(
+  const [activeTab, setActiveTab] = useState<"plan" | "missions" | "sos_list">(
     defaultTab ?? "missions",
   );
   const [expandedMissionSupplyKeys, setExpandedMissionSupplyKeys] = useState<
@@ -10028,8 +10558,8 @@ const RescuePlanPanel = ({
               className={cn(
                 "mt-2 transition-all duration-200",
                 isStatsCollapsed
-                  ? "grid grid-cols-4 gap-1"
-                  : "grid grid-cols-2 lg:grid-cols-4 gap-1.5",
+                  ? "grid grid-cols-2 gap-1"
+                  : "grid grid-cols-2 lg:grid-cols-2 gap-1.5",
               )}
             >
               {[
@@ -10049,24 +10579,6 @@ const RescuePlanPanel = ({
                   label: "Yêu cầu SOS",
                   color: "text-blue-500",
                   bg: "bg-blue-500/5 border-blue-500/15",
-                },
-                {
-                  icon: ShieldCheck,
-                  value: `${((activeSuggestion.confidenceScore ?? 0) * 100).toFixed(0)}%`,
-                  label: "Độ tin cậy",
-                  color: "text-emerald-500",
-                  bg: "bg-emerald-500/5 border-emerald-500/15",
-                },
-                {
-                  icon: Clock,
-                  value:
-                    typeof activeSuggestion.responseTimeMs === "number" &&
-                    activeSuggestion.responseTimeMs > 0
-                      ? `${(activeSuggestion.responseTimeMs / 1000).toFixed(1)}s`
-                      : "N/A",
-                  label: "Thời gian AI",
-                  color: "text-orange-500",
-                  bg: "bg-orange-500/5 border-orange-500/15",
                 },
               ].map((stat) => (
                 <div
@@ -10105,6 +10617,22 @@ const RescuePlanPanel = ({
 
         {/* Tab bar */}
         <div className="flex border-b shrink-0 px-4 bg-background">
+          <button
+            type="button"
+            className={cn(
+              "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              activeTab === "sos_list"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setActiveTab("sos_list")}
+          >
+            <Info className="h-3.5 w-3.5 inline mr-1.5" weight="fill" />
+            Thông tin SOS
+            <Badge variant="secondary" className="text-sm h-5 px-1.5 ml-1.5">
+              {panelSOSRequests.length}
+            </Badge>
+          </button>
           <button
             type="button"
             className={cn(
@@ -10300,26 +10828,90 @@ const RescuePlanPanel = ({
                                           )
                                           .join(" • ")}
                                       </p>
-                                      <div className="mt-2 flex flex-wrap gap-1.5">
-                                        <Badge
-                                          variant="outline"
-                                          className="h-5 border-emerald-300/80 px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
-                                        >
-                                          Đã gửi: {missionReportStats.submitted}
-                                        </Badge>
-                                        <Badge
-                                          variant="outline"
-                                          className="h-5 border-amber-300/80 px-1.5 text-sm text-amber-700 dark:border-amber-700 dark:text-amber-300"
-                                        >
-                                          Nháp: {missionReportStats.draft}
-                                        </Badge>
-                                        <Badge
-                                          variant="outline"
-                                          className="h-5 border-slate-300/80 px-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                                        >
-                                          Chưa báo cáo:{" "}
-                                          {missionReportStats.notStarted}
-                                        </Badge>
+                                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          <Badge
+                                            variant="outline"
+                                            className="h-5 border-emerald-300/80 px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
+                                          >
+                                            Đã gửi:{" "}
+                                            {missionReportStats.submitted}
+                                          </Badge>
+                                          <Badge
+                                            variant="outline"
+                                            className="h-5 border-amber-300/80 px-1.5 text-sm text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                                          >
+                                            Nháp: {missionReportStats.draft}
+                                          </Badge>
+                                          <Badge
+                                            variant="outline"
+                                            className="h-5 border-slate-300/80 px-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                                          >
+                                            Chưa báo cáo:{" "}
+                                            {missionReportStats.notStarted}
+                                          </Badge>
+                                        </div>
+
+                                        {activeMissionTeams.length > 0 && (
+                                          <div className="shrink-0">
+                                            {activeMissionTeams.length === 1 ? (
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 gap-1 px-2.5 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20 shadow-sm"
+                                                onClick={() =>
+                                                  handleOpenMissionTeamReport(
+                                                    mission,
+                                                    activeMissionTeams[0],
+                                                  )
+                                                }
+                                              >
+                                                <Info
+                                                  className="h-3.5 w-3.5"
+                                                  weight="fill"
+                                                />
+                                                Xem báo cáo
+                                              </Button>
+                                            ) : (
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 gap-1 px-2.5 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20 shadow-sm"
+                                                  >
+                                                    <Info
+                                                      className="h-3.5 w-3.5"
+                                                      weight="fill"
+                                                    />
+                                                    Xem báo cáo
+                                                    <CaretDown className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  {activeMissionTeams.map(
+                                                    (team) => (
+                                                      <DropdownMenuItem
+                                                        key={team.missionTeamId}
+                                                        onClick={() =>
+                                                          handleOpenMissionTeamReport(
+                                                            mission,
+                                                            team,
+                                                          )
+                                                        }
+                                                      >
+                                                        {team.teamName ||
+                                                          `Đội #${team.rescueTeamId}`}
+                                                      </DropdownMenuItem>
+                                                    ),
+                                                  )}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     </>
                                   )}
@@ -10428,9 +11020,7 @@ const RescuePlanPanel = ({
                                       />
                                       Lưu ý
                                     </p>
-                                    <p className="text-sm text-foreground/75 leading-relaxed">
-                                      {mission.specialNotes}
-                                    </p>
+                                    <FormattedAINotes text={mission.specialNotes} textClassName="text-sm text-foreground/75 leading-relaxed" />
                                   </div>
                                 )}
 
@@ -10712,65 +11302,65 @@ const RescuePlanPanel = ({
                                                               )}
                                                             >
                                                               <div className="min-w-0 space-y-2">
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                  <span className="text-sm font-bold text-foreground">
-                                                                    Bước{" "}
+                                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="text-base font-bold text-foreground">
+                                                                      Bước{" "}
+                                                                      {
+                                                                        activity.step
+                                                                      }
+                                                                    </span>
+                                                                    <Badge
+                                                                      variant="outline"
+                                                                      className={cn(
+                                                                        "h-6 border-transparent px-2 text-base font-semibold",
+                                                                        config.color,
+                                                                        config.bgColor,
+                                                                      )}
+                                                                    >
+                                                                      {
+                                                                        config.label
+                                                                      }
+                                                                    </Badge>
+                                                                    <Badge
+                                                                      variant="outline"
+                                                                      className={cn(
+                                                                        "flex h-6 items-center gap-1 border px-2 text-base font-bold",
+                                                                        stepStatus.className,
+                                                                      )}
+                                                                    >
+                                                                      {
+                                                                        stepStatus.icon
+                                                                      }
+                                                                      {
+                                                                        stepStatus.label
+                                                                      }
+                                                                    </Badge>
+                                                                  </div>
+                                                                  <p className="line-clamp-4 text-base font-medium leading-relaxed text-foreground/80">
                                                                     {
-                                                                      activity.step
+                                                                      displayDescription
                                                                     }
-                                                                  </span>
-                                                                  <Badge
-                                                                    variant="outline"
-                                                                    className={cn(
-                                                                      "h-6 border-transparent px-2 text-sm font-semibold",
-                                                                      config.color,
-                                                                      config.bgColor,
-                                                                    )}
-                                                                  >
-                                                                    {
-                                                                      config.label
-                                                                    }
-                                                                  </Badge>
-                                                                  <Badge
-                                                                    variant="outline"
-                                                                    className={cn(
-                                                                      "flex h-6 items-center gap-1 border px-2 text-sm font-bold",
-                                                                      stepStatus.className,
-                                                                    )}
-                                                                  >
-                                                                    {
-                                                                      stepStatus.icon
-                                                                    }
-                                                                    {
-                                                                      stepStatus.label
-                                                                    }
-                                                                  </Badge>
+                                                                  </p>
                                                                 </div>
-                                                                <p className="line-clamp-4 text-sm font-medium leading-relaxed text-foreground/80">
-                                                                  {
-                                                                    displayDescription
-                                                                  }
-                                                                </p>
-                                                              </div>
-                                                              {typeof activity.estimatedTime ===
-                                                              "number" ? (
-                                                                <div
-                                                                  className={cn(
-                                                                    "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
-                                                                    useCompactMissionCards &&
-                                                                      "self-start",
-                                                                  )}
-                                                                >
-                                                                  <p className="text-[10px] font-semibold leading-tight text-muted-foreground">
-                                                                    Thời gian dự
-                                                                    kiến đến
-                                                                  </p>
-                                                                  <p className="text-sm font-bold text-foreground">
-                                                                    {
-                                                                      activity.estimatedTime
-                                                                    }{" "}
-                                                                    phút
-                                                                  </p>
+                                                                {typeof activity.estimatedTime ===
+                                                                "number" ? (
+                                                                  <div
+                                                                    className={cn(
+                                                                      "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
+                                                                      useCompactMissionCards &&
+                                                                        "self-start",
+                                                                    )}
+                                                                  >
+                                                                    <p className="text-sm font-semibold leading-tight text-muted-foreground">
+                                                                      Thời gian dự
+                                                                      kiến đến
+                                                                    </p>
+                                                                    <p className="text-base font-bold text-foreground">
+                                                                      {
+                                                                        activity.estimatedTime
+                                                                      }{" "}
+                                                                      phút
+                                                                    </p>
                                                                 </div>
                                                               ) : null}
                                                             </div>
@@ -11038,26 +11628,25 @@ const RescuePlanPanel = ({
                                                                                 reportStatusMeta.label
                                                                               }
                                                                             </Badge>
-                                                                            <Button
-                                                                              type="button"
-                                                                              variant="outline"
-                                                                              size="sm"
-                                                                              className="h-6 gap-1 px-2 text-sm border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20"
-                                                                              onClick={() =>
-                                                                                handleOpenMissionTeamReport(
-                                                                                  mission,
-                                                                                  team,
-                                                                                )
-                                                                              }
-                                                                            >
-                                                                              <Info
-                                                                                className="h-3 w-3"
-                                                                                weight="fill"
-                                                                              />
-                                                                              Xem
-                                                                              báo
-                                                                              cáo
-                                                                            </Button>
+                                                                            {normalizeMissionReportStatusKey(
+                                                                              team.reportStatus,
+                                                                            ) ===
+                                                                              "submitted" && (
+                                                                              <Button
+                                                                                type="button"
+                                                                                variant="link"
+                                                                                size="sm"
+                                                                                className="h-5 p-0 text-sky-600 dark:text-sky-400 font-bold text-sm"
+                                                                                onClick={() =>
+                                                                                  handleOpenMissionTeamReport(
+                                                                                    mission,
+                                                                                    team,
+                                                                                  )
+                                                                                }
+                                                                              >
+                                                                                [Xem chi tiết]
+                                                                              </Button>
+                                                                            )}
                                                                           </div>
                                                                         </div>
                                                                       );
@@ -11134,7 +11723,7 @@ const RescuePlanPanel = ({
                                                                                   "-"}
                                                                               </span>
                                                                               {supply.bufferRatioLabel ? (
-                                                                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                                                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                                                   Dự
                                                                                   trù{" "}
                                                                                   {
@@ -11149,7 +11738,7 @@ const RescuePlanPanel = ({
                                                                             supply.deliveredQuantityLabel) && (
                                                                             <div className="mt-1 flex flex-wrap gap-1">
                                                                               {supply.pickedQuantityLabel ? (
-                                                                                <span className="inline-flex items-center rounded border border-emerald-300/70 bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/25 dark:text-emerald-300">
+                                                                                <span className="inline-flex items-center rounded border border-emerald-300/70 bg-emerald-50 px-1.5 py-0.5 text-sm font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/25 dark:text-emerald-300">
                                                                                   Đã
                                                                                   lấy:{" "}
                                                                                   {
@@ -11158,7 +11747,7 @@ const RescuePlanPanel = ({
                                                                                 </span>
                                                                               ) : null}
                                                                               {supply.deliveredQuantityLabel ? (
-                                                                                <span className="inline-flex items-center rounded border border-sky-300/70 bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-700 dark:border-sky-700/60 dark:bg-sky-900/25 dark:text-sky-300">
+                                                                                <span className="inline-flex items-center rounded border border-sky-300/70 bg-sky-50 px-1.5 py-0.5 text-sm font-semibold text-sky-700 dark:border-sky-700/60 dark:bg-sky-900/25 dark:text-sky-300">
                                                                                   Đã
                                                                                   giao:{" "}
                                                                                   {
@@ -11174,7 +11763,7 @@ const RescuePlanPanel = ({
                                                                             .length >
                                                                           0 ? (
                                                                             <div className="mt-1 rounded-md border border-blue-200/70 bg-blue-50/50 px-2 py-1 dark:border-blue-800/50 dark:bg-blue-900/20">
-                                                                              <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                                                                              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                                                                                 {supply.lotSourceLabel ??
                                                                                   "Theo dõi lô"}
                                                                               </p>
@@ -11186,7 +11775,7 @@ const RescuePlanPanel = ({
                                                                                   ) => (
                                                                                     <p
                                                                                       key={`${sIdx}-lot-${lotIdx}`}
-                                                                                      className="text-xs leading-relaxed text-blue-800/85 dark:text-blue-200/85"
+                                                                                      className="text-sm leading-relaxed text-blue-800/85 dark:text-blue-200/85"
                                                                                     >
                                                                                       {
                                                                                         lotRow
@@ -11203,7 +11792,7 @@ const RescuePlanPanel = ({
                                                                             .length >
                                                                           0 ? (
                                                                             <div className="mt-1 rounded-md border border-slate-200/70 bg-slate-50/80 px-2 py-1 dark:border-slate-700/60 dark:bg-slate-900/35">
-                                                                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                                                                              <p className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
                                                                                 {supply.lotReferenceLabel ??
                                                                                   "Kế hoạch tham chiếu"}
                                                                               </p>
@@ -11215,7 +11804,7 @@ const RescuePlanPanel = ({
                                                                                   ) => (
                                                                                     <p
                                                                                       key={`${sIdx}-plan-${lotIdx}`}
-                                                                                      className="text-xs leading-relaxed text-slate-700/90 dark:text-slate-200/90"
+                                                                                      className="text-sm leading-relaxed text-slate-700/90 dark:text-slate-200/90"
                                                                                     >
                                                                                       {
                                                                                         lotRow
@@ -11268,10 +11857,29 @@ const RescuePlanPanel = ({
                   </section>
                 )}
 
+                {/* ═══ TAB: SOS List ═══ */}
+                {activeTab === "sos_list" && (
+                  <ScrollArea className="h-full">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <ListChecks className="h-4 w-4" />
+                          Danh sách yêu cầu SOS trong cụm
+                        </h3>
+                      </div>
+
+                      <div className="space-y-4">
+                        {panelSOSRequests.map((sos) => (
+                          <SOSRequestDetailedCard key={sos.id} sos={sos} />
+                        ))}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                )}
+
                 {/* ═══ TAB: Plan ═══ */}
                 {activeTab === "plan" && (
                   <>
-                    {/* === Edit mode content === */}
                     {isEditMode && (
                       <>
                         {/* Edit mode banner */}
@@ -12432,7 +13040,7 @@ const RescuePlanPanel = ({
                                                         </p>
                                                         {supplyBalanceIssues.length >
                                                         1 ? (
-                                                          <p className="mt-1 text-xs opacity-80">
+                                                          <p className="mt-1 text-sm opacity-80">
                                                             +
                                                             {supplyBalanceIssues.length -
                                                               1}{" "}
@@ -12459,6 +13067,14 @@ const RescuePlanPanel = ({
                                                         <div className="space-y-1">
                                                           {activity.suppliesToCollect.map(
                                                             (supply, sIdx) => {
+                                                              const isReusable =
+                                                                isReusableSupplyCollection(
+                                                                  supply,
+                                                                );
+                                                              const showBufferInput =
+                                                                isCollectSuppliesActivity &&
+                                                                !isReusable;
+
                                                               const supplyDisplay =
                                                                 buildSupplyDisplayItem(
                                                                   activity.activityType,
@@ -12481,7 +13097,7 @@ const RescuePlanPanel = ({
                                                                 >
                                                                   <div
                                                                     className={cn(
-                                                                      isCollectSuppliesActivity
+                                                                      showBufferInput
                                                                         ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
                                                                         : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
                                                                       hasActivityError
@@ -12518,20 +13134,15 @@ const RescuePlanPanel = ({
                                                                       type="number"
                                                                       min={1}
                                                                       value={
-                                                                        supply.quantity
+                                                                        Number.isNaN(supply.quantity)
+                                                                          ? ""
+                                                                          : supply.quantity
                                                                       }
-                                                                      onChange={(
-                                                                        event,
-                                                                      ) =>
+                                                                      onChange={(event) =>
                                                                         handleUpdateSupplyQuantity(
                                                                           activity._id,
                                                                           sIdx,
-                                                                          parseInt(
-                                                                            event
-                                                                              .target
-                                                                              .value,
-                                                                          ) ||
-                                                                            1,
+                                                                          parseInt(event.target.value),
                                                                         )
                                                                       }
                                                                       disabled={
@@ -12545,7 +13156,7 @@ const RescuePlanPanel = ({
                                                                         supply.unit,
                                                                       )}
                                                                     </span>
-                                                                    {isCollectSuppliesActivity ? (
+                                                                    {showBufferInput ? (
                                                                       <div className="relative min-w-0">
                                                                         <Input
                                                                           type="number"
@@ -12561,17 +13172,11 @@ const RescuePlanPanel = ({
                                                                           value={getSupplyBufferPercentInputValue(
                                                                             supply.bufferRatio,
                                                                           )}
-                                                                          onChange={(
-                                                                            event,
-                                                                          ) =>
+                                                                          onChange={(event) =>
                                                                             handleUpdateSupplyBufferRatio(
                                                                               activity._id,
                                                                               sIdx,
-                                                                              parseFloat(
-                                                                                event
-                                                                                  .target
-                                                                                  .value,
-                                                                              ),
+                                                                              parseFloat(event.target.value),
                                                                             )
                                                                           }
                                                                           disabled={
@@ -12580,7 +13185,7 @@ const RescuePlanPanel = ({
                                                                           title="Dự trù (%)"
                                                                           className="h-6 w-full pr-4 pl-1 text-center text-sm"
                                                                         />
-                                                                        <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                                        <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                                                                           %
                                                                         </span>
                                                                       </div>
@@ -12669,10 +13274,20 @@ const RescuePlanPanel = ({
                                   <h3 className="text-sm font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
                                     Tách nhiệm vụ theo cảnh báo an toàn
                                   </h3>
-                                  <p className="mt-1 text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed">
-                                    {effectiveSplitSuggestionPreview?.mixedRescueReliefWarning ||
-                                      "AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."}
-                                  </p>
+                                  <div className="mt-1">
+                                    <FormattedAINotes 
+                                      text={effectiveSplitSuggestionPreview?.mixedRescueReliefWarning || "AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."} 
+                                      textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                    />
+                                    {effectiveSplitSuggestionPreview?.specialNotes && (
+                                      <div className="mt-2 pt-2 border-t border-rose-200/50 dark:border-rose-800/50">
+                                        <FormattedAINotes 
+                                          text={effectiveSplitSuggestionPreview.specialNotes} 
+                                          textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -12785,10 +13400,20 @@ const RescuePlanPanel = ({
                                 <h3 className="text-sm font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
                                   Tách nhiệm vụ theo cảnh báo an toàn
                                 </h3>
-                                <p className="mt-1 text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed">
-                                  {effectiveSplitSuggestionPreview?.mixedRescueReliefWarning ||
-                                    "Gợi ý AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."}
-                                </p>
+                                <div className="mt-1">
+                                  <FormattedAINotes 
+                                    text={effectiveSplitSuggestionPreview?.mixedRescueReliefWarning || "Gợi ý AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."} 
+                                    textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                  />
+                                  {effectiveSplitSuggestionPreview?.specialNotes && (
+                                    <div className="mt-2 pt-2 border-t border-rose-200/50 dark:border-rose-800/50">
+                                      <FormattedAINotes 
+                                        text={effectiveSplitSuggestionPreview.specialNotes} 
+                                        textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                      />
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -13225,7 +13850,7 @@ const RescuePlanPanel = ({
                                                                 "-"}
                                                             </span>
                                                             {supply.bufferRatioLabel ? (
-                                                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                                 Dự trù{" "}
                                                                 {
                                                                   supply.bufferRatioLabel
@@ -13303,7 +13928,7 @@ const RescuePlanPanel = ({
                         activeSuggestion.errorMessage ||
                         activeSuggestion.lowConfidenceWarning ||
                         activeSuggestion.multiDepotRecommended ||
-                        trimToNull(activeSuggestion.mixedRescueReliefWarning) ||
+                        (!isEditMode && trimToNull(activeSuggestion.mixedRescueReliefWarning)) ||
                         activeSuggestion.needsAdditionalDepot ||
                         (activeSuggestion.supplyShortages?.length ?? 0) >
                           0) && (
@@ -13314,13 +13939,11 @@ const RescuePlanPanel = ({
                               <Info className="h-3.5 w-3.5" weight="fill" />
                               Cảnh báo hệ thống
                             </h4>
-                            {trimToNull(
+                            {!isEditMode && trimToNull(
                               activeSuggestion.mixedRescueReliefWarning,
                             ) ? (
                               <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 rounded-lg p-2.5">
-                                <p className="text-sm text-rose-800 dark:text-rose-300 leading-relaxed">
-                                  {activeSuggestion.mixedRescueReliefWarning}
-                                </p>
+                                <FormattedAINotes text={activeSuggestion.mixedRescueReliefWarning} textClassName="text-sm text-rose-800 dark:text-rose-300 leading-relaxed" />
                               </div>
                             ) : null}
                             {activeSuggestion.errorMessage ? (
@@ -13399,9 +14022,7 @@ const RescuePlanPanel = ({
                               Lưu ý đặc biệt
                             </h4>
                             <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2.5">
-                              <p className="text-sm text-foreground/75 leading-relaxed">
-                                {activeSuggestion.specialNotes}
-                              </p>
+                              <FormattedAINotes text={activeSuggestion.specialNotes} textClassName="text-sm text-foreground/75 leading-relaxed" />
                             </div>
                           </section>
                         </>
@@ -13467,7 +14088,7 @@ const RescuePlanPanel = ({
                                           {selectedShortageDepot.depotName}
                                         </p>
                                         {selectedShortageDepot.depotAddress ? (
-                                          <p className="text-xs text-muted-foreground">
+                                          <p className="text-sm text-muted-foreground">
                                             {selectedShortageDepot.depotAddress}
                                           </p>
                                         ) : null}
@@ -13475,7 +14096,7 @@ const RescuePlanPanel = ({
                                       {isAlternativeDepotsFetching ? (
                                         <Badge
                                           variant="secondary"
-                                          className="h-5 shrink-0 rounded-full px-2 text-xs"
+                                          className="h-5 shrink-0 rounded-full px-2 text-sm"
                                         >
                                           Đang cập nhật
                                         </Badge>
@@ -13507,7 +14128,7 @@ const RescuePlanPanel = ({
                                   </div>
                                 ) : alternativeDepotsData ? (
                                   <div className="mt-2 space-y-2">
-                                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                                       <Badge
                                         variant="outline"
                                         className="h-5 rounded-full px-2"
@@ -13548,19 +14169,19 @@ const RescuePlanPanel = ({
                                                     {depot.depotName}
                                                   </p>
                                                   {depot.coversAllShortages ? (
-                                                    <Badge className="h-5 rounded-full bg-emerald-500 px-2 text-xs text-white hover:bg-emerald-500">
+                                                    <Badge className="h-5 rounded-full bg-emerald-500 px-2 text-sm text-white hover:bg-emerald-500">
                                                       Đủ toàn bộ
                                                     </Badge>
                                                   ) : (
                                                     <Badge
                                                       variant="secondary"
-                                                      className="h-5 rounded-full bg-amber-100 px-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                                      className="h-5 rounded-full bg-amber-100 px-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                                                     >
                                                       Cover một phần
                                                     </Badge>
                                                   )}
                                                 </div>
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                <p className="mt-0.5 text-sm text-muted-foreground">
                                                   {depot.depotAddress}
                                                 </p>
                                               </div>
@@ -13587,7 +14208,7 @@ const RescuePlanPanel = ({
 
                                             <div className="mt-2 grid grid-cols-3 gap-2">
                                               <div className="rounded-md border bg-slate-50/80 px-2 py-1.5 dark:bg-slate-900/40">
-                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                                <p className="text-sm uppercase tracking-wider text-muted-foreground">
                                                   Cover
                                                 </p>
                                                 <p className="text-sm font-semibold text-foreground">
@@ -13598,7 +14219,7 @@ const RescuePlanPanel = ({
                                                 </p>
                                               </div>
                                               <div className="rounded-md border bg-slate-50/80 px-2 py-1.5 dark:bg-slate-900/40">
-                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                                <p className="text-sm uppercase tracking-wider text-muted-foreground">
                                                   Khối lượng
                                                 </p>
                                                 <p className="text-sm font-semibold text-foreground">
@@ -13607,7 +14228,7 @@ const RescuePlanPanel = ({
                                                 </p>
                                               </div>
                                               <div className="rounded-md border bg-slate-50/80 px-2 py-1.5 dark:bg-slate-900/40">
-                                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                                <p className="text-sm uppercase tracking-wider text-muted-foreground">
                                                   Khoảng cách
                                                 </p>
                                                 <p className="text-sm font-semibold text-foreground">
@@ -13617,7 +14238,7 @@ const RescuePlanPanel = ({
                                               </div>
                                             </div>
 
-                                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                                            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                               {depot.reason}
                                             </p>
 
@@ -13634,7 +14255,7 @@ const RescuePlanPanel = ({
                                                         <p className="truncate text-sm font-medium text-foreground">
                                                           {item.itemName}
                                                         </p>
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <p className="text-sm text-muted-foreground">
                                                           Cần{" "}
                                                           {item.neededQuantity}
                                                           {item.unit
@@ -13652,7 +14273,7 @@ const RescuePlanPanel = ({
                                                       <Badge
                                                         variant="outline"
                                                         className={cn(
-                                                          "h-5 shrink-0 rounded-full px-2 text-xs font-semibold",
+                                                          "h-5 shrink-0 rounded-full px-2 text-sm font-semibold",
                                                           item.coverageStatus ===
                                                             "Full"
                                                             ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300"
@@ -13680,77 +14301,6 @@ const RescuePlanPanel = ({
                             </section>
                           </>
                         )}
-
-                      <Separator />
-                    </>
-                  )}
-
-                  {/* AI Confidence */}
-                  <section>
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
-                      <ShieldCheck
-                        className="h-3.5 w-3.5 text-emerald-500"
-                        weight="fill"
-                      />
-                      Độ tin cậy AI
-                    </h4>
-                    <Card className="bg-card border">
-                      <CardContent className="p-2.5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-sm text-muted-foreground">
-                            Mức tự tin của AI
-                          </span>
-                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                            {(
-                              (activeSuggestion?.confidenceScore ?? 0) * 100
-                            ).toFixed(0)}
-                            %
-                          </span>
-                        </div>
-                        <Progress
-                          value={(activeSuggestion?.confidenceScore ?? 0) * 100}
-                          className="h-1.5"
-                        />
-                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                          Chỉ số này thể hiện mức độ chắc chắn của AI với đề
-                          xuất hiện tại, không phải mức ưu tiên xử lý.
-                        </p>
-                        <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
-                          <div>
-                            <p className="text-muted-foreground/60">Model</p>
-                            <p className="font-medium text-foreground/80">
-                              {activeSuggestion?.modelName}
-                            </p>
-                          </div>
-                          {activeSuggestion && (
-                            <div>
-                              <p className="text-muted-foreground/60">
-                                Phản hồi
-                              </p>
-                              <p className="font-medium text-foreground/80">
-                                {typeof activeSuggestion.responseTimeMs ===
-                                  "number" &&
-                                activeSuggestion.responseTimeMs > 0
-                                  ? `${(activeSuggestion.responseTimeMs / 1000).toFixed(1)}s`
-                                  : "N/A"}
-                              </p>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-muted-foreground/60">Đánh giá</p>
-                            <p className="font-medium text-foreground/80">
-                              {(activeSuggestion?.confidenceScore ?? 0) >= 0.8
-                                ? "Cao"
-                                : (activeSuggestion?.confidenceScore ?? 0) >=
-                                    0.6
-                                  ? "Trung bình"
-                                  : "Cần rà soát"}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </section>
 
                   {/* Depot Inventory — shown whenever depots are present */}
                   {visibleSidebarDepots.length > 0 && (
@@ -13784,11 +14334,14 @@ const RescuePlanPanel = ({
                       </section>
                     </>
                   )}
-                </div>
-              </ScrollArea>
+                </>
+              )}
             </div>
-          )}
+          </ScrollArea>
         </div>
+      )}
+        </div>
+
 
         {/* Footer */}
         <div className="p-4 border-t shrink-0 bg-background">

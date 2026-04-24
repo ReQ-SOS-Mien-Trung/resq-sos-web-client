@@ -25,6 +25,7 @@ import {
   WaitingConversationEntity,
 } from "./type";
 import { coordinatorChatTransport } from "./transport";
+import { useAuthStore } from "@/stores/auth.store";
 
 export const WAITING_CONVERSATIONS_QUERY_KEY = [
   "chat",
@@ -92,6 +93,17 @@ export interface UseCoordinatorChatConnectionOptions {
   onResyncRequested?: () => void;
 }
 
+function isNegotiationAbortError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes("stopped during negotiation") ||
+    normalized.includes("aborterror")
+  );
+}
+
 export function useCoordinatorChatConnection(
   options: UseCoordinatorChatConnectionOptions,
 ) {
@@ -111,6 +123,7 @@ export function useCoordinatorChatConnection(
     useState<CoordinatorChatConnectionState>("disconnected");
   const [transportError, setTransportError] = useState<string | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const joinedConversationRef = useRef<number | null>(null);
   const onJoinedConversationRef = useRef(options.onJoinedConversation);
   const onReceiveMessageRef = useRef(options.onReceiveMessage);
@@ -153,7 +166,7 @@ export function useCoordinatorChatConnection(
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !accessToken) {
       return;
     }
 
@@ -205,6 +218,8 @@ export function useCoordinatorChatConnection(
     );
     coordinatorChatTransport.on<string>(CHAT_EVENTS.Error, handleHubError);
 
+    coordinatorChatTransport.retainConnection();
+
     coordinatorChatTransport.onReconnecting(() => {
       if (!mounted) return;
       setRetryAttempts((prev) => prev + 1);
@@ -240,6 +255,11 @@ export function useCoordinatorChatConnection(
         refreshConnectionState();
       } catch (error: unknown) {
         if (!mounted) return;
+        if (isNegotiationAbortError(error)) {
+          setConnectionState("disconnected");
+          return;
+        }
+
         const message =
           error instanceof Error
             ? error.message
@@ -276,11 +296,16 @@ export function useCoordinatorChatConnection(
       coordinatorChatTransport.onClose(() => undefined);
       coordinatorChatTransport.onReconnected(() => undefined);
       coordinatorChatTransport.onReconnecting(() => undefined);
+      void coordinatorChatTransport.releaseConnection().catch(() => null);
     };
-  }, [enabled, refreshConnectionState]);
+  }, [accessToken, enabled, refreshConnectionState]);
 
   useEffect(() => {
     const syncConversation = async () => {
+      if (!enabled || !accessToken) {
+        return;
+      }
+
       if (!activeConversationId || activeConversationId < 1) {
         if (joinedConversationRef.current) {
           await coordinatorChatTransport.leaveConversation(
@@ -314,7 +339,7 @@ export function useCoordinatorChatConnection(
     };
 
     void syncConversation();
-  }, [activeConversationId, connectionState]);
+  }, [accessToken, activeConversationId, connectionState, enabled]);
 
   const disconnect = useCallback(async () => {
     await coordinatorChatTransport.stop();
@@ -331,6 +356,12 @@ export function useCoordinatorChatConnection(
   const retryConnection = useCallback(async () => {
     setTransportError(null);
 
+    if (!accessToken) {
+      setConnectionState("disconnected");
+      setTransportError("Bạn cần đăng nhập lại để kết nối hệ thống chat.");
+      return;
+    }
+
     try {
       setConnectionState("connecting");
       await coordinatorChatTransport.stop();
@@ -345,6 +376,11 @@ export function useCoordinatorChatConnection(
         onResyncRequestedRef.current?.();
       }
     } catch (error: unknown) {
+      if (isNegotiationAbortError(error)) {
+        setConnectionState("disconnected");
+        return;
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -353,10 +389,10 @@ export function useCoordinatorChatConnection(
       setTransportError(message);
       onErrorRef.current?.(message);
     }
-  }, [activeConversationId, refreshConnectionState]);
+  }, [accessToken, activeConversationId, refreshConnectionState]);
 
   return {
-    connectionState,
+    connectionState: enabled && accessToken ? connectionState : "disconnected",
     transportError,
     retryAttempts,
     retryConnection,

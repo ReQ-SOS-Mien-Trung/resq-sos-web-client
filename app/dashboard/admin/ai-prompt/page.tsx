@@ -166,7 +166,7 @@ function incrementVersionCore(versionCore: string) {
   return `${normalizedCore.slice(0, matchStart)}${nextNumber}${normalizedCore.slice(matchEnd)}`;
 }
 
-function getNextAiDraftVersion(version: string | null | undefined) {
+function getNextDraftVersion(version: string | null | undefined) {
   const normalized = normalizeAiConfigVersion(version ?? "1.0").replace(
     /^v/i,
     "",
@@ -324,7 +324,7 @@ function formatDate(date: string | null) {
 }
 
 function shouldShowPromptVersion(status: string) {
-  return status !== "Draft";
+  return status === "Active" || status === "Draft" || status === "Archived";
 }
 
 function getStatusLabel(status: string) {
@@ -695,7 +695,14 @@ const AIPromptPage = () => {
         setEditorDraftPromptId(targetId);
 
         const detail = await getPromptById(targetId);
-        setEditingPrompt(detail);
+        setEditingPrompt(
+          prompt.status === "Draft"
+            ? detail
+            : {
+                ...detail,
+                version: getNextDraftVersion(prompt.version ?? detail.version),
+              },
+        );
         setEditorMode("editing");
         setIsEditorFullscreen(false);
         toast.dismiss(toastId);
@@ -968,7 +975,7 @@ const AIPromptPage = () => {
         temperature: selectedAiConfig.temperature,
         max_tokens: selectedAiConfig.maxTokens,
         api_key: "",
-        version: getNextAiDraftVersion(selectedAiConfig.version),
+        version: getNextDraftVersion(selectedAiConfig.version),
         is_active: selectedAiConfig.isActive,
       }),
     );
@@ -1428,7 +1435,6 @@ const AIPromptPage = () => {
           recommendedRollbackId={recommendedRollbackPromptId}
           selectedPromptType={effectiveSelectedPromptType}
           promptTypeCounts={promptTypeCounts}
-          aiConfig={promptAiConfig}
           onSelectPromptType={setSelectedPromptType}
           onSelect={(prompt) => {
             setSelectedPromptId(prompt.id);

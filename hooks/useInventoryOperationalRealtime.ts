@@ -11,12 +11,14 @@ import {
 } from "@/services/depot/hooks";
 import { INVENTORY_KEYS } from "@/services/inventory/hooks";
 import { operationalRealtimeClient } from "@/services/operational_realtime/client";
-import type {
+import {
+  OperationalRealtimeConnectionState,
   ReceiveDepotActivityUpdatePayload,
   ReceiveDepotClosureUpdatePayload,
   ReceiveSupplyRequestUpdatePayload,
 } from "@/services/operational_realtime/type";
 import { useAuthStore } from "@/stores/auth.store";
+import { useState } from "react";
 
 interface InventoryOperationalRealtimeOptions {
   enabled?: boolean;
@@ -179,9 +181,13 @@ function invalidateDepotInventoryQueries(
 
 export function useInventoryOperationalRealtime(
   options?: InventoryOperationalRealtimeOptions,
-): void {
+): OperationalRealtimeConnectionState {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const [connectionState, setConnectionState] =
+    useState<OperationalRealtimeConnectionState>(
+      operationalRealtimeClient.getConnectionState(),
+    );
   const activeSupplyDepotId = toPositiveId(options?.supplyRequests?.depotId);
   const activeSupplyRequestId = toPositiveId(options?.supplyRequests?.requestId);
   const activeActivityDepotId = toPositiveId(options?.depotActivities?.depotId);
@@ -535,4 +541,16 @@ export function useInventoryOperationalRealtime(
     options?.enabled,
     queryClient,
   ]);
+
+  useEffect(() => {
+    const unsubscribe = operationalRealtimeClient.subscribeConnectionState(
+      (nextState) => {
+        setConnectionState(nextState);
+      },
+    );
+
+    return unsubscribe;
+  }, []);
+
+  return connectionState;
 }

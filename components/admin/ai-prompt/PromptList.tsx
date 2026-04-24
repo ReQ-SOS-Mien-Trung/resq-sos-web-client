@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -15,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PencilSimple, Robot, Trash } from "@phosphor-icons/react";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
 import type { PromptEntity, PromptType } from "@/services/prompt/type";
-import type { AiConfigSummaryEntity } from "@/services/ai-config/type";
 import { PROMPT_TYPE_OPTIONS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +25,6 @@ type PromptListProps = {
   recommendedRollbackId?: number | null;
   selectedPromptType: PromptType | null;
   promptTypeCounts: Record<PromptType, number>;
-  aiConfig?: AiConfigSummaryEntity | null;
   onSelectPromptType: (promptType: PromptType) => void;
   onSelect: (prompt: PromptEntity) => void;
   onEdit: (prompt: PromptEntity) => void | Promise<void>;
@@ -157,7 +154,6 @@ const PromptList = ({
   recommendedRollbackId = null,
   selectedPromptType,
   promptTypeCounts,
-  aiConfig = null,
   onSelectPromptType,
   onSelect,
   onEdit,
@@ -168,6 +164,10 @@ const PromptList = ({
 
   const archivedCount = useMemo(
     () => prompts.filter((prompt) => prompt.status === "Archived").length,
+    [prompts],
+  );
+  const draftCount = useMemo(
+    () => prompts.filter((prompt) => prompt.status === "Draft").length,
     [prompts],
   );
 
@@ -227,6 +227,9 @@ const PromptList = ({
           <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/95 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               Đang hiển thị {visiblePrompts.length}/{prompts.length} phiên bản.
+              {draftCount > 0
+                ? ` Có ${draftCount} bản nháp có thể sửa hoặc kích hoạt.`
+                : ""}
               {archivedCount > 0
                 ? ` Có ${archivedCount} bản lưu trữ để khôi phục khi cần.`
                 : ""}
@@ -290,15 +293,18 @@ const PromptList = ({
                         <p className="font-semibold text-foreground">
                           {prompt.name}
                         </p>
-                        {!isDraft ? (
-                          <Badge
-                            variant={
-                              prompt.status === "Active" ? "success" : "outline"
-                            }
-                          >
-                            {getStatusLabel(prompt.status)}
-                          </Badge>
-                        ) : null}
+                        <Badge
+                          variant={
+                            prompt.status === "Active" ? "success" : "outline"
+                          }
+                          className={
+                            isDraft
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : undefined
+                          }
+                        >
+                          {getStatusLabel(prompt.status)}
+                        </Badge>
                         {isRecommendedRollback ? (
                           <Badge variant="outline">Gợi ý khôi phục</Badge>
                         ) : null}
@@ -327,7 +333,9 @@ const PromptList = ({
                             ? "Đang chạy"
                             : isActivating
                               ? "Đang kích hoạt..."
-                              : "Kích hoạt"}
+                              : isDraft
+                                ? "Kích hoạt nháp"
+                                : "Kích hoạt"}
                         </span>
                         <button
                           type="button"
