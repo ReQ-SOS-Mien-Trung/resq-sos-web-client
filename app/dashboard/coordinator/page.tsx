@@ -172,7 +172,13 @@ function normalizeSOSRequestTypeFilterValue(
   return null;
 }
 
-const AUTO_CLUSTER_MAX_SIZE = 3;
+/** Số lượng SOS tối đa trong mỗi cụm tự động, theo mức độ ưu tiên của seed */
+const AUTO_CLUSTER_MAX_SIZE_BY_PRIORITY: Record<SOSRequest["priority"], number> = {
+  P1: 1, // Rất nghiêm trọng → chỉ 1 mình, không gom thêm
+  P2: 2, // Nghiêm trọng → gom tối đa 2
+  P3: 3, // Trung bình → gom tối đa 3
+  P4: 5, // Thấp → gom tối đa 5
+};
 const AUTO_CLUSTER_RADIUS_STEP_KM = 1;
 const SOS_PRIORITY_ORDER: Record<SOSRequest["priority"], number> = {
   P1: 0,
@@ -309,6 +315,16 @@ function buildAutoClusters(
       continue;
     }
 
+    const maxClusterSize =
+      AUTO_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
+
+    // P1: không gom thêm, chỉ tạo cụm 1 mình
+    if (maxClusterSize <= 1) {
+      cluster.forEach((request) => clusteredIds.add(request.id));
+      clusters.push(cluster);
+      continue;
+    }
+
     let selectedNeighbors: AutoClusterCandidate[] = [];
     let hasFoundNeighbor = false;
 
@@ -329,7 +345,7 @@ function buildAutoClusters(
         }))
         .filter((candidate) => candidate.distanceKm <= radiusKm)
         .sort(compareAutoClusterCandidates)
-        .slice(0, AUTO_CLUSTER_MAX_SIZE - 1);
+        .slice(0, maxClusterSize - 1);
 
       if (neighborsWithinRadius.length > 0) {
         hasFoundNeighbor = true;
@@ -338,7 +354,7 @@ function buildAutoClusters(
 
       if (
         hasFoundNeighbor &&
-        selectedNeighbors.length >= AUTO_CLUSTER_MAX_SIZE - 1
+        selectedNeighbors.length >= maxClusterSize - 1
       ) {
         break;
       }
@@ -437,7 +453,9 @@ const MapLegend = () => {
     <div className="absolute bottom-6 left-6 z-[40] pointer-events-none select-none">
       <div className="bg-background/85 backdrop-blur-md border border-border/60 shadow-xl rounded-2xl p-3 flex flex-col gap-3 min-w-[160px] animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">Mức độ SOS</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">
+            Mức độ SOS
+          </p>
           <div className="grid grid-cols-1 gap-1.5">
             {[
               { label: "P1: Rất nghiêm trọng", color: "bg-[#ef4444]" },
@@ -445,9 +463,19 @@ const MapLegend = () => {
               { label: "P3: Trung bình", color: "bg-[#eab308]" },
               { label: "P4: Thấp", color: "bg-[#14b8a6]" },
             ].map((item) => (
-              <div key={item.label} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
-                <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm shrink-0", item.color)} />
-                <span className="text-[11px] font-medium text-foreground/90">{item.label}</span>
+              <div
+                key={item.label}
+                className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors"
+              >
+                <div
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full shadow-sm shrink-0",
+                    item.color,
+                  )}
+                />
+                <span className="text-[11px] font-medium text-foreground/90">
+                  {item.label}
+                </span>
               </div>
             ))}
           </div>
@@ -456,19 +484,25 @@ const MapLegend = () => {
         <div className="h-px bg-border/40" />
 
         <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">Địa điểm</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">
+            Địa điểm
+          </p>
           <div className="grid grid-cols-1 gap-1.5">
             <div className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
               <div className="w-5 h-5 rounded-md bg-purple-100 border border-purple-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
                 📍
               </div>
-              <span className="text-[11px] font-medium text-foreground/90">Điểm tập kết</span>
+              <span className="text-[11px] font-medium text-foreground/90">
+                Điểm tập kết
+              </span>
             </div>
             <div className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
               <div className="w-5 h-5 rounded-md bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
                 📦
               </div>
-              <span className="text-[11px] font-medium text-foreground/90">Kho vật phẩm</span>
+              <span className="text-[11px] font-medium text-foreground/90">
+                Kho vật phẩm
+              </span>
             </div>
           </div>
         </div>
@@ -907,31 +941,28 @@ const CoordinatorDashboardContent = () => {
   const maximumAutoClusterDistanceKm =
     sosClusterGroupingConfigQuery.data?.maximumDistanceKm ?? 0;
 
-  const autoClusters = useMemo(
-    () => {
-      if (clusterGroupingStatus !== "success") {
-        return [];
-      }
+  const autoClusters = useMemo(() => {
+    if (clusterGroupingStatus !== "success") {
+      return [];
+    }
 
-      const clusterableSOSRequests =
-        recentlyClusteredSOSIds.size === 0
-          ? sosRequests
-          : sosRequests.filter((sos) => !recentlyClusteredSOSIds.has(sos.id));
+    const clusterableSOSRequests =
+      recentlyClusteredSOSIds.size === 0
+        ? sosRequests
+        : sosRequests.filter((sos) => !recentlyClusteredSOSIds.has(sos.id));
 
-      return buildAutoClusters(
-        clusterableSOSRequests,
-        clusters,
-        maximumAutoClusterDistanceKm,
-      );
-    },
-    [
-      clusterGroupingStatus,
+    return buildAutoClusters(
+      clusterableSOSRequests,
       clusters,
       maximumAutoClusterDistanceKm,
-      recentlyClusteredSOSIds,
-      sosRequests,
-    ],
-  );
+    );
+  }, [
+    clusterGroupingStatus,
+    clusters,
+    maximumAutoClusterDistanceKm,
+    recentlyClusteredSOSIds,
+    sosRequests,
+  ]);
 
   useEffect(() => {
     if (isWeatherMode) {
@@ -1006,9 +1037,7 @@ const CoordinatorDashboardContent = () => {
   useEffect(() => {
     setSelectedRescuer((prev) => {
       if (!prev) return prev;
-      const nextSelected = rescuers.find(
-        (rescuer) => rescuer.id === prev.id,
-      );
+      const nextSelected = rescuers.find((rescuer) => rescuer.id === prev.id);
       return nextSelected ?? null;
     });
   }, [rescuers]);
@@ -1462,9 +1491,7 @@ const CoordinatorDashboardContent = () => {
     (clusterId: number) => {
       const cluster = clusters.find((item) => item.id === clusterId);
       if (isClusterMissionLocked(cluster)) {
-        toast.info(
-          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
-        );
+        toast.info("Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.");
         return;
       }
 
@@ -1516,9 +1543,7 @@ const CoordinatorDashboardContent = () => {
     (clusterId: number) => {
       const cluster = clusters.find((item) => item.id === clusterId);
       if (isClusterMissionLocked(cluster)) {
-        toast.info(
-          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
-        );
+        toast.info("Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.");
         return;
       }
 
@@ -1578,8 +1603,9 @@ const CoordinatorDashboardContent = () => {
         : null,
     [activeClusterId, clusters],
   );
-  const isActiveRescuePlanClusterLocked =
-    isClusterMissionLocked(activeRescuePlanCluster);
+  const isActiveRescuePlanClusterLocked = isClusterMissionLocked(
+    activeRescuePlanCluster,
+  );
 
   const rescuePlanSOSRequests = useMemo(
     () => getClusterSOSRequests(activeClusterId, sosRequests, clusters),

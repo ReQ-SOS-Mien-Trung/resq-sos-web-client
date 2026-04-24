@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { SOSDetailsPanelProps } from "@/type";
@@ -666,57 +673,110 @@ function FormulaTooltip({
   description?: string;
   details?: ReactNode[];
 }) {
-  return (
-    <Tooltip delayDuration={150}>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex shrink-0 items-center text-muted-foreground hover:text-foreground transition-colors ml-1.5 focus:outline-none"
-          aria-label={`Xem công thức: ${title}`}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <Info className="h-4 w-4" weight="fill" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent
-        side="left"
-        align="center"
-        sideOffset={12}
-        collisionPadding={20}
-        className="w-[320px] sm:w-[380px] p-0 shadow-2xl z-[10001] bg-popover border-border/50 overflow-hidden"
-      >
-        <div className="p-4">
-          <ScrollArea className="max-h-[60vh]">
-            <div className="pr-4">
-              <p className="font-bold text-foreground text-sm tracking-tight">
-                {title}
-              </p>
-              {description ? (
-                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/90 font-medium">
-                  {description}
-                </p>
-              ) : null}
-              <div className="mt-4 overflow-x-auto rounded-lg border bg-muted/30 px-3.5 py-3.5 shadow-inner border-border/40">
-                {formula}
-              </div>
-              {details && details.length > 0 && (
-                <div className="mt-4 space-y-2.5 text-[11px] leading-relaxed text-muted-foreground/80">
-                  {details.map((line, idx) => (
-                    <div key={idx} className="flex gap-2.5 items-start">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-indigo-500/50" />
-                      <div className="flex-1">{line}</div>
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const updateCoords = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const popoverWidth = 340;
+    let left = rect.right - popoverWidth;
+    if (left < 8) left = 8;
+    setCoords({ top: rect.bottom + 6, left });
+  }, []);
+
+  const open = useCallback(() => {
+    updateCoords();
+    setIsOpen(true);
+  }, [updateCoords]);
+
+  const close = useCallback(() => setIsOpen(false), []);
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        btnRef.current?.contains(e.target as Node) ||
+        popoverRef.current?.contains(e.target as Node)
+      )
+        return;
+      close();
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isOpen, close]);
+
+  const popover =
+    isOpen && coords
+      ? createPortal(
+          <div
+            ref={popoverRef}
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: 340,
+              zIndex: 10001,
+            }}
+            className="rounded-lg border bg-popover shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
+            onMouseEnter={open}
+            onMouseLeave={close}
+          >
+            <div className="p-4">
+              <ScrollArea className="max-h-[55vh]">
+                <div className="pr-4">
+                  <p className="font-bold text-foreground text-sm tracking-tight">
+                    {title}
+                  </p>
+                  {description ? (
+                    <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/90 font-medium">
+                      {description}
+                    </p>
+                  ) : null}
+                  <div className="mt-4">{formula}</div>
+                  {details && details.length > 0 && (
+                    <div className="mt-4 space-y-2.5 text-[11px] leading-relaxed text-muted-foreground/80">
+                      {details.map((line, idx) => (
+                        <div key={idx} className="flex gap-2.5 items-start">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-indigo-500/50" />
+                          <div className="flex-1">{line}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+              </ScrollArea>
             </div>
-          </ScrollArea>
-        </div>
-      </TooltipContent>
-    </Tooltip>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <span className="inline-flex items-center ml-1.5">
+      <button
+        ref={btnRef}
+        type="button"
+        className="inline-flex shrink-0 items-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+        aria-label={`Xem công thức: ${title}`}
+        onMouseEnter={open}
+        onMouseLeave={close}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isOpen) close();
+          else open();
+        }}
+      >
+        <Info className="h-4 w-4" weight="fill" />
+      </button>
+      {popover}
+    </span>
   );
 }
 
@@ -1251,7 +1311,6 @@ const SOSDetailsPanel = ({
     ) : null,
     priorityThresholdText,
   ]);
-  const itemsNeeded = parseItemsNeeded(ruleEvaluation?.itemsNeeded);
   const latestAiAnalysis =
     aiAnalyses.length > 0
       ? [...aiAnalyses].sort(
@@ -1271,6 +1330,82 @@ const SOSDetailsPanel = ({
     latestAiAnalysis?.metadata?.analysisResult?.explanation?.trim() ||
     latestAiAnalysis?.explanation?.trim() ||
     null;
+
+  const aiPriorityFormulaContent = latestAiAnalysis ? (
+    <div className="space-y-3 p-1 max-w-[320px]">
+      <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-violet-500" weight="fill" />
+          <span className="font-bold text-base">Phân tích AI</span>
+        </div>
+        {latestAiAnalysis.suggestedPriorityScore != null && (
+          <Badge className="font-mono bg-violet-600 text-white">
+            {latestAiAnalysis.suggestedPriorityScore.toFixed(1)}
+          </Badge>
+        )}
+      </div>
+
+      {aiExplanation && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Nhận định chi tiết
+          </p>
+          <p className="text-sm leading-relaxed text-foreground/90">
+            {aiExplanation}
+          </p>
+        </div>
+      )}
+
+      {latestAiAnalysis.handlingReason && (
+        <div className="space-y-1 bg-violet-50 dark:bg-violet-900/20 p-2.5 rounded-md border border-violet-100 dark:border-violet-800/50">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+            Lý do xử lý
+          </p>
+          <p className="text-[13px] italic leading-snug text-violet-900/90 dark:text-violet-200/90">
+            {latestAiAnalysis.handlingReason}
+          </p>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  const aiPriorityFormulaDetails = compactFormulaDetails([
+    latestAiAnalysis?.modelName ? (
+      <div className="flex items-center gap-1.5">
+        <Icon
+          icon="ph:cpu-bold"
+          className="w-3.5 h-3.5 text-muted-foreground"
+        />
+        <span>Model: {latestAiAnalysis.modelName}</span>
+      </div>
+    ) : null,
+    latestAiAnalysis?.suggestedSeverityLevel ? (
+      <div className="flex items-center gap-1.5">
+        <Icon
+          icon="ph:warning-circle-bold"
+          className="w-3.5 h-3.5 text-muted-foreground"
+        />
+        <span>
+          Mức độ: {severityLabel(latestAiAnalysis.suggestedSeverityLevel)}
+        </span>
+      </div>
+    ) : null,
+    latestAiAnalysis?.needsImmediateSafeTransfer ? (
+      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-medium">
+        <Icon icon="ph:warning-bold" className="w-3.5 h-3.5" />
+        <span>Cần chuyển đi ngay lập tức</span>
+      </div>
+    ) : null,
+    latestAiAnalysis?.canWaitForCombinedMission === false ? (
+      <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-medium">
+        <Icon icon="ph:hourglass-simple-bold" className="w-3.5 h-3.5" />
+        <span>Không nên chờ ghép đoàn</span>
+      </div>
+    ) : null,
+    aiConfidencePercent ? `Độ tin cậy: ${aiConfidencePercent}` : null,
+  ]);
+
+  const itemsNeeded = parseItemsNeeded(ruleEvaluation?.itemsNeeded);
 
   const normalizeContactText = (value?: string | null) => {
     const trimmed = value?.trim();
@@ -1907,10 +2042,10 @@ const SOSDetailsPanel = ({
                       className="h-4 w-4 text-indigo-500"
                       weight="fill"
                     />
-                    Thông số hệ thống & AI
+                    Điểm số Rulebase & AI
                   </h4>
 
-                  <div className="space-y-3 rounded-lg border bg-muted/30 p-3.5 shadow-sm">
+                  <div className="space-y-3">
                     {ruleEvaluation && (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2 rounded-md border bg-background p-2.5 shadow-sm">
@@ -1927,11 +2062,6 @@ const SOSDetailsPanel = ({
                             <div className="flex items-center gap-2 text-right">
                               <div className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                                 Tổng
-                                <FormulaTooltip
-                                  title="Công thức tính điểm ưu tiên"
-                                  formula={priorityFormulaContent}
-                                  details={priorityFormulaDetails}
-                                />
                               </div>
                               <div className="text-base font-bold text-foreground">
                                 {ruleEvaluation.totalScore.toFixed(1)}
@@ -1966,6 +2096,59 @@ const SOSDetailsPanel = ({
                             ) : null}
                           </div>
                         </div>
+
+                        {latestAiAnalysis && (
+                          <div className="flex items-center justify-between gap-2 rounded-md border bg-background p-2.5 shadow-sm">
+                            <div className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold whitespace-nowrap pl-1">
+                              <Brain
+                                className="h-4 w-4 text-violet-500"
+                                weight="fill"
+                              />
+                              AI Phân tích
+                              <FormulaTooltip
+                                title="Nhận định từ AI"
+                                formula={aiPriorityFormulaContent}
+                                details={aiPriorityFormulaDetails}
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-3 pr-1">
+                              <div className="flex items-center gap-2 text-right">
+                                <div className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                                  Tổng
+                                </div>
+                                <div className="text-base font-bold text-foreground">
+                                  {latestAiAnalysis.suggestedPriorityScore.toFixed(
+                                    1,
+                                  )}
+                                </div>
+                              </div>
+
+                              {latestAiAnalysis.suggestedPriority && (
+                                <>
+                                  <div className="h-4 w-px bg-border/60 shrink-0"></div>
+                                  <Badge
+                                    variant={
+                                      PRIORITY_BADGE_VARIANT[
+                                        latestAiAnalysis.suggestedPriority as keyof typeof PRIORITY_BADGE_VARIANT
+                                      ] || "secondary"
+                                    }
+                                    className={cn(
+                                      "h-6 px-2 text-xs shrink-0",
+                                      getRulePriorityBadgeClass(
+                                        latestAiAnalysis.suggestedPriority,
+                                      ),
+                                    )}
+                                  >
+                                    {getRulePriorityLabel(
+                                      latestAiAnalysis.suggestedPriority,
+                                    )}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {itemsNeeded.length > 0 && (
                           <div className="border-t border-border/50 pt-3">
@@ -2002,123 +2185,6 @@ const SOSDetailsPanel = ({
                         )}
                       </div>
                     )}
-
-                    <div
-                      className={cn(
-                        "space-y-3",
-                        ruleEvaluation && "border-t border-border/50 pt-3",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                            <Brain
-                              className="h-4 w-4 text-violet-500"
-                              weight="fill"
-                            />
-                            AI
-                            <FormulaTooltip
-                              title="Cách đọc chỉ số AI"
-                              description="AI là phần nhận định của mô hình, không chạy theo công thức điểm cố định như rule base."
-                              formula={
-                                <div className="space-y-2 text-sm leading-relaxed text-foreground">
-                                  <p>
-                                    Độ tin cậy được hiển thị theo phần trăm.
-                                  </p>
-                                  <p>
-                                    Nếu backend trả giá trị từ 0 đến 1, giao
-                                    diện sẽ quy đổi sang 0 đến 100%.
-                                  </p>
-                                </div>
-                              }
-                            />
-                          </div>
-                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Nhận định của model để hỗ trợ coordinator, có thể
-                            đồng thuận hoặc khác nhẹ với rule base.
-                          </p>
-                        </div>
-                        {aiConfidencePercent ? (
-                          <Badge
-                            variant="secondary"
-                            className="h-6 px-2 text-sm"
-                          >
-                            Tin cậy {aiConfidencePercent}
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="h-6 px-2 text-[10px] uppercase tracking-wider font-semibold bg-muted/30 text-muted-foreground/70 border-dashed animate-pulse"
-                          >
-                            Đang chờ
-                          </Badge>
-                        )}
-                      </div>
-
-                      {riskFactors.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {riskFactors.map((factor, idx) => (
-                            <Badge
-                              key={`${factor}-${idx}`}
-                              variant="outline"
-                              className="text-sm border-violet-200 bg-violet-50/30 dark:border-violet-800 dark:bg-violet-900/10"
-                            >
-                              {factor}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      {latestAiAnalysis ? (
-                        <div className="rounded-md border border-violet-200 bg-violet-50/50 p-3 shadow-sm dark:border-violet-800/30 dark:bg-violet-900/10">
-                          <div className="flex flex-wrap gap-1.5">
-                            {aiPriorityLabel ? (
-                              <Badge
-                                variant="outline"
-                                className="border-violet-200 bg-background/80 text-sm dark:border-violet-800/60"
-                              >
-                                Ưu tiên AI: {aiPriorityLabel}
-                              </Badge>
-                            ) : null}
-                            {latestAiAnalysis.suggestedSeverityLevel ? (
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "text-sm",
-                                  severityBadgeClass(
-                                    latestAiAnalysis.suggestedSeverityLevel,
-                                  ),
-                                )}
-                              >
-                                Mức độ:{" "}
-                                {severityLabel(
-                                  latestAiAnalysis.suggestedSeverityLevel,
-                                )}
-                              </Badge>
-                            ) : null}
-                            {latestAiAnalysis.modelName ? (
-                              <Badge
-                                variant="outline"
-                                className="text-sm border-violet-200 bg-background/80 dark:border-violet-800/60"
-                              >
-                                {latestAiAnalysis.modelName}
-                              </Badge>
-                            ) : null}
-                          </div>
-
-                          {aiExplanation ? (
-                            <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-violet-900/85 dark:text-violet-300/85">
-                              {aiExplanation}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-muted-foreground italic bg-muted/10 rounded-md p-3 border border-dashed border-border/40 flex items-center gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-pulse" />
-                          Đang chờ nhận định chi tiết từ AI...
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}

@@ -67,6 +67,8 @@ import {
   Check,
   Eye,
   X,
+  Brain,
+  ShieldCheck,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
@@ -1469,6 +1471,43 @@ const SOSSidebar = ({
                         <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
                           {sos.message}
                         </p>
+
+                        {/* Evaluation Scores Section */}
+                        {(sos.evaluation?.ruleEvaluation || sos.evaluation?.aiAnalyses?.length) && (
+                          <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
+                            {sos.evaluation.ruleEvaluation && (
+                              <div className="flex items-center gap-1.5 min-w-0" title="Điểm hệ thống (Rule-base)">
+                                <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="fill" />
+                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">Hệ thống:</span>
+                                <span className="text-[12px] font-mono font-bold text-foreground">
+                                  {sos.evaluation.ruleEvaluation.totalScore.toFixed(1)}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {sos.evaluation.aiAnalyses && sos.evaluation.aiAnalyses.length > 0 && (
+                              <>
+                                <div className="w-px h-3 bg-border/60 shrink-0" />
+                                <div 
+                                  className={cn(
+                                    "flex items-center gap-1.5 min-w-0",
+                                    sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && "text-amber-600 dark:text-amber-400"
+                                  )} 
+                                  title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                                >
+                                  <Brain className="h-3.5 w-3.5 shrink-0" weight="fill" />
+                                  <span className="text-[11px] font-bold uppercase tracking-tight">AI:</span>
+                                  <span className="text-[12px] font-mono font-bold">
+                                    {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(1)}
+                                  </span>
+                                  {sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && (
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="px-3 py-2 border-t border-inherit space-y-1.5">
                         {canCreateClusterFromSOS(sos) ? (
@@ -2171,6 +2210,43 @@ const SOSSidebar = ({
                                           <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
                                             {sos.message}
                                           </p>
+
+                                          {/* Evaluation Scores Section */}
+                                          {(sos.evaluation?.ruleEvaluation || (sos.evaluation?.aiAnalyses && sos.evaluation.aiAnalyses.length > 0)) && (
+                                            <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
+                                              {sos.evaluation.ruleEvaluation && (
+                                                <div className="flex items-center gap-1.5 min-w-0" title="Điểm hệ thống (Rule-base)">
+                                                  <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="fill" />
+                                                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">Hệ thống:</span>
+                                                  <span className="text-[12px] font-mono font-bold text-foreground">
+                                                    {sos.evaluation.ruleEvaluation.totalScore.toFixed(1)}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              
+                                              {sos.evaluation.aiAnalyses && sos.evaluation.aiAnalyses.length > 0 && (
+                                                <>
+                                                  <div className="w-px h-3 bg-border/60 shrink-0" />
+                                                  <div 
+                                                    className={cn(
+                                                      "flex items-center gap-1.5 min-w-0",
+                                                      sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && "text-amber-600 dark:text-amber-400"
+                                                    )} 
+                                                    title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                                                  >
+                                                    <Brain className="h-3.5 w-3.5 shrink-0" weight="fill" />
+                                                    <span className="text-[11px] font-bold uppercase tracking-tight">AI:</span>
+                                                    <span className="text-[12px] font-mono font-bold">
+                                                      {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(1)}
+                                                    </span>
+                                                    {sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && (
+                                                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                                    )}
+                                                  </div>
+                                                </>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                       );
                                     })

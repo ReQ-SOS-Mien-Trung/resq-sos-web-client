@@ -389,7 +389,12 @@ export interface AiAnalysis {
   analysisType: string;
   suggestedSeverityLevel: SeverityLevel;
   suggestedPriority: SOSPriorityLevel;
+  suggestedPriorityScore: number;
+  agreesWithRuleBase: boolean;
+  needsImmediateSafeTransfer: boolean;
+  canWaitForCombinedMission: boolean;
   explanation: string;
+  handlingReason?: string;
   confidenceScore: number;
   suggestionScope: string;
   metadata: AiAnalysisMetadata;
