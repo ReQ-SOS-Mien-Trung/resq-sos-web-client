@@ -1710,6 +1710,7 @@ export default function FundingRequestPage() {
             <Bank size={20} />
             Quỹ kho
           </button>
+          {/* HIDDEN TAB - Sổ quản lý quyết toán (ẩn tạm thời, không xóa code)
           <button
             onClick={() => setActiveTab("ledger")}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
@@ -1730,6 +1731,7 @@ export default function FundingRequestPage() {
               </Badge>
             )}
           </button>
+          */}
         </motion.div>
 
         {/* ─── CREATE TAB ────────────────────────────────── */}
