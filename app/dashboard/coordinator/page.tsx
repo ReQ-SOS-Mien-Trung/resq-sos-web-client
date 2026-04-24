@@ -320,8 +320,8 @@ function buildAutoClusters(
 
     // P1: không gom thêm, chỉ tạo cụm 1 mình
     if (maxClusterSize <= 1) {
-      cluster.forEach((request) => clusteredIds.add(request.id));
-      clusters.push(cluster);
+      clusteredIds.add(seed.id);
+      clusters.push([seed]);
       continue;
     }
 

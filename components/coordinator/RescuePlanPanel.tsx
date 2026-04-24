@@ -311,24 +311,43 @@ function translateAIText(text: string): string {
   return text
     .replace(
       /Activity step (\d+) \(([^)]+)\)/g,
-      (match, step, type) => `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`
+      (match, step, type) =>
+        `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`,
     )
     .replace(/team_id=(\d+)/g, "đội ID $1")
-    .replace(/pool nearby teams/g, "danh sách đội cứu hộ được quét xung quanh khu vực");
+    .replace(
+      /pool nearby teams/g,
+      "danh sách đội cứu hộ được quét xung quanh khu vực",
+    );
 }
 
-function FormattedAINotes({ text, textClassName }: { text: string; textClassName?: string }) {
+function FormattedAINotes({
+  text,
+  textClassName,
+}: {
+  text: string;
+  textClassName?: string;
+}) {
   if (!text) return null;
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
   return (
     <div className="space-y-3">
       {lines.map((line, idx) => {
         if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
           const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
-          const items = content.split("|").map(i => i.trim()).filter(Boolean);
+          const items = content
+            .split("|")
+            .map((i) => i.trim())
+            .filter(Boolean);
           return (
-            <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3">
+            <div
+              key={idx}
+              className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3"
+            >
               <h5 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2.5 flex items-center gap-1.5">
                 <Warning className="w-4 h-4" weight="fill" />
                 CẦN XEM LẠI THỦ CÔNG
@@ -342,7 +361,12 @@ function FormattedAINotes({ text, textClassName }: { text: string; textClassName
           );
         }
         return (
-          <p key={idx} className={textClassName || "text-sm text-foreground/80 leading-relaxed"}>
+          <p
+            key={idx}
+            className={
+              textClassName || "text-sm text-foreground/80 leading-relaxed"
+            }
+          >
             {translateAIText(line)}
           </p>
         );
@@ -8089,12 +8113,16 @@ const RescuePlanPanel = ({
       }
 
       const distributableSupplies = lastCollectSupplies.filter(
-        (s) => !isReusableSupplyCollection(s)
+        (s) => !isReusableSupplyCollection(s),
       );
 
       normalizedActivities = normalizedActivities.map((activity) => {
         if (activity.activityType === "DELIVER_SUPPLIES") {
-          return { ...activity, suppliesToCollect: distributableSupplies.length > 0 ? distributableSupplies : null };
+          return {
+            ...activity,
+            suppliesToCollect:
+              distributableSupplies.length > 0 ? distributableSupplies : null,
+          };
         }
         return activity;
       });
@@ -8511,8 +8539,9 @@ const RescuePlanPanel = ({
         return;
       }
 
-      const isDistributionStep = targetActivity?.activityType === "DELIVER_SUPPLIES";
-      // We pass the incoming item to isReusableSupplyCollection. 
+      const isDistributionStep =
+        targetActivity?.activityType === "DELIVER_SUPPLIES";
+      // We pass the incoming item to isReusableSupplyCollection.
       // It might lack metadata, but it's the safest heuristic we have.
       const isReusable = isReusableSupplyCollection(item as any);
 
@@ -8522,7 +8551,6 @@ const RescuePlanPanel = ({
         );
         return;
       }
-
 
       clearEditActivityErrors();
       setExpandedEditSupplyKeys((previous) => ({
@@ -11020,7 +11048,10 @@ const RescuePlanPanel = ({
                                       />
                                       Lưu ý
                                     </p>
-                                    <FormattedAINotes text={mission.specialNotes} textClassName="text-sm text-foreground/75 leading-relaxed" />
+                                    <FormattedAINotes
+                                      text={mission.specialNotes}
+                                      textClassName="text-sm text-foreground/75 leading-relaxed"
+                                    />
                                   </div>
                                 )}
 
@@ -11302,65 +11333,65 @@ const RescuePlanPanel = ({
                                                               )}
                                                             >
                                                               <div className="min-w-0 space-y-2">
-                                                                  <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="text-base font-bold text-foreground">
-                                                                      Bước{" "}
-                                                                      {
-                                                                        activity.step
-                                                                      }
-                                                                    </span>
-                                                                    <Badge
-                                                                      variant="outline"
-                                                                      className={cn(
-                                                                        "h-6 border-transparent px-2 text-base font-semibold",
-                                                                        config.color,
-                                                                        config.bgColor,
-                                                                      )}
-                                                                    >
-                                                                      {
-                                                                        config.label
-                                                                      }
-                                                                    </Badge>
-                                                                    <Badge
-                                                                      variant="outline"
-                                                                      className={cn(
-                                                                        "flex h-6 items-center gap-1 border px-2 text-base font-bold",
-                                                                        stepStatus.className,
-                                                                      )}
-                                                                    >
-                                                                      {
-                                                                        stepStatus.icon
-                                                                      }
-                                                                      {
-                                                                        stepStatus.label
-                                                                      }
-                                                                    </Badge>
-                                                                  </div>
-                                                                  <p className="line-clamp-4 text-base font-medium leading-relaxed text-foreground/80">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                  <span className="text-base font-bold text-foreground">
+                                                                    Bước{" "}
                                                                     {
-                                                                      displayDescription
+                                                                      activity.step
                                                                     }
-                                                                  </p>
-                                                                </div>
-                                                                {typeof activity.estimatedTime ===
-                                                                "number" ? (
-                                                                  <div
+                                                                  </span>
+                                                                  <Badge
+                                                                    variant="outline"
                                                                     className={cn(
-                                                                      "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
-                                                                      useCompactMissionCards &&
-                                                                        "self-start",
+                                                                      "h-6 border-transparent px-2 text-base font-semibold",
+                                                                      config.color,
+                                                                      config.bgColor,
                                                                     )}
                                                                   >
-                                                                    <p className="text-sm font-semibold leading-tight text-muted-foreground">
-                                                                      Thời gian dự
-                                                                      kiến đến
-                                                                    </p>
-                                                                    <p className="text-base font-bold text-foreground">
-                                                                      {
-                                                                        activity.estimatedTime
-                                                                      }{" "}
-                                                                      phút
-                                                                    </p>
+                                                                    {
+                                                                      config.label
+                                                                    }
+                                                                  </Badge>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                      "flex h-6 items-center gap-1 border px-2 text-base font-bold",
+                                                                      stepStatus.className,
+                                                                    )}
+                                                                  >
+                                                                    {
+                                                                      stepStatus.icon
+                                                                    }
+                                                                    {
+                                                                      stepStatus.label
+                                                                    }
+                                                                  </Badge>
+                                                                </div>
+                                                                <p className="line-clamp-4 text-base font-medium leading-relaxed text-foreground/80">
+                                                                  {
+                                                                    displayDescription
+                                                                  }
+                                                                </p>
+                                                              </div>
+                                                              {typeof activity.estimatedTime ===
+                                                              "number" ? (
+                                                                <div
+                                                                  className={cn(
+                                                                    "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
+                                                                    useCompactMissionCards &&
+                                                                      "self-start",
+                                                                  )}
+                                                                >
+                                                                  <p className="text-sm font-semibold leading-tight text-muted-foreground">
+                                                                    Thời gian dự
+                                                                    kiến đến
+                                                                  </p>
+                                                                  <p className="text-base font-bold text-foreground">
+                                                                    {
+                                                                      activity.estimatedTime
+                                                                    }{" "}
+                                                                    phút
+                                                                  </p>
                                                                 </div>
                                                               ) : null}
                                                             </div>
@@ -11644,7 +11675,9 @@ const RescuePlanPanel = ({
                                                                                   )
                                                                                 }
                                                                               >
-                                                                                [Xem chi tiết]
+                                                                                [Xem
+                                                                                chi
+                                                                                tiết]
                                                                               </Button>
                                                                             )}
                                                                           </div>
@@ -11956,24 +11989,6 @@ const RescuePlanPanel = ({
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
-                            </div>
-                            <div>
-                              <Label className="text-sm text-muted-foreground uppercase tracking-wider">
-                                Điểm ưu tiên
-                              </Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={10}
-                                step={0.1}
-                                value={editPriorityScore}
-                                onChange={(e) =>
-                                  setEditPriorityScore(
-                                    parseFloat(e.target.value) || 5,
-                                  )
-                                }
-                                className="h-8 text-sm mt-1"
-                              />
                             </div>
                             <div>
                               <Label className="text-sm text-muted-foreground uppercase tracking-wider">
@@ -12477,15 +12492,23 @@ const RescuePlanPanel = ({
                                                   <SelectContent className="z-1200">
                                                     {Object.entries(
                                                       activityTypeConfig,
-                                                    ).map(([key, cfg]) => (
-                                                      <SelectItem
-                                                        key={key}
-                                                        value={key}
-                                                        className="text-sm"
-                                                      >
-                                                        {cfg.label}
-                                                      </SelectItem>
-                                                    ))}
+                                                    )
+                                                      .filter(
+                                                        ([key]) =>
+                                                          key !==
+                                                            "RETURN_TO_ASSEMBLY_POINT" &&
+                                                          key !==
+                                                            "RETURN_ASSEMBLY",
+                                                      )
+                                                      .map(([key, cfg]) => (
+                                                        <SelectItem
+                                                          key={key}
+                                                          value={key}
+                                                          className="text-sm"
+                                                        >
+                                                          {cfg.label}
+                                                        </SelectItem>
+                                                      ))}
                                                   </SelectContent>
                                                 </Select>
                                               ) : (
@@ -13134,15 +13157,23 @@ const RescuePlanPanel = ({
                                                                       type="number"
                                                                       min={1}
                                                                       value={
-                                                                        Number.isNaN(supply.quantity)
+                                                                        Number.isNaN(
+                                                                          supply.quantity,
+                                                                        )
                                                                           ? ""
                                                                           : supply.quantity
                                                                       }
-                                                                      onChange={(event) =>
+                                                                      onChange={(
+                                                                        event,
+                                                                      ) =>
                                                                         handleUpdateSupplyQuantity(
                                                                           activity._id,
                                                                           sIdx,
-                                                                          parseInt(event.target.value),
+                                                                          parseInt(
+                                                                            event
+                                                                              .target
+                                                                              .value,
+                                                                          ),
                                                                         )
                                                                       }
                                                                       disabled={
@@ -13172,11 +13203,17 @@ const RescuePlanPanel = ({
                                                                           value={getSupplyBufferPercentInputValue(
                                                                             supply.bufferRatio,
                                                                           )}
-                                                                          onChange={(event) =>
+                                                                          onChange={(
+                                                                            event,
+                                                                          ) =>
                                                                             handleUpdateSupplyBufferRatio(
                                                                               activity._id,
                                                                               sIdx,
-                                                                              parseFloat(event.target.value),
+                                                                              parseFloat(
+                                                                                event
+                                                                                  .target
+                                                                                  .value,
+                                                                              ),
                                                                             )
                                                                           }
                                                                           disabled={
@@ -13275,15 +13312,20 @@ const RescuePlanPanel = ({
                                     Tách nhiệm vụ theo cảnh báo an toàn
                                   </h3>
                                   <div className="mt-1">
-                                    <FormattedAINotes 
-                                      text={effectiveSplitSuggestionPreview?.mixedRescueReliefWarning || "AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."} 
-                                      textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                    <FormattedAINotes
+                                      text={
+                                        effectiveSplitSuggestionPreview?.mixedRescueReliefWarning ||
+                                        "AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."
+                                      }
+                                      textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                     />
                                     {effectiveSplitSuggestionPreview?.specialNotes && (
                                       <div className="mt-2 pt-2 border-t border-rose-200/50 dark:border-rose-800/50">
-                                        <FormattedAINotes 
-                                          text={effectiveSplitSuggestionPreview.specialNotes} 
-                                          textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                        <FormattedAINotes
+                                          text={
+                                            effectiveSplitSuggestionPreview.specialNotes
+                                          }
+                                          textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                         />
                                       </div>
                                     )}
@@ -13401,15 +13443,20 @@ const RescuePlanPanel = ({
                                   Tách nhiệm vụ theo cảnh báo an toàn
                                 </h3>
                                 <div className="mt-1">
-                                  <FormattedAINotes 
-                                    text={effectiveSplitSuggestionPreview?.mixedRescueReliefWarning || "Gợi ý AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."} 
-                                    textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                  <FormattedAINotes
+                                    text={
+                                      effectiveSplitSuggestionPreview?.mixedRescueReliefWarning ||
+                                      "Gợi ý AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."
+                                    }
+                                    textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                   />
                                   {effectiveSplitSuggestionPreview?.specialNotes && (
                                     <div className="mt-2 pt-2 border-t border-rose-200/50 dark:border-rose-800/50">
-                                      <FormattedAINotes 
-                                        text={effectiveSplitSuggestionPreview.specialNotes} 
-                                        textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                      <FormattedAINotes
+                                        text={
+                                          effectiveSplitSuggestionPreview.specialNotes
+                                        }
+                                        textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                       />
                                     </div>
                                   )}
@@ -13928,7 +13975,10 @@ const RescuePlanPanel = ({
                         activeSuggestion.errorMessage ||
                         activeSuggestion.lowConfidenceWarning ||
                         activeSuggestion.multiDepotRecommended ||
-                        (!isEditMode && trimToNull(activeSuggestion.mixedRescueReliefWarning)) ||
+                        (!isEditMode &&
+                          trimToNull(
+                            activeSuggestion.mixedRescueReliefWarning,
+                          )) ||
                         activeSuggestion.needsAdditionalDepot ||
                         (activeSuggestion.supplyShortages?.length ?? 0) >
                           0) && (
@@ -13939,11 +13989,17 @@ const RescuePlanPanel = ({
                               <Info className="h-3.5 w-3.5" weight="fill" />
                               Cảnh báo hệ thống
                             </h4>
-                            {!isEditMode && trimToNull(
+                            {!isEditMode &&
+                            trimToNull(
                               activeSuggestion.mixedRescueReliefWarning,
                             ) ? (
                               <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 rounded-lg p-2.5">
-                                <FormattedAINotes text={activeSuggestion.mixedRescueReliefWarning} textClassName="text-sm text-rose-800 dark:text-rose-300 leading-relaxed" />
+                                <FormattedAINotes
+                                  text={
+                                    activeSuggestion.mixedRescueReliefWarning
+                                  }
+                                  textClassName="text-sm text-rose-800 dark:text-rose-300 leading-relaxed"
+                                />
                               </div>
                             ) : null}
                             {activeSuggestion.errorMessage ? (
@@ -14022,7 +14078,10 @@ const RescuePlanPanel = ({
                               Lưu ý đặc biệt
                             </h4>
                             <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2.5">
-                              <FormattedAINotes text={activeSuggestion.specialNotes} textClassName="text-sm text-foreground/75 leading-relaxed" />
+                              <FormattedAINotes
+                                text={activeSuggestion.specialNotes}
+                                textClassName="text-sm text-foreground/75 leading-relaxed"
+                              />
                             </div>
                           </section>
                         </>
@@ -14302,46 +14361,45 @@ const RescuePlanPanel = ({
                           </>
                         )}
 
-                  {/* Depot Inventory — shown whenever depots are present */}
-                  {visibleSidebarDepots.length > 0 && (
-                    <>
-                      <Separator />
-                      <section>
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
-                          <Storefront
-                            className="h-3.5 w-3.5 text-amber-500"
-                            weight="fill"
-                          />
-                          Kho vật phẩm
-                        </h4>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {isEditMode
-                            ? "Kéo vật phẩm vào bước thực hiện bên trái"
-                            : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
-                        </p>
-                        <div className="space-y-2">
-                          {visibleSidebarDepots.map((depot) => (
-                            <DepotInventoryCard
-                              key={depot.depotId}
-                              depotId={depot.depotId}
-                              depotName={depot.depotName}
-                              depotAddress={depot.depotAddress}
-                              isDraggable={isEditMode}
-                              kind={depot.kind}
-                            />
-                          ))}
-                        </div>
-                      </section>
+                      {/* Depot Inventory — shown whenever depots are present */}
+                      {visibleSidebarDepots.length > 0 && (
+                        <>
+                          <Separator />
+                          <section>
+                            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
+                              <Storefront
+                                className="h-3.5 w-3.5 text-amber-500"
+                                weight="fill"
+                              />
+                              Kho vật phẩm
+                            </h4>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {isEditMode
+                                ? "Kéo vật phẩm vào bước thực hiện bên trái"
+                                : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
+                            </p>
+                            <div className="space-y-2">
+                              {visibleSidebarDepots.map((depot) => (
+                                <DepotInventoryCard
+                                  key={depot.depotId}
+                                  depotId={depot.depotId}
+                                  depotName={depot.depotName}
+                                  depotAddress={depot.depotAddress}
+                                  isDraggable={isEditMode}
+                                  kind={depot.kind}
+                                />
+                              ))}
+                            </div>
+                          </section>
+                        </>
+                      )}
                     </>
                   )}
-                </>
-              )}
+                </div>
+              </ScrollArea>
             </div>
-          </ScrollArea>
+          )}
         </div>
-      )}
-        </div>
-
 
         {/* Footer */}
         <div className="p-4 border-t shrink-0 bg-background">
