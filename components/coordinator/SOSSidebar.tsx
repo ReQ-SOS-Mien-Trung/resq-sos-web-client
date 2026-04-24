@@ -4,7 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { SOSRequest, SOSSidebarProps } from "@/type";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
-import { useRemoveSOSRequestFromCluster, useAddSOSRequestToCluster } from "@/services/sos_cluster/hooks";
+import {
+  useRemoveSOSRequestFromCluster,
+  useAddSOSRequestToCluster,
+} from "@/services/sos_cluster/hooks";
 import { useSOSRequestsByIds } from "@/services/sos_request/hooks";
 import {
   DndContext,
@@ -556,14 +559,14 @@ const SOSSidebar = ({
       activationConstraint: {
         distance: 5,
       },
-    })
+    }),
   );
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
     const sosIdStr = String(event.active.id).replace("sos-", "");
-    const sos = 
-      sosRequests.find((s) => String(s.id) === sosIdStr) || 
+    const sos =
+      sosRequests.find((s) => String(s.id) === sosIdStr) ||
       incomingRequests?.find((s) => String(s.id) === sosIdStr);
     setActiveDragSOS(sos || null);
   };
@@ -610,7 +613,7 @@ const SOSSidebar = ({
                 "Không thể thêm SOS vào cụm. Vui lòng thử lại.";
               toast.error(errorMessage);
             },
-          }
+          },
         );
       }
     }
@@ -1166,1303 +1169,1373 @@ const SOSSidebar = ({
         onDragEnd={handleDragEnd}
       >
         <Tabs
-        value={currentTab}
-        onValueChange={(nextValue) => {
-          const normalizedValue: SidebarTabValue =
-            nextValue === "clusters" ? "clusters" : "incoming";
+          value={currentTab}
+          onValueChange={(nextValue) => {
+            const normalizedValue: SidebarTabValue =
+              nextValue === "clusters" ? "clusters" : "incoming";
 
-          setActiveTab(normalizedValue);
-          setManualTabSelectionKey(selectedSOSId);
-        }}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
-        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-2 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-inner dark:border-white/10 dark:bg-white/5">
-          <TabsTrigger
-            value="incoming"
-            className="h-10 rounded-xl px-3 text-[15px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
-          >
-            SOS Mới
-          </TabsTrigger>
-          <DroppableTabsTrigger
-            value="clusters"
-            className="h-10 rounded-xl px-3 text-[15px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
-          >
-            Cụm SOS
-          </DroppableTabsTrigger>
-        </TabsList>
-
-        {/* Incoming SOS Tab */}
-        <TabsContent
-          value="incoming"
-          className="m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
+            setActiveTab(normalizedValue);
+            setManualTabSelectionKey(selectedSOSId);
+          }}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="border-b bg-background/80 p-3">
-            <div
-              className={cn(
-                "grid items-center gap-1.5",
-                hasSOSFiltersApplied ? "grid-cols-4" : "grid-cols-3",
-              )}
+          <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-2 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <TabsTrigger
+              value="incoming"
+              className="h-10 rounded-xl px-3 text-[15px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
             >
-              <Popover
-                open={statusFilterOpen}
-                onOpenChange={setStatusFilterOpen}
+              SOS Mới
+            </TabsTrigger>
+            <DroppableTabsTrigger
+              value="clusters"
+              className="h-10 rounded-xl px-3 text-[15px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+            >
+              Cụm SOS
+            </DroppableTabsTrigger>
+          </TabsList>
+
+          {/* Incoming SOS Tab */}
+          <TabsContent
+            value="incoming"
+            className="m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
+            <div className="border-b bg-background/80 p-3">
+              <div
+                className={cn(
+                  "grid items-center gap-1.5",
+                  hasSOSFiltersApplied ? "grid-cols-4" : "grid-cols-3",
+                )}
               >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-full gap-1 px-1.5 text-[12px] font-normal"
-                  >
-                    <span className="truncate">Trạng thái</span>
-                    {selectedStatuses.length > 0 ? (
-                      <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                        {selectedStatuses.length}
-                      </Badge>
-                    ) : (
-                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-1.5" align="start">
-                  {SOS_STATUS_FILTER_OPTIONS.map((option) => {
-                    const checked = selectedStatuses.includes(option.key);
-
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => toggleStatusFilter(option.key)}
-                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                      >
-                        <span
-                          className={cn(
-                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                            checked
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-transparent",
-                          )}
-                        >
-                          <Check className="h-2.5 w-2.5" weight="bold" />
-                        </span>
-                        <span className={checked ? "font-medium" : undefined}>
-                          {option.value}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {selectedStatuses.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectedStatusesChange?.([])}
-                      className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                      Xóa lọc trạng thái
-                    </button>
-                  ) : null}
-                </PopoverContent>
-              </Popover>
-
-              <Popover
-                open={priorityFilterOpen}
-                onOpenChange={setPriorityFilterOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-full gap-1 px-1.5 text-[12px] font-normal"
-                  >
-                    <span className="truncate">Ưu tiên</span>
-                    {selectedPriorities.length > 0 ? (
-                      <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                        {selectedPriorities.length}
-                      </Badge>
-                    ) : (
-                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-1.5" align="start">
-                  {SOS_PRIORITY_FILTER_OPTIONS.map((option) => {
-                    const checked = selectedPriorities.includes(option.key);
-
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => togglePriorityFilter(option.key)}
-                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                      >
-                        <span
-                          className={cn(
-                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                            checked
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-transparent",
-                          )}
-                        >
-                          <Check className="h-2.5 w-2.5" weight="bold" />
-                        </span>
-                        <span className={checked ? "font-medium" : undefined}>
-                          {option.value}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {selectedPriorities.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectedPrioritiesChange?.([])}
-                      className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                      Xóa lọc mức ưu tiên
-                    </button>
-                  ) : null}
-                </PopoverContent>
-              </Popover>
-
-              <Popover
-                open={sosTypeFilterOpen}
-                onOpenChange={setSosTypeFilterOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 w-full gap-1 px-1.5 text-[12px] font-normal"
-                  >
-                    <span className="truncate">Loại SOS</span>
-                    {selectedSosTypes.length > 0 ? (
-                      <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                        {selectedSosTypes.length}
-                      </Badge>
-                    ) : (
-                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-60 p-1.5" align="start">
-                  {SOS_TYPE_FILTER_OPTIONS.map((option) => {
-                    const checked = selectedSosTypes.includes(option.key);
-
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => toggleSosTypeFilter(option.key)}
-                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                      >
-                        <span
-                          className={cn(
-                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                            checked
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-transparent",
-                          )}
-                        >
-                          <Check className="h-2.5 w-2.5" weight="bold" />
-                        </span>
-                        <span className={checked ? "font-medium" : undefined}>
-                          {option.value}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {selectedSosTypes.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectedSosTypesChange?.([])}
-                      className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                      Xóa lọc loại SOS
-                    </button>
-                  ) : null}
-                </PopoverContent>
-              </Popover>
-
-              {hasSOSFiltersApplied ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 w-full gap-1 px-1 text-[12px] text-muted-foreground"
-                  onClick={clearSOSFilters}
+                <Popover
+                  open={statusFilterOpen}
+                  onOpenChange={setStatusFilterOpen}
                 >
-                  <X className="h-3 w-3" />
-                  <span className="truncate">Xóa lọc</span>
-                </Button>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="h-full min-h-0 flex-1 overflow-y-auto">
-            <div className="p-3 space-y-3">
-              {visibleIncomingRequests.length > 0 && (
-                <>
-                  <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    {incomingSectionTitle}
-                  </div>
-                  <PaginationControls
-                    page={incomingCurrentPage}
-                    totalItems={incomingTotalCount}
-                    pageSize={incomingPageSize}
-                    onPageChange={(nextPage) => {
-                      if (hasIncomingServerPagination) {
-                        incomingPagination?.onPageChange(nextPage);
-                        return;
-                      }
-
-                      setStandalonePage(nextPage);
-                      setManualStandalonePageSelectionKey(selectedSOSId);
-                    }}
-                  />
-                  {visibleIncomingRequests.map((sos) => (
-                    <DraggableSOSCard
-                      key={sos.id}
-                      sos={sos}
-                      className={cn(
-                        "rounded-xl border overflow-hidden",
-                        PRIORITY_BORDER_COLOR[sos.priority],
-                      )}
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-full gap-1 px-1.5 text-[12px] font-normal"
                     >
-                      <div
-                        className={cn(
-                          "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-                          selectedSOS?.id === sos.id &&
-                            "bg-black/10 dark:bg-white/10",
-                        )}
-                        onClick={() => onSOSSelect(sos)}
+                      <span className="truncate">Trạng thái</span>
+                      {selectedStatuses.length > 0 ? (
+                        <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                          {selectedStatuses.length}
+                        </Badge>
+                      ) : (
+                        <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-1.5" align="start">
+                    {SOS_STATUS_FILTER_OPTIONS.map((option) => {
+                      const checked = selectedStatuses.includes(option.key);
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => toggleStatusFilter(option.key)}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                              checked
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background text-transparent",
+                            )}
+                          >
+                            <Check className="h-2.5 w-2.5" weight="bold" />
+                          </span>
+                          <span className={checked ? "font-medium" : undefined}>
+                            {option.value}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {selectedStatuses.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectedStatusesChange?.([])}
+                        className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
                       >
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                            <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
-                              SOS {sos.id}
-                            </span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge
-                                variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                                className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                              >
-                                {PRIORITY_LABELS[sos.priority]}
-                              </Badge>
-                              <Badge
-                                variant={getSOSStatusBadgeVariant(sos.status)}
-                                className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                              >
-                                {getSOSStatusLabel(sos.status)}
-                              </Badge>
-                              {sos.clusterId ? (
+                        <X className="h-3 w-3" />
+                        Xóa lọc trạng thái
+                      </button>
+                    ) : null}
+                  </PopoverContent>
+                </Popover>
+
+                <Popover
+                  open={priorityFilterOpen}
+                  onOpenChange={setPriorityFilterOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-full gap-1 px-1.5 text-[12px] font-normal"
+                    >
+                      <span className="truncate">Ưu tiên</span>
+                      {selectedPriorities.length > 0 ? (
+                        <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                          {selectedPriorities.length}
+                        </Badge>
+                      ) : (
+                        <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-1.5" align="start">
+                    {SOS_PRIORITY_FILTER_OPTIONS.map((option) => {
+                      const checked = selectedPriorities.includes(option.key);
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => togglePriorityFilter(option.key)}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                              checked
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background text-transparent",
+                            )}
+                          >
+                            <Check className="h-2.5 w-2.5" weight="bold" />
+                          </span>
+                          <span className={checked ? "font-medium" : undefined}>
+                            {option.value}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {selectedPriorities.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectedPrioritiesChange?.([])}
+                        className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                        Xóa lọc mức ưu tiên
+                      </button>
+                    ) : null}
+                  </PopoverContent>
+                </Popover>
+
+                <Popover
+                  open={sosTypeFilterOpen}
+                  onOpenChange={setSosTypeFilterOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-full gap-1 px-1.5 text-[12px] font-normal"
+                    >
+                      <span className="truncate">Loại SOS</span>
+                      {selectedSosTypes.length > 0 ? (
+                        <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                          {selectedSosTypes.length}
+                        </Badge>
+                      ) : (
+                        <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-60 p-1.5" align="start">
+                    {SOS_TYPE_FILTER_OPTIONS.map((option) => {
+                      const checked = selectedSosTypes.includes(option.key);
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => toggleSosTypeFilter(option.key)}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                              checked
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background text-transparent",
+                            )}
+                          >
+                            <Check className="h-2.5 w-2.5" weight="bold" />
+                          </span>
+                          <span className={checked ? "font-medium" : undefined}>
+                            {option.value}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {selectedSosTypes.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectedSosTypesChange?.([])}
+                        className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                        Xóa lọc loại SOS
+                      </button>
+                    ) : null}
+                  </PopoverContent>
+                </Popover>
+
+                {hasSOSFiltersApplied ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-full gap-1 px-1 text-[12px] text-muted-foreground"
+                    onClick={clearSOSFilters}
+                  >
+                    <X className="h-3 w-3" />
+                    <span className="truncate">Xóa lọc</span>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
+              <div className="p-3 space-y-3">
+                {visibleIncomingRequests.length > 0 && (
+                  <>
+                    <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      {incomingSectionTitle}
+                    </div>
+                    <PaginationControls
+                      page={incomingCurrentPage}
+                      totalItems={incomingTotalCount}
+                      pageSize={incomingPageSize}
+                      onPageChange={(nextPage) => {
+                        if (hasIncomingServerPagination) {
+                          incomingPagination?.onPageChange(nextPage);
+                          return;
+                        }
+
+                        setStandalonePage(nextPage);
+                        setManualStandalonePageSelectionKey(selectedSOSId);
+                      }}
+                    />
+                    {visibleIncomingRequests.map((sos) => (
+                      <DraggableSOSCard
+                        key={sos.id}
+                        sos={sos}
+                        className={cn(
+                          "rounded-xl border overflow-hidden",
+                          PRIORITY_BORDER_COLOR[sos.priority],
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+                            selectedSOS?.id === sos.id &&
+                              "bg-black/10 dark:bg-white/10",
+                          )}
+                          onClick={() => onSOSSelect(sos)}
+                        >
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                SOS {sos.id}
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <Badge
-                                  variant="outline"
+                                  variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                                   className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
                                 >
-                                  Cụm #{sos.clusterId}
+                                  {PRIORITY_LABELS[sos.priority]}
                                 </Badge>
-                              ) : null}
+                                <Badge
+                                  variant={getSOSStatusBadgeVariant(sos.status)}
+                                  className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                >
+                                  {getSOSStatusLabel(sos.status)}
+                                </Badge>
+                                {sos.clusterId ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                  >
+                                    Cụm #{sos.clusterId}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                              <Clock className="h-3 w-3" />
+                              <TimeElapsed date={sos.createdAt} />
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
-                            <Clock className="h-3 w-3" />
-                            <TimeElapsed date={sos.createdAt} />
-                          </div>
-                        </div>
-                        <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
-                          {sos.message}
-                        </p>
+                          <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
+                            {sos.message}
+                          </p>
 
-                        {/* Evaluation Scores Section */}
-                        {(sos.evaluation?.ruleEvaluation || sos.evaluation?.aiAnalyses?.length) && (
-                          <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
-                            {sos.evaluation.ruleEvaluation && (
-                              <div className="flex items-center gap-1.5 min-w-0" title="Điểm hệ thống (Rule-base)">
-                                <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="fill" />
-                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">Hệ thống:</span>
-                                <span className="text-[12px] font-mono font-bold text-foreground">
-                                  {sos.evaluation.ruleEvaluation.totalScore.toFixed(1)}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {sos.evaluation.aiAnalyses && sos.evaluation.aiAnalyses.length > 0 && (
-                              <>
-                                <div className="w-px h-3 bg-border/60 shrink-0" />
-                                <div 
-                                  className={cn(
-                                    "flex items-center gap-1.5 min-w-0",
-                                    sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && "text-amber-600 dark:text-amber-400"
-                                  )} 
-                                  title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                          {/* Evaluation Scores Section */}
+                          {(sos.evaluation?.ruleEvaluation ||
+                            sos.evaluation?.aiAnalyses?.length) && (
+                            <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
+                              {sos.evaluation.ruleEvaluation && (
+                                <div
+                                  className="flex items-center gap-1.5 min-w-0"
+                                  title="Điểm hệ thống (Rule-base)"
                                 >
-                                  <Brain className="h-3.5 w-3.5 shrink-0" weight="fill" />
-                                  <span className="text-[11px] font-bold uppercase tracking-tight">AI:</span>
-                                  <span className="text-[12px] font-mono font-bold">
-                                    {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(1)}
+                                  <ShieldCheck
+                                    className="h-3.5 w-3.5 text-blue-500 shrink-0"
+                                    weight="fill"
+                                  />
+                                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">
+                                    Hệ thống:
                                   </span>
-                                  {sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && (
-                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                  )}
+                                  <span className="text-[12px] font-mono font-bold text-foreground">
+                                    {sos.evaluation.ruleEvaluation.totalScore.toFixed(
+                                      1,
+                                    )}
+                                  </span>
                                 </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="px-3 py-2 border-t border-inherit space-y-1.5">
-                        {canCreateClusterFromSOS(sos) ? (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="w-full h-9 text-[14px] bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCreateCluster([sos.id]);
-                            }}
-                            disabled={
-                              processingSosId === sos.id ||
-                              isCreatingCluster ||
-                              isAnalyzingCluster
-                            }
-                          >
-                            {processingSosId === sos.id ? (
-                              <>
-                                <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                                Đang xử lý...
-                              </>
-                            ) : (
-                              <>
-                                <Lightning
-                                  className="h-3 w-3 mr-1"
-                                  weight="fill"
-                                />
-                                Gom & AI Phân tích
-                              </>
-                            )}
-                          </Button>
-                        ) : (
-                          <div className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[13px] text-muted-foreground">
-                            {sos.clusterId
-                              ? `SOS này đã thuộc cụm #${sos.clusterId}.`
-                              : `SOS đang ở trạng thái ${getSOSStatusLabel(
-                                  sos.status,
-                                ).toLowerCase()}.`}
-                          </div>
-                        )}
-                        {onManualMission && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-[14px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                            disabled
-                          >
-                            <PencilSimpleLine
-                              className="h-3 w-3 mr-1"
-                              weight="fill"
-                            />
-                            Tạo nhiệm vụ thủ công
-                          </Button>
-                        )}
-                      </div>
-                    </DraggableSOSCard>
-                  ))}
-                </>
-              )}
+                              )}
 
-              {visibleIncomingRequests.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  {isIncomingRequestsLoading ? (
-                    <>
-                      <Spinner className="h-8 w-8 mx-auto mb-2 animate-spin opacity-70" />
-                      <p className="text-[15px]">Đang tải danh sách SOS...</p>
-                    </>
-                  ) : (
-                    <>
-                      <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-[15px]">
-                        {hasIncomingServerPagination
-                          ? "Không có yêu cầu SOS phù hợp với bộ lọc hiện tại."
-                          : pendingRequests.length > 0 ||
-                              activeClusters.length > 0 ||
-                              autoClusters.length > 0
-                            ? "Không còn SOS lẻ. Chuyển sang tab Cụm SOS để xử lý theo cụm."
-                            : "Không có yêu cầu SOS nào"}
-                      </p>
-                    </>
-                  )}
-                </div>
-              ) : null}
+                              {sos.evaluation.aiAnalyses &&
+                                sos.evaluation.aiAnalyses.length > 0 && (
+                                  <>
+                                    <div className="w-px h-3 bg-border/60 shrink-0" />
+                                    <div
+                                      className={cn(
+                                        "flex items-center gap-1.5 min-w-0",
+                                        sos.evaluation.aiAnalyses[0]
+                                          .agreesWithRuleBase === false &&
+                                          "text-amber-600 dark:text-amber-400",
+                                      )}
+                                      title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                                    >
+                                      <Brain
+                                        className="h-3.5 w-3.5 shrink-0"
+                                        weight="fill"
+                                      />
+                                      <span className="text-[11px] font-bold uppercase tracking-tight">
+                                        AI:
+                                      </span>
+                                      <span className="text-[12px] font-mono font-bold">
+                                        {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(
+                                          1,
+                                        )}
+                                      </span>
+                                      {sos.evaluation.aiAnalyses[0]
+                                        .agreesWithRuleBase === false && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-3 py-2 border-t border-inherit space-y-1.5">
+                          {canCreateClusterFromSOS(sos) ? (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="w-full h-9 text-[14px] bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCreateCluster([sos.id]);
+                              }}
+                              disabled={
+                                processingSosId === sos.id ||
+                                isCreatingCluster ||
+                                isAnalyzingCluster
+                              }
+                            >
+                              {processingSosId === sos.id ? (
+                                <>
+                                  <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                                  Đang xử lý...
+                                </>
+                              ) : (
+                                <>
+                                  <Lightning
+                                    className="h-3 w-3 mr-1"
+                                    weight="fill"
+                                  />
+                                  Gom & AI Phân tích
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[13px] text-muted-foreground">
+                              {sos.clusterId
+                                ? `SOS này đã thuộc cụm #${sos.clusterId}.`
+                                : `SOS đang ở trạng thái ${getSOSStatusLabel(
+                                    sos.status,
+                                  ).toLowerCase()}.`}
+                            </div>
+                          )}
+                          {onManualMission && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-9 text-[14px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                              disabled
+                            >
+                              <PencilSimpleLine
+                                className="h-3 w-3 mr-1"
+                                weight="fill"
+                              />
+                              Tạo nhiệm vụ thủ công
+                            </Button>
+                          )}
+                        </div>
+                      </DraggableSOSCard>
+                    ))}
+                  </>
+                )}
+
+                {visibleIncomingRequests.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    {isIncomingRequestsLoading ? (
+                      <>
+                        <Spinner className="h-8 w-8 mx-auto mb-2 animate-spin opacity-70" />
+                        <p className="text-[15px]">Đang tải danh sách SOS...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-[15px]">
+                          {hasIncomingServerPagination
+                            ? "Không có yêu cầu SOS phù hợp với bộ lọc hiện tại."
+                            : pendingRequests.length > 0 ||
+                                activeClusters.length > 0 ||
+                                autoClusters.length > 0
+                              ? "Không còn SOS lẻ. Chuyển sang tab Cụm SOS để xử lý theo cụm."
+                              : "Không có yêu cầu SOS nào"}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        {/* SOS Clusters Tab */}
-        <TabsContent
-          value="clusters"
-          className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
-        >
-          <div className="h-full min-h-0 flex-1 overflow-y-auto">
-            <div className="p-3 space-y-3">
-              {/* Auto-cluster all nearby groups button */}
-              {autoClusters.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-10 text-[15px] font-semibold border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
-                  onClick={() => onClusterOnly(autoClusters)}
-                  disabled={isCreatingCluster}
-                >
-                  {isCreatingCluster ? (
-                    <>
-                      <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      <TreeStructure
-                        className="h-3.5 w-3.5 mr-1.5"
-                        weight="fill"
-                      />
-                      Gợi ý gom cụm ({autoClusters.length} cụm •{" "}
-                      {autoClusters.reduce((sum, c) => sum + c.length, 0)} SOS)
-                    </>
-                  )}
-                </Button>
-              )}
+          {/* SOS Clusters Tab */}
+          <TabsContent
+            value="clusters"
+            className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
+          >
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
+              <div className="p-3 space-y-3">
+                {/* Auto-cluster all nearby groups button */}
+                {autoClusters.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-10 text-[15px] font-semibold border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                    onClick={() => onClusterOnly(autoClusters)}
+                    disabled={isCreatingCluster}
+                  >
+                    {isCreatingCluster ? (
+                      <>
+                        <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Đang xử lý...
+                      </>
+                    ) : (
+                      <>
+                        <TreeStructure
+                          className="h-3.5 w-3.5 mr-1.5"
+                          weight="fill"
+                        />
+                        Gợi ý gom cụm ({autoClusters.length} cụm •{" "}
+                        {autoClusters.reduce((sum, c) => sum + c.length, 0)}{" "}
+                        SOS)
+                      </>
+                    )}
+                  </Button>
+                )}
 
-              {/* Existing backend clusters */}
-              {shouldShowBackendClusterControls && (
-                <>
-                  <div className="space-y-2">
-                    <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide">
-                      Cụm đã gom ({filteredActiveClusters.length}/
-                      {activeClusters.length})
-                    </div>
-
+                {/* Existing backend clusters */}
+                {shouldShowBackendClusterControls && (
+                  <>
                     <div className="space-y-2">
-                      <div className="relative">
-                        <Icon
-                          icon="ph:magnifying-glass"
-                          className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                        />
-                        <Input
-                          value={clusterSearchTerm}
-                          onChange={(event) => {
-                            setClusterSearchTerm(event.target.value);
-                            setClusterPage(1);
-                            setManualClusterPageSelectionKey(selectedSOSId);
-                          }}
-                          placeholder="Tìm theo ID cụm hoặc SOS ID"
-                          className="h-9 pl-8 pr-8 text-[14px]"
-                        />
-                        {trimmedClusterSearchTerm.length > 0 ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
-                            onClick={() => {
-                              setClusterSearchTerm("");
+                      <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Cụm đã gom ({filteredActiveClusters.length}/
+                        {activeClusters.length})
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Icon
+                            icon="ph:magnifying-glass"
+                            className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                          />
+                          <Input
+                            value={clusterSearchTerm}
+                            onChange={(event) => {
+                              setClusterSearchTerm(event.target.value);
                               setClusterPage(1);
                               setManualClusterPageSelectionKey(selectedSOSId);
                             }}
-                            aria-label="Xóa tìm kiếm cụm"
-                          >
-                            <Icon icon="ph:x" className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : null}
-                      </div>
-
-                      <div
-                        className={cn(
-                          "grid items-center gap-1.5",
-                          hasClusterFiltersApplied
-                            ? "grid-cols-4"
-                            : "grid-cols-3",
-                        )}
-                      >
-                        <Popover
-                          open={clusterStatusFilterOpen}
-                          onOpenChange={setClusterStatusFilterOpen}
-                        >
-                          <PopoverTrigger asChild>
+                            placeholder="Tìm theo ID cụm hoặc SOS ID"
+                            className="h-9 pl-8 pr-8 text-[14px]"
+                          />
+                          {trimmedClusterSearchTerm.length > 0 ? (
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-9 w-full gap-1 px-2 text-[13px] font-normal"
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                              onClick={() => {
+                                setClusterSearchTerm("");
+                                setClusterPage(1);
+                                setManualClusterPageSelectionKey(selectedSOSId);
+                              }}
+                              aria-label="Xóa tìm kiếm cụm"
                             >
-                              <span className="truncate">Trạng thái</span>
+                              <Icon icon="ph:x" className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
+
+                        <div
+                          className={cn(
+                            "grid items-center gap-1.5",
+                            hasClusterFiltersApplied
+                              ? "grid-cols-4"
+                              : "grid-cols-3",
+                          )}
+                        >
+                          <Popover
+                            open={clusterStatusFilterOpen}
+                            onOpenChange={setClusterStatusFilterOpen}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 w-full gap-1 px-2 text-[13px] font-normal"
+                              >
+                                <span className="truncate">Trạng thái</span>
+                                {selectedClusterStatuses.length > 0 ? (
+                                  <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                                    {selectedClusterStatuses.length}
+                                  </Badge>
+                                ) : (
+                                  <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-60 p-1.5"
+                              align="start"
+                            >
+                              {CLUSTER_STATUS_FILTER_OPTIONS.map((option) => {
+                                const checked =
+                                  selectedClusterStatuses.includes(option.key);
+
+                                return (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleClusterStatusFilter(option.key)
+                                    }
+                                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                                  >
+                                    <span
+                                      className={cn(
+                                        "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                                        checked
+                                          ? "border-primary bg-primary text-primary-foreground"
+                                          : "border-border bg-background text-transparent",
+                                      )}
+                                    >
+                                      <Check
+                                        className="h-2.5 w-2.5"
+                                        weight="bold"
+                                      />
+                                    </span>
+                                    <span
+                                      className={
+                                        checked ? "font-medium" : undefined
+                                      }
+                                    >
+                                      {option.value}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                               {selectedClusterStatuses.length > 0 ? (
-                                <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                                  {selectedClusterStatuses.length}
-                                </Badge>
-                              ) : (
-                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-60 p-1.5" align="start">
-                            {CLUSTER_STATUS_FILTER_OPTIONS.map((option) => {
-                              const checked = selectedClusterStatuses.includes(
-                                option.key,
-                              );
-
-                              return (
                                 <button
-                                  key={option.key}
                                   type="button"
-                                  onClick={() =>
-                                    toggleClusterStatusFilter(option.key)
-                                  }
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                                  onClick={() => {
+                                    onSelectedClusterStatusesChange?.([]);
+                                    setClusterPage(1);
+                                    setManualClusterPageSelectionKey(
+                                      selectedSOSId,
+                                    );
+                                  }}
+                                  className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
                                 >
-                                  <span
-                                    className={cn(
-                                      "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                                      checked
-                                        ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-border bg-background text-transparent",
-                                    )}
-                                  >
-                                    <Check
-                                      className="h-2.5 w-2.5"
-                                      weight="bold"
-                                    />
-                                  </span>
-                                  <span
-                                    className={
-                                      checked ? "font-medium" : undefined
-                                    }
-                                  >
-                                    {option.value}
-                                  </span>
+                                  <X className="h-3 w-3" />
+                                  Xóa lọc trạng thái cụm
                                 </button>
-                              );
-                            })}
-                            {selectedClusterStatuses.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onSelectedClusterStatusesChange?.([]);
-                                  setClusterPage(1);
-                                  setManualClusterPageSelectionKey(
-                                    selectedSOSId,
-                                  );
-                                }}
-                                className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                              >
-                                <X className="h-3 w-3" />
-                                Xóa lọc trạng thái cụm
-                              </button>
-                            ) : null}
-                          </PopoverContent>
-                        </Popover>
+                              ) : null}
+                            </PopoverContent>
+                          </Popover>
 
-                        <Popover
-                          open={clusterPriorityFilterOpen}
-                          onOpenChange={setClusterPriorityFilterOpen}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-9 w-full gap-1 px-2 text-[13px] font-normal"
-                            >
-                              <span className="truncate">Ưu tiên</span>
-                              {selectedClusterPriorities.length > 0 ? (
-                                <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                                  {selectedClusterPriorities.length}
-                                </Badge>
-                              ) : (
-                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-56 p-1.5" align="start">
-                            {CLUSTER_PRIORITY_FILTER_OPTIONS.map((option) => {
-                              const checked =
-                                selectedClusterPriorities.includes(option.key);
-
-                              return (
-                                <button
-                                  key={option.key}
-                                  type="button"
-                                  onClick={() =>
-                                    toggleClusterPriorityFilter(option.key)
-                                  }
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                                >
-                                  <span
-                                    className={cn(
-                                      "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                                      checked
-                                        ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-border bg-background text-transparent",
-                                    )}
-                                  >
-                                    <Check
-                                      className="h-2.5 w-2.5"
-                                      weight="bold"
-                                    />
-                                  </span>
-                                  <span
-                                    className={
-                                      checked ? "font-medium" : undefined
-                                    }
-                                  >
-                                    {option.value}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                            {selectedClusterPriorities.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onSelectedClusterPrioritiesChange?.([]);
-                                  setClusterPage(1);
-                                  setManualClusterPageSelectionKey(
-                                    selectedSOSId,
-                                  );
-                                }}
-                                className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                              >
-                                <X className="h-3 w-3" />
-                                Xóa lọc mức ưu tiên
-                              </button>
-                            ) : null}
-                          </PopoverContent>
-                        </Popover>
-
-                        <Popover
-                          open={clusterSosTypeFilterOpen}
-                          onOpenChange={setClusterSosTypeFilterOpen}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-9 w-full gap-1 px-2 text-[13px] font-normal"
-                            >
-                              <span className="truncate">Loại SOS</span>
-                              {selectedClusterSosTypes.length > 0 ? (
-                                <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                                  {selectedClusterSosTypes.length}
-                                </Badge>
-                              ) : (
-                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-60 p-1.5" align="start">
-                            {CLUSTER_SOS_TYPE_FILTER_OPTIONS.map((option) => {
-                              const checked = selectedClusterSosTypes.includes(
-                                option.key,
-                              );
-
-                              return (
-                                <button
-                                  key={option.key}
-                                  type="button"
-                                  onClick={() =>
-                                    toggleClusterSosTypeFilter(option.key)
-                                  }
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                                >
-                                  <span
-                                    className={cn(
-                                      "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                                      checked
-                                        ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-border bg-background text-transparent",
-                                    )}
-                                  >
-                                    <Check
-                                      className="h-2.5 w-2.5"
-                                      weight="bold"
-                                    />
-                                  </span>
-                                  <span
-                                    className={
-                                      checked ? "font-medium" : undefined
-                                    }
-                                  >
-                                    {option.value}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                            {selectedClusterSosTypes.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onSelectedClusterSosTypesChange?.([]);
-                                  setClusterPage(1);
-                                  setManualClusterPageSelectionKey(
-                                    selectedSOSId,
-                                  );
-                                }}
-                                className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                              >
-                                <X className="h-3 w-3" />
-                                Xóa lọc loại SOS
-                              </button>
-                            ) : null}
-                          </PopoverContent>
-                        </Popover>
-
-                        {hasClusterFiltersApplied ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 w-full gap-1 px-1 text-[12px] text-muted-foreground"
-                            onClick={clearClusterFilters}
+                          <Popover
+                            open={clusterPriorityFilterOpen}
+                            onOpenChange={setClusterPriorityFilterOpen}
                           >
-                            <X className="h-3 w-3" />
-                            <span className="truncate">Xóa lọc</span>
-                          </Button>
-                        ) : null}
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 w-full gap-1 px-2 text-[13px] font-normal"
+                              >
+                                <span className="truncate">Ưu tiên</span>
+                                {selectedClusterPriorities.length > 0 ? (
+                                  <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                                    {selectedClusterPriorities.length}
+                                  </Badge>
+                                ) : (
+                                  <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-56 p-1.5"
+                              align="start"
+                            >
+                              {CLUSTER_PRIORITY_FILTER_OPTIONS.map((option) => {
+                                const checked =
+                                  selectedClusterPriorities.includes(
+                                    option.key,
+                                  );
+
+                                return (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleClusterPriorityFilter(option.key)
+                                    }
+                                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                                  >
+                                    <span
+                                      className={cn(
+                                        "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                                        checked
+                                          ? "border-primary bg-primary text-primary-foreground"
+                                          : "border-border bg-background text-transparent",
+                                      )}
+                                    >
+                                      <Check
+                                        className="h-2.5 w-2.5"
+                                        weight="bold"
+                                      />
+                                    </span>
+                                    <span
+                                      className={
+                                        checked ? "font-medium" : undefined
+                                      }
+                                    >
+                                      {option.value}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                              {selectedClusterPriorities.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onSelectedClusterPrioritiesChange?.([]);
+                                    setClusterPage(1);
+                                    setManualClusterPageSelectionKey(
+                                      selectedSOSId,
+                                    );
+                                  }}
+                                  className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                                >
+                                  <X className="h-3 w-3" />
+                                  Xóa lọc mức ưu tiên
+                                </button>
+                              ) : null}
+                            </PopoverContent>
+                          </Popover>
+
+                          <Popover
+                            open={clusterSosTypeFilterOpen}
+                            onOpenChange={setClusterSosTypeFilterOpen}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 w-full gap-1 px-2 text-[13px] font-normal"
+                              >
+                                <span className="truncate">Loại SOS</span>
+                                {selectedClusterSosTypes.length > 0 ? (
+                                  <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                                    {selectedClusterSosTypes.length}
+                                  </Badge>
+                                ) : (
+                                  <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-60 p-1.5"
+                              align="start"
+                            >
+                              {CLUSTER_SOS_TYPE_FILTER_OPTIONS.map((option) => {
+                                const checked =
+                                  selectedClusterSosTypes.includes(option.key);
+
+                                return (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleClusterSosTypeFilter(option.key)
+                                    }
+                                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                                  >
+                                    <span
+                                      className={cn(
+                                        "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                                        checked
+                                          ? "border-primary bg-primary text-primary-foreground"
+                                          : "border-border bg-background text-transparent",
+                                      )}
+                                    >
+                                      <Check
+                                        className="h-2.5 w-2.5"
+                                        weight="bold"
+                                      />
+                                    </span>
+                                    <span
+                                      className={
+                                        checked ? "font-medium" : undefined
+                                      }
+                                    >
+                                      {option.value}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                              {selectedClusterSosTypes.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onSelectedClusterSosTypesChange?.([]);
+                                    setClusterPage(1);
+                                    setManualClusterPageSelectionKey(
+                                      selectedSOSId,
+                                    );
+                                  }}
+                                  className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                                >
+                                  <X className="h-3 w-3" />
+                                  Xóa lọc loại SOS
+                                </button>
+                              ) : null}
+                            </PopoverContent>
+                          </Popover>
+
+                          {hasClusterFiltersApplied ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 w-full gap-1 px-1 text-[12px] text-muted-foreground"
+                              onClick={clearClusterFilters}
+                            >
+                              <X className="h-3 w-3" />
+                              <span className="truncate">Xóa lọc</span>
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {filteredActiveClusters.length > 0 ? (
-                    <>
-                      <PaginationControls
-                        page={currentClusterPage}
-                        totalItems={filteredActiveClusters.length}
-                        pageSize={BACKEND_CLUSTERS_PAGE_SIZE}
-                        onPageChange={(nextPage) => {
-                          setClusterPage(nextPage);
-                          setManualClusterPageSelectionKey(selectedSOSId);
-                        }}
-                      />
-                      {paginatedFilteredActiveClusters.map((cluster) => {
-                        const clusterStatus = resolveClusterStatus(cluster);
-                        const isAnalyzing =
-                          isAnalyzingCluster &&
-                          analyzingClusterId === cluster.id;
-                        const sosCount =
-                          cluster.sosRequestCount ||
-                          cluster.sosRequestIds.length;
-                        const isExpanded =
-                          expandedClusters.has(cluster.id) ||
-                          (selectedClusterId === cluster.id &&
-                            currentSelectionClusterKey !==
-                              collapsedSelectionKey);
-                        const clusterSosIds = cluster.sosRequestIds.map(
-                          normalizeSOSRequestId,
-                        );
-                        const clusterSOS = clusterSosIds
-                          .map((id) => allKnownSOS.get(id))
-                          .filter((s): s is SOSRequest => !!s);
-                        const unresolvedClusterSOS = clusterSOS.filter((s) => {
-                          const bucket = getSOSStatusBucket(s.status);
-                          return bucket === "pending" || bucket === "active";
-                        });
-                        const pendingClusterSOS = unresolvedClusterSOS.filter(
-                          (s) => getSOSStatusBucket(s.status) === "pending",
-                        );
-                        const activeClusterSOS = unresolvedClusterSOS.filter(
-                          (s) => getSOSStatusBucket(s.status) === "active",
-                        );
-                        const rescuedClusterSOS = clusterSOS.filter(
-                          (s) => getSOSStatusBucket(s.status) === "resolved",
-                        );
-                        const cancelledClusterSOS = clusterSOS.filter(
-                          (s) => getSOSStatusBucket(s.status) === "cancelled",
-                        );
-                        const displayClusterSOS = [
-                          ...unresolvedClusterSOS,
-                        ].sort((left, right) => {
-                          const statusDelta =
-                            getSOSStatusSortWeight(left.status) -
-                            getSOSStatusSortWeight(right.status);
+                    {filteredActiveClusters.length > 0 ? (
+                      <>
+                        <PaginationControls
+                          page={currentClusterPage}
+                          totalItems={filteredActiveClusters.length}
+                          pageSize={BACKEND_CLUSTERS_PAGE_SIZE}
+                          onPageChange={(nextPage) => {
+                            setClusterPage(nextPage);
+                            setManualClusterPageSelectionKey(selectedSOSId);
+                          }}
+                        />
+                        {paginatedFilteredActiveClusters.map((cluster) => {
+                          const clusterStatus = resolveClusterStatus(cluster);
+                          const isAnalyzing =
+                            isAnalyzingCluster &&
+                            analyzingClusterId === cluster.id;
+                          const sosCount =
+                            cluster.sosRequestCount ||
+                            cluster.sosRequestIds.length;
+                          const isExpanded =
+                            expandedClusters.has(cluster.id) ||
+                            (selectedClusterId === cluster.id &&
+                              currentSelectionClusterKey !==
+                                collapsedSelectionKey);
+                          const clusterSosIds = cluster.sosRequestIds.map(
+                            normalizeSOSRequestId,
+                          );
+                          const clusterSOS = clusterSosIds
+                            .map((id) => allKnownSOS.get(id))
+                            .filter((s): s is SOSRequest => !!s);
+                          const unresolvedClusterSOS = clusterSOS.filter(
+                            (s) => {
+                              const bucket = getSOSStatusBucket(s.status);
+                              return (
+                                bucket === "pending" || bucket === "active"
+                              );
+                            },
+                          );
+                          const pendingClusterSOS = unresolvedClusterSOS.filter(
+                            (s) => getSOSStatusBucket(s.status) === "pending",
+                          );
+                          const activeClusterSOS = unresolvedClusterSOS.filter(
+                            (s) => getSOSStatusBucket(s.status) === "active",
+                          );
+                          const rescuedClusterSOS = clusterSOS.filter(
+                            (s) => getSOSStatusBucket(s.status) === "resolved",
+                          );
+                          const cancelledClusterSOS = clusterSOS.filter(
+                            (s) => getSOSStatusBucket(s.status) === "cancelled",
+                          );
+                          const displayClusterSOS = [
+                            ...unresolvedClusterSOS,
+                          ].sort((left, right) => {
+                            const statusDelta =
+                              getSOSStatusSortWeight(left.status) -
+                              getSOSStatusSortWeight(right.status);
 
-                          if (statusDelta !== 0) {
-                            return statusDelta;
-                          }
+                            if (statusDelta !== 0) {
+                              return statusDelta;
+                            }
+
+                            return (
+                              right.createdAt.getTime() -
+                              left.createdAt.getTime()
+                            );
+                          });
 
                           return (
-                            right.createdAt.getTime() - left.createdAt.getTime()
-                          );
-                        });
-
-                        return (
-                          <DroppableClusterCard
-                            key={cluster.id}
-                            clusterId={cluster.id}
-                            className={cn(
-                              "rounded-xl border overflow-hidden",
-                              CLUSTER_CONTAINER_CLASS_BY_SEVERITY[
-                                cluster.severityLevel
-                              ],
-                            )}
-                          >
-                            <div
-                              className="px-3 py-2.5 cursor-pointer"
-                              onClick={() => {
-                                setExpandedClusters((prev) => {
-                                  const next = new Set(prev);
-                                  if (isExpanded) {
-                                    next.delete(cluster.id);
-                                  } else {
-                                    next.add(cluster.id);
-                                  }
-                                  return next;
-                                });
-
-                                setCollapsedSelectionKey((previousKey) => {
-                                  if (
-                                    selectedClusterId !== cluster.id ||
-                                    currentSelectionClusterKey == null
-                                  ) {
-                                    return previousKey;
-                                  }
-
-                                  return isExpanded
-                                    ? currentSelectionClusterKey
-                                    : null;
-                                });
-                              }}
+                            <DroppableClusterCard
+                              key={cluster.id}
+                              clusterId={cluster.id}
+                              className={cn(
+                                "rounded-xl border overflow-hidden",
+                                CLUSTER_CONTAINER_CLASS_BY_SEVERITY[
+                                  cluster.severityLevel
+                                ],
+                              )}
                             >
-                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                  <TreeStructure
-                                    className="h-4 w-4 text-violet-600 dark:text-violet-400"
-                                    weight="fill"
-                                  />
-                                  <span className="text-[15px] font-semibold">
-                                    Cụm #{cluster.id}
-                                  </span>
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-[14px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
-                                      CLUSTER_SEVERITY_BADGE_CLASS_BY_SEVERITY[
-                                        cluster.severityLevel
-                                      ],
-                                    )}
-                                  >
-                                    {
-                                      CLUSTER_SEVERITY_LABELS[
-                                        cluster.severityLevel
-                                      ]
+                              <div
+                                className="px-3 py-2.5 cursor-pointer"
+                                onClick={() => {
+                                  setExpandedClusters((prev) => {
+                                    const next = new Set(prev);
+                                    if (isExpanded) {
+                                      next.delete(cluster.id);
+                                    } else {
+                                      next.add(cluster.id);
                                     }
-                                  </Badge>
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-[14px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
-                                      CLUSTER_STATUS_BADGE_CLASS_BY_STATUS[
-                                        clusterStatus
-                                      ],
+                                    return next;
+                                  });
+
+                                  setCollapsedSelectionKey((previousKey) => {
+                                    if (
+                                      selectedClusterId !== cluster.id ||
+                                      currentSelectionClusterKey == null
+                                    ) {
+                                      return previousKey;
+                                    }
+
+                                    return isExpanded
+                                      ? currentSelectionClusterKey
+                                      : null;
+                                  });
+                                }}
+                              >
+                                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                    <TreeStructure
+                                      className="h-4 w-4 text-violet-600 dark:text-violet-400"
+                                      weight="fill"
+                                    />
+                                    <span className="text-[15px] font-semibold">
+                                      Cụm #{cluster.id}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[14px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
+                                        CLUSTER_SEVERITY_BADGE_CLASS_BY_SEVERITY[
+                                          cluster.severityLevel
+                                        ],
+                                      )}
+                                    >
+                                      {
+                                        CLUSTER_SEVERITY_LABELS[
+                                          cluster.severityLevel
+                                        ]
+                                      }
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[14px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
+                                        CLUSTER_STATUS_BADGE_CLASS_BY_STATUS[
+                                          clusterStatus
+                                        ],
+                                      )}
+                                    >
+                                      {CLUSTER_STATUS_LABELS[clusterStatus]}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                    <span className="text-[14px] text-muted-foreground whitespace-nowrap">
+                                      {pendingClusterSOS.length > 0
+                                        ? `${pendingClusterSOS.length} chờ xử lý`
+                                        : activeClusterSOS.length > 0
+                                          ? `${activeClusterSOS.length} đang cứu hộ`
+                                          : unresolvedClusterSOS.length > 0
+                                            ? `${unresolvedClusterSOS.length} chờ/đang cứu`
+                                            : rescuedClusterSOS.length > 0
+                                              ? `${rescuedClusterSOS.length} đã xử lý`
+                                              : cancelledClusterSOS.length > 0
+                                                ? `${cancelledClusterSOS.length} đã hủy`
+                                                : `${sosCount} SOS`}
+                                    </span>
+                                    {isExpanded ? (
+                                      <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
+                                    ) : (
+                                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
                                     )}
-                                  >
-                                    {CLUSTER_STATUS_LABELS[clusterStatus]}
-                                  </Badge>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                                  <span className="text-[14px] text-muted-foreground whitespace-nowrap">
-                                    {pendingClusterSOS.length > 0
-                                      ? `${pendingClusterSOS.length} chờ xử lý`
-                                      : activeClusterSOS.length > 0
-                                        ? `${activeClusterSOS.length} đang cứu hộ`
-                                        : unresolvedClusterSOS.length > 0
-                                          ? `${unresolvedClusterSOS.length} chờ/đang cứu`
-                                          : rescuedClusterSOS.length > 0
-                                            ? `${rescuedClusterSOS.length} đã xử lý`
-                                            : cancelledClusterSOS.length > 0
-                                              ? `${cancelledClusterSOS.length} đã hủy`
-                                              : `${sosCount} SOS`}
-                                  </span>
-                                  {isExpanded ? (
-                                    <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
-                                  ) : (
-                                    <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[14px] text-muted-foreground mt-1.5">
+                                  {cluster.victimEstimated && (
+                                    <span className="flex items-center gap-1">
+                                      <Users
+                                        className="h-3 w-3"
+                                        weight="fill"
+                                      />
+                                      ~{cluster.victimEstimated} nạn nhân
+                                    </span>
+                                  )}
+                                  {cluster.waterLevel && (
+                                    <span className="flex items-center gap-1">
+                                      <WaterLevelIcon />
+                                      {cluster.waterLevel}
+                                    </span>
                                   )}
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[14px] text-muted-foreground mt-1.5">
-                                {cluster.victimEstimated && (
-                                  <span className="flex items-center gap-1">
-                                    <Users className="h-3 w-3" weight="fill" />~
-                                    {cluster.victimEstimated} nạn nhân
-                                  </span>
-                                )}
-                                {cluster.waterLevel && (
-                                  <span className="flex items-center gap-1">
-                                    <WaterLevelIcon />
-                                    {cluster.waterLevel}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                              {isExpanded && (
+                                <>
+                                  <div className="border-t border-inherit divide-y divide-inherit">
+                                    {displayClusterSOS.length > 0 ? (
+                                      displayClusterSOS.map((sos) => {
+                                        const canDetachThisSOS =
+                                          canDetachSOSFromCluster(
+                                            clusterStatus,
+                                            sos.status,
+                                          );
+                                        const isRemovingThisSOS =
+                                          canDetachThisSOS &&
+                                          isRemovingSOSRequestFromCluster &&
+                                          removeCandidate?.clusterId ===
+                                            cluster.id &&
+                                          removeCandidate?.displaySOSId ===
+                                            String(sos.id);
 
-                            {isExpanded && (
-                              <>
-                                <div className="border-t border-inherit divide-y divide-inherit">
-                                  {displayClusterSOS.length > 0 ? (
-                                    displayClusterSOS.map((sos) => {
-                                      const canDetachThisSOS =
-                                        canDetachSOSFromCluster(
-                                          clusterStatus,
-                                          sos.status,
-                                        );
-                                      const isRemovingThisSOS =
-                                        canDetachThisSOS &&
-                                        isRemovingSOSRequestFromCluster &&
-                                        removeCandidate?.clusterId ===
-                                          cluster.id &&
-                                        removeCandidate?.displaySOSId ===
-                                          String(sos.id);
-
-                                      return (
-                                        <div
-                                          key={sos.id}
-                                          className={cn(
-                                            "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-                                            selectedSOS?.id === sos.id &&
-                                              "bg-black/10 dark:bg-white/10",
-                                          )}
-                                          onClick={() => onSOSSelect(sos)}
-                                        >
-                                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                              <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
-                                                SOS {sos.id}
-                                              </span>
-                                              {canDetachThisSOS ? (
-                                                <Button
-                                                  type="button"
-                                                  size="icon"
-                                                  variant="ghost"
-                                                  className="h-7 w-7 rounded-full text-red-600 hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
-                                                  onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    openRemoveSOSDialog(
-                                                      cluster.id,
-                                                      sos,
-                                                    );
-                                                  }}
-                                                  disabled={isRemovingThisSOS}
-                                                  aria-label={
-                                                    isRemovingThisSOS
-                                                      ? "Đang tách SOS"
-                                                      : `Tách SOS ${sos.id} khỏi cụm`
-                                                  }
-                                                  title={
-                                                    isRemovingThisSOS
-                                                      ? "Đang tách SOS..."
-                                                      : "Tách SOS khỏi cụm"
-                                                  }
-                                                >
-                                                  {isRemovingThisSOS ? (
-                                                    <Spinner className="h-3.5 w-3.5 animate-spin" />
-                                                  ) : (
-                                                    <Icon
-                                                      icon="ph:link-break-bold"
-                                                      className="h-3.5 w-3.5"
-                                                    />
-                                                  )}
-                                                  <span className="sr-only">
-                                                    {isRemovingThisSOS
-                                                      ? "Đang tách SOS"
-                                                      : "Tách SOS"}
-                                                  </span>
-                                                </Button>
-                                              ) : null}
-                                              <div className="flex items-center gap-1.5 flex-wrap">
-                                                <Badge
-                                                  variant={
-                                                    PRIORITY_BADGE_VARIANT[
-                                                      sos.priority
-                                                    ]
-                                                  }
-                                                  className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                                                >
-                                                  {
-                                                    PRIORITY_LABELS[
-                                                      sos.priority
-                                                    ]
-                                                  }
-                                                </Badge>
-                                                <Badge
-                                                  variant={getSOSStatusBadgeVariant(
-                                                    sos.status,
-                                                  )}
-                                                  className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                                                >
-                                                  {getSOSStatusLabel(
-                                                    sos.status,
-                                                  )}
-                                                </Badge>
+                                        return (
+                                          <div
+                                            key={sos.id}
+                                            className={cn(
+                                              "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+                                              selectedSOS?.id === sos.id &&
+                                                "bg-black/10 dark:bg-white/10",
+                                            )}
+                                            onClick={() => onSOSSelect(sos)}
+                                          >
+                                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                                <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                                  SOS {sos.id}
+                                                </span>
+                                                {canDetachThisSOS ? (
+                                                  <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-7 w-7 rounded-full text-red-600 hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      openRemoveSOSDialog(
+                                                        cluster.id,
+                                                        sos,
+                                                      );
+                                                    }}
+                                                    disabled={isRemovingThisSOS}
+                                                    aria-label={
+                                                      isRemovingThisSOS
+                                                        ? "Đang tách SOS"
+                                                        : `Tách SOS ${sos.id} khỏi cụm`
+                                                    }
+                                                    title={
+                                                      isRemovingThisSOS
+                                                        ? "Đang tách SOS..."
+                                                        : "Tách SOS khỏi cụm"
+                                                    }
+                                                  >
+                                                    {isRemovingThisSOS ? (
+                                                      <Spinner className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                      <Icon
+                                                        icon="ph:link-break-bold"
+                                                        className="h-3.5 w-3.5"
+                                                      />
+                                                    )}
+                                                    <span className="sr-only">
+                                                      {isRemovingThisSOS
+                                                        ? "Đang tách SOS"
+                                                        : "Tách SOS"}
+                                                    </span>
+                                                  </Button>
+                                                ) : null}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <Badge
+                                                    variant={
+                                                      PRIORITY_BADGE_VARIANT[
+                                                        sos.priority
+                                                      ]
+                                                    }
+                                                    className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                                  >
+                                                    {
+                                                      PRIORITY_LABELS[
+                                                        sos.priority
+                                                      ]
+                                                    }
+                                                  </Badge>
+                                                  <Badge
+                                                    variant={getSOSStatusBadgeVariant(
+                                                      sos.status,
+                                                    )}
+                                                    className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                                  >
+                                                    {getSOSStatusLabel(
+                                                      sos.status,
+                                                    )}
+                                                  </Badge>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                                                <Clock className="h-3 w-3" />
+                                                <TimeElapsed
+                                                  date={sos.createdAt}
+                                                />
                                               </div>
                                             </div>
-                                            <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
-                                              <Clock className="h-3 w-3" />
-                                              <TimeElapsed
-                                                date={sos.createdAt}
-                                              />
-                                            </div>
+                                            <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
+                                              {sos.message}
+                                            </p>
+
+                                            {/* Evaluation Scores Section */}
+                                            {(sos.evaluation?.ruleEvaluation ||
+                                              (sos.evaluation?.aiAnalyses &&
+                                                sos.evaluation.aiAnalyses
+                                                  .length > 0)) && (
+                                              <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
+                                                {sos.evaluation
+                                                  .ruleEvaluation && (
+                                                  <div
+                                                    className="flex items-center gap-1.5 min-w-0"
+                                                    title="Điểm hệ thống (Rule-base)"
+                                                  >
+                                                    <ShieldCheck
+                                                      className="h-3.5 w-3.5 text-blue-500 shrink-0"
+                                                      weight="fill"
+                                                    />
+                                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">
+                                                      Hệ thống:
+                                                    </span>
+                                                    <span className="text-[12px] font-mono font-bold text-foreground">
+                                                      {sos.evaluation.ruleEvaluation.totalScore.toFixed(
+                                                        1,
+                                                      )}
+                                                    </span>
+                                                  </div>
+                                                )}
+
+                                                {sos.evaluation.aiAnalyses &&
+                                                  sos.evaluation.aiAnalyses
+                                                    .length > 0 && (
+                                                    <>
+                                                      <div className="w-px h-3 bg-border/60 shrink-0" />
+                                                      <div
+                                                        className={cn(
+                                                          "flex items-center gap-1.5 min-w-0",
+                                                          sos.evaluation
+                                                            .aiAnalyses[0]
+                                                            .agreesWithRuleBase ===
+                                                            false &&
+                                                            "text-amber-600 dark:text-amber-400",
+                                                        )}
+                                                        title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                                                      >
+                                                        <Brain
+                                                          className="h-3.5 w-3.5 shrink-0"
+                                                          weight="fill"
+                                                        />
+                                                        <span className="text-[11px] font-bold uppercase tracking-tight">
+                                                          AI:
+                                                        </span>
+                                                        <span className="text-[12px] font-mono font-bold">
+                                                          {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(
+                                                            1,
+                                                          )}
+                                                        </span>
+                                                        {sos.evaluation
+                                                          .aiAnalyses[0]
+                                                          .agreesWithRuleBase ===
+                                                          false && (
+                                                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                                        )}
+                                                      </div>
+                                                    </>
+                                                  )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })
+                                    ) : clusterSOS.length > 0 ? (
+                                      <div className="px-3 py-2 text-[14px] text-muted-foreground">
+                                        Các SOS trong cụm này đã xử lý xong hoặc
+                                        đã hủy, nên không còn hiển thị trong
+                                        danh sách theo dõi nhanh.
+                                      </div>
+                                    ) : (
+                                      cluster.sosRequestIds.map((sosId) => (
+                                        <div
+                                          key={`cluster-${cluster.id}-fallback-${sosId}`}
+                                          className="px-3 py-2"
+                                        >
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                              SOS {sosId}
+                                            </span>
+                                            <Badge
+                                              variant="outline"
+                                              className="text-[14px] h-6 px-2 leading-none whitespace-nowrap"
+                                            >
+                                              {clusterSOSDetailsQuery.isFetching
+                                                ? "Đang tải chi tiết"
+                                                : "Chưa tải chi tiết"}
+                                            </Badge>
                                           </div>
                                           <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
-                                            {sos.message}
-                                          </p>
-
-                                          {/* Evaluation Scores Section */}
-                                          {(sos.evaluation?.ruleEvaluation || (sos.evaluation?.aiAnalyses && sos.evaluation.aiAnalyses.length > 0)) && (
-                                            <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
-                                              {sos.evaluation.ruleEvaluation && (
-                                                <div className="flex items-center gap-1.5 min-w-0" title="Điểm hệ thống (Rule-base)">
-                                                  <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="fill" />
-                                                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">Hệ thống:</span>
-                                                  <span className="text-[12px] font-mono font-bold text-foreground">
-                                                    {sos.evaluation.ruleEvaluation.totalScore.toFixed(1)}
-                                                  </span>
-                                                </div>
-                                              )}
-                                              
-                                              {sos.evaluation.aiAnalyses && sos.evaluation.aiAnalyses.length > 0 && (
-                                                <>
-                                                  <div className="w-px h-3 bg-border/60 shrink-0" />
-                                                  <div 
-                                                    className={cn(
-                                                      "flex items-center gap-1.5 min-w-0",
-                                                      sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && "text-amber-600 dark:text-amber-400"
-                                                    )} 
-                                                    title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
-                                                  >
-                                                    <Brain className="h-3.5 w-3.5 shrink-0" weight="fill" />
-                                                    <span className="text-[11px] font-bold uppercase tracking-tight">AI:</span>
-                                                    <span className="text-[12px] font-mono font-bold">
-                                                      {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(1)}
-                                                    </span>
-                                                    {sos.evaluation.aiAnalyses[0].agreesWithRuleBase === false && (
-                                                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                                    )}
-                                                  </div>
-                                                </>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })
-                                  ) : clusterSOS.length > 0 ? (
-                                    <div className="px-3 py-2 text-[14px] text-muted-foreground">
-                                      Các SOS trong cụm này đã xử lý xong hoặc
-                                      đã hủy, nên không còn hiển thị trong danh
-                                      sách theo dõi nhanh.
-                                    </div>
-                                  ) : (
-                                    cluster.sosRequestIds.map((sosId) => (
-                                      <div
-                                        key={`cluster-${cluster.id}-fallback-${sosId}`}
-                                        className="px-3 py-2"
-                                      >
-                                        <div className="flex items-center justify-between gap-2">
-                                          <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
-                                            SOS {sosId}
-                                          </span>
-                                          <Badge
-                                            variant="outline"
-                                            className="text-[14px] h-6 px-2 leading-none whitespace-nowrap"
-                                          >
                                             {clusterSOSDetailsQuery.isFetching
-                                              ? "Đang tải chi tiết"
-                                              : "Chưa tải chi tiết"}
-                                          </Badge>
+                                              ? "Đang tải dữ liệu SOS theo ID cụm..."
+                                              : "Dữ liệu SOS chưa đồng bộ trong danh sách hiện tại."}
+                                          </p>
                                         </div>
-                                        <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
-                                          {clusterSOSDetailsQuery.isFetching
-                                            ? "Đang tải dữ liệu SOS theo ID cụm..."
-                                            : "Dữ liệu SOS chưa đồng bộ trong danh sách hiện tại."}
-                                        </p>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
+                                      ))
+                                    )}
+                                  </div>
 
-                                <ClusterActionButtons
-                                  clusterId={cluster.id}
-                                  clusterStatus={clusterStatus}
-                                  isAnalyzing={!!isAnalyzing}
-                                  isAnalyzingCluster={isAnalyzingCluster}
-                                  analyzingStatus={analyzingStatus}
-                                  onAnalyzeCluster={onAnalyzeCluster}
-                                  onViewClusterPlan={onViewClusterPlan}
-                                  onManualMission={onManualMission}
-                                />
-                              </>
-                            )}
-                          </DroppableClusterCard>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-3 text-[14px] text-muted-foreground">
-                      Không tìm thấy cụm phù hợp với{" "}
-                      {trimmedClusterSearchTerm
-                        ? `từ khóa "${trimmedClusterSearchTerm}"`
-                        : "bộ lọc hiện tại"}
-                      .
-                    </div>
-                  )}
-                </>
-              )}
-
-              {autoClusters.length > 0 && (
-                <>
-                  <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Gợi ý gom cụm ({autoClusters.length})
-                  </div>
-                  <PaginationControls
-                    page={currentAutoClusterPage}
-                    totalItems={autoClusters.length}
-                    pageSize={AUTO_CLUSTERS_PAGE_SIZE}
-                    onPageChange={setAutoClusterPage}
-                  />
-                  {paginatedAutoClusters.map(({ cluster, sourceIndex }) => {
-                    const isProcessing =
-                      isCreatingCluster &&
-                      processingClusterIndex === sourceIndex;
-
-                    return (
-                      <div
-                        key={sourceIndex}
-                        className="rounded-xl border border-violet-200 dark:border-violet-800/40 bg-violet-50/50 dark:bg-violet-900/10 overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-violet-100/60 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800/30">
-                          <div className="flex items-center gap-2">
-                            <TreeStructure
-                              className="h-4 w-4 text-violet-600 dark:text-violet-400"
-                              weight="fill"
-                            />
-                            <span className="text-[15px] font-semibold text-violet-700 dark:text-violet-300">
-                              Cụm {sourceIndex + 1} • {cluster.length} SOS
-                            </span>
-                          </div>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-9 text-[14px] px-3 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                            onClick={() =>
-                              onCreateCluster(cluster.map((s) => s.id))
-                            }
-                            disabled={isCreatingCluster}
-                          >
-                            {isProcessing ? (
-                              <>
-                                <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                                Đang xử lý...
-                              </>
-                            ) : (
-                              <>
-                                <TreeStructure
-                                  className="h-3 w-3 mr-1"
-                                  weight="fill"
-                                />
-                                Gom & AI
-                              </>
-                            )}
-                          </Button>
-                        </div>
-
-                        <div className="divide-y divide-violet-100 dark:divide-violet-800/20">
-                          {cluster.map((sos) => (
-                            <div
-                              key={sos.id}
-                              className={cn(
-                                "px-3 py-2 cursor-pointer transition-colors hover:bg-violet-100/60 dark:hover:bg-violet-900/20",
-                                selectedSOS?.id === sos.id &&
-                                  "bg-violet-100 dark:bg-violet-900/30",
+                                  <ClusterActionButtons
+                                    clusterId={cluster.id}
+                                    clusterStatus={clusterStatus}
+                                    isAnalyzing={!!isAnalyzing}
+                                    isAnalyzingCluster={isAnalyzingCluster}
+                                    analyzingStatus={analyzingStatus}
+                                    onAnalyzeCluster={onAnalyzeCluster}
+                                    onViewClusterPlan={onViewClusterPlan}
+                                    onManualMission={onManualMission}
+                                  />
+                                </>
                               )}
-                              onClick={() => onSOSSelect(sos)}
-                            >
-                              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                                  <Badge
-                                    variant={
-                                      PRIORITY_BADGE_VARIANT[sos.priority]
-                                    }
-                                    className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                                  >
-                                    {PRIORITY_LABELS[sos.priority]}
-                                  </Badge>
-                                  <span className="text-[14px] font-mono text-muted-foreground">
-                                    SOS {sos.id}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
-                                  <Clock className="h-3 w-3" />
-                                  <TimeElapsed date={sos.createdAt} />
-                                </div>
-                              </div>
-                              <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
-                                {sos.message}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
+                            </DroppableClusterCard>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-3 text-[14px] text-muted-foreground">
+                        Không tìm thấy cụm phù hợp với{" "}
+                        {trimmedClusterSearchTerm
+                          ? `từ khóa "${trimmedClusterSearchTerm}"`
+                          : "bộ lọc hiện tại"}
+                        .
                       </div>
-                    );
-                  })}
-                </>
-              )}
+                    )}
+                  </>
+                )}
 
-              {!hasClusterFiltersApplied &&
-              activeClusters.length === 0 &&
-              autoClusters.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-[15px]">Chưa có cụm SOS nào</p>
-                </div>
-              ) : null}
+                {autoClusters.length > 0 && (
+                  <>
+                    <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Gợi ý gom cụm ({autoClusters.length})
+                    </div>
+                    <PaginationControls
+                      page={currentAutoClusterPage}
+                      totalItems={autoClusters.length}
+                      pageSize={AUTO_CLUSTERS_PAGE_SIZE}
+                      onPageChange={setAutoClusterPage}
+                    />
+                    {paginatedAutoClusters.map(({ cluster, sourceIndex }) => {
+                      const isProcessing =
+                        isCreatingCluster &&
+                        processingClusterIndex === sourceIndex;
+
+                      return (
+                        <div
+                          key={sourceIndex}
+                          className="rounded-xl border border-violet-200 dark:border-violet-800/40 bg-violet-50/50 dark:bg-violet-900/10 overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-violet-100/60 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800/30">
+                            <div className="flex items-center gap-2">
+                              <TreeStructure
+                                className="h-4 w-4 text-violet-600 dark:text-violet-400"
+                                weight="fill"
+                              />
+                              <span className="text-[15px] font-semibold text-violet-700 dark:text-violet-300">
+                                Cụm {sourceIndex + 1} • {cluster.length} SOS
+                              </span>
+                            </div>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-9 text-[14px] px-3 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                              onClick={() =>
+                                onCreateCluster(cluster.map((s) => s.id))
+                              }
+                              disabled={isCreatingCluster}
+                            >
+                              {isProcessing ? (
+                                <>
+                                  <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                                  Đang xử lý...
+                                </>
+                              ) : (
+                                <>
+                                  <TreeStructure
+                                    className="h-3 w-3 mr-1"
+                                    weight="fill"
+                                  />
+                                  Gom & AI
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          <div className="divide-y divide-violet-100 dark:divide-violet-800/20">
+                            {cluster.map((sos) => (
+                              <div
+                                key={sos.id}
+                                className={cn(
+                                  "px-3 py-2 cursor-pointer transition-colors hover:bg-violet-100/60 dark:hover:bg-violet-900/20",
+                                  selectedSOS?.id === sos.id &&
+                                    "bg-violet-100 dark:bg-violet-900/30",
+                                )}
+                                onClick={() => onSOSSelect(sos)}
+                              >
+                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                    <Badge
+                                      variant={
+                                        PRIORITY_BADGE_VARIANT[sos.priority]
+                                      }
+                                      className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                    >
+                                      {PRIORITY_LABELS[sos.priority]}
+                                    </Badge>
+                                    <span className="text-[14px] font-mono text-muted-foreground">
+                                      SOS {sos.id}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                                    <Clock className="h-3 w-3" />
+                                    <TimeElapsed date={sos.createdAt} />
+                                  </div>
+                                </div>
+                                <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
+                                  {sos.message}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {!hasClusterFiltersApplied &&
+                activeClusters.length === 0 &&
+                autoClusters.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-[15px]">Chưa có cụm SOS nào</p>
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
 
-      <Dialog open={removeDialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Xác nhận tách SOS khỏi cụm</DialogTitle>
-            <DialogDescription>
-              {removeCandidate
-                ? `Bạn có chắc muốn tách SOS ${removeCandidate.displaySOSId} ra khỏi cụm #${removeCandidate.clusterId}?`
-                : "Bạn có chắc muốn tách SOS ra khỏi cụm hiện tại?"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => handleDialogOpenChange(false)}
-              disabled={isRemovingSOSRequestFromCluster}
-            >
-              Hủy
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmRemoveSOS}
-              disabled={isRemovingSOSRequestFromCluster || !removeCandidate}
-            >
-              {isRemovingSOSRequestFromCluster ? (
-                <>
-                  <Spinner className="h-3.5 w-3.5 animate-spin" />
-                  Đang tách...
-                </>
-              ) : (
-                "Xác nhận tách"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <DragOverlay dropAnimation={null}>
-        <DragOverlaySOSCard sos={activeDragSOS} />
-      </DragOverlay>
+        <Dialog open={removeDialogOpen} onOpenChange={handleDialogOpenChange}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Xác nhận tách SOS khỏi cụm</DialogTitle>
+              <DialogDescription>
+                {removeCandidate
+                  ? `Bạn có chắc muốn tách SOS ${removeCandidate.displaySOSId} ra khỏi cụm #${removeCandidate.clusterId}?`
+                  : "Bạn có chắc muốn tách SOS ra khỏi cụm hiện tại?"}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => handleDialogOpenChange(false)}
+                disabled={isRemovingSOSRequestFromCluster}
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmRemoveSOS}
+                disabled={isRemovingSOSRequestFromCluster || !removeCandidate}
+              >
+                {isRemovingSOSRequestFromCluster ? (
+                  <>
+                    <Spinner className="h-3.5 w-3.5 animate-spin" />
+                    Đang tách...
+                  </>
+                ) : (
+                  "Xác nhận tách"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <DragOverlay dropAnimation={null}>
+          <DragOverlaySOSCard sos={activeDragSOS} />
+        </DragOverlay>
       </DndContext>
     </div>
   );
@@ -2626,7 +2699,7 @@ function DroppableClusterCard({
       ref={setNodeRef}
       className={cn(
         className,
-        isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+        isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background",
       )}
     >
       {children}
