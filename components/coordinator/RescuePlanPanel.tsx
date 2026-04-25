@@ -13,6 +13,7 @@ import {
   Tooltip,
   useMap,
 } from "react-leaflet";
+import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 import { divIcon, tileLayer } from "leaflet";
 import {
   activityTypeConfig,
@@ -311,24 +312,43 @@ function translateAIText(text: string): string {
   return text
     .replace(
       /Activity step (\d+) \(([^)]+)\)/g,
-      (match, step, type) => `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`
+      (match, step, type) =>
+        `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`,
     )
     .replace(/team_id=(\d+)/g, "đội ID $1")
-    .replace(/pool nearby teams/g, "danh sách đội cứu hộ được quét xung quanh khu vực");
+    .replace(
+      /pool nearby teams/g,
+      "danh sách đội cứu hộ được quét xung quanh khu vực",
+    );
 }
 
-function FormattedAINotes({ text, textClassName }: { text: string; textClassName?: string }) {
+function FormattedAINotes({
+  text,
+  textClassName,
+}: {
+  text: string;
+  textClassName?: string;
+}) {
   if (!text) return null;
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
   return (
     <div className="space-y-3">
       {lines.map((line, idx) => {
         if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
           const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
-          const items = content.split("|").map(i => i.trim()).filter(Boolean);
+          const items = content
+            .split("|")
+            .map((i) => i.trim())
+            .filter(Boolean);
           return (
-            <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3">
+            <div
+              key={idx}
+              className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3"
+            >
               <h5 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2.5 flex items-center gap-1.5">
                 <Warning className="w-4 h-4" weight="fill" />
                 CẦN XEM LẠI THỦ CÔNG
@@ -342,7 +362,12 @@ function FormattedAINotes({ text, textClassName }: { text: string; textClassName
           );
         }
         return (
-          <p key={idx} className={textClassName || "text-sm text-foreground/80 leading-relaxed"}>
+          <p
+            key={idx}
+            className={
+              textClassName || "text-sm text-foreground/80 leading-relaxed"
+            }
+          >
             {translateAIText(line)}
           </p>
         );
@@ -2398,7 +2423,7 @@ const RoutePreviewMap = ({
         attributionControl={false}
         className="h-full w-full"
       >
-        <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
         <RoutePreviewFitBounds points={points} />
         <Polyline
           positions={points}
@@ -3916,7 +3941,7 @@ function cloneSupplyCollections(
           itemType: normalizeInventoryItemType(supply.itemType),
         }
       : {}),
-    quantity: Math.max(1, Number(supply.quantity) || 1),
+    quantity: Math.max(0, Number(supply.quantity) || 0),
     unit:
       typeof supply.unit === "string" && supply.unit.trim()
         ? supply.unit.trim()
@@ -4293,7 +4318,7 @@ function mergeSupplyCollections(
 
     buckets.set(key, {
       ...supply,
-      quantity: Math.max(1, Number(supply.quantity) || 1),
+      quantity: Math.max(0, Number(supply.quantity) || 0),
     });
   });
 
@@ -4302,13 +4327,270 @@ function mergeSupplyCollections(
 
 function syncDeliveryActivitiesWithCollectors(
   activities: EditableActivity[],
+  options?: { sourceActivityId?: string | null },
 ): EditableActivity[] {
-  // Keep legacy flag cleanup but do not auto-lock DELIVER_SUPPLIES edits.
-  return activities.map((activity) =>
+  const normalizedActivities = activities.map((activity) =>
     activity._autoSyncedDeliveryStep
       ? { ...activity, _autoSyncedDeliveryStep: false }
       : activity,
   );
+
+  const sourceActivityId = options?.sourceActivityId ?? null;
+  const sourceIndex =
+    sourceActivityId != null
+      ? normalizedActivities.findIndex(
+          (activity) => activity._id === sourceActivityId,
+        )
+      : -1;
+  const sourceActivity =
+    sourceIndex >= 0 ? normalizedActivities[sourceIndex] : null;
+
+  if (sourceActivity?.activityType === "DELIVER_SUPPLIES") {
+    const collectIndex = findPairedCollectIndexForDelivery(
+      normalizedActivities,
+      sourceIndex,
+    );
+
+    if (collectIndex < 0) {
+      return normalizedActivities;
+    }
+
+    const pairedDeliveryIndexes = findPairedDeliveryIndexesForCollector(
+      normalizedActivities,
+      collectIndex,
+    );
+
+    // Aggregate supplies from ALL paired delivery steps (including the just-edited one)
+    // so the collector reflects the total of all deliveries, not just the changed step.
+    const allDeliverySupplies: ClusterSupplyCollection[] = [];
+    for (const idx of pairedDeliveryIndexes) {
+      const distributable = getDistributableSupplyCollections(
+        normalizedActivities[idx].suppliesToCollect,
+      );
+      if (distributable) {
+        allDeliverySupplies.push(...distributable);
+      }
+    }
+    const aggregatedDeliverySupplies =
+      allDeliverySupplies.length > 0
+        ? mergeSupplyCollections(allDeliverySupplies)
+        : null;
+
+    return normalizedActivities.map((activity, index) =>
+      index === collectIndex
+        ? {
+            ...activity,
+            suppliesToCollect: mergeCollectorReusableSuppliesWithDelivery(
+              activity.suppliesToCollect,
+              aggregatedDeliverySupplies,
+            ),
+          }
+        : activity,
+    );
+  }
+
+  const collectIndexesToSync =
+    sourceActivity?.activityType === "COLLECT_SUPPLIES"
+      ? [sourceIndex]
+      : normalizedActivities
+          .map((activity, index) =>
+            activity.activityType === "COLLECT_SUPPLIES" ? index : -1,
+          )
+          .filter((index) => index >= 0);
+
+  if (collectIndexesToSync.length === 0) {
+    return normalizedActivities;
+  }
+
+  const deliveryUpdates = new Map<number, ClusterSupplyCollection[] | null>();
+
+  for (const collectIndex of collectIndexesToSync) {
+    const collector = normalizedActivities[collectIndex];
+    const distributableSupplies = getDistributableSupplyCollections(
+      collector.suppliesToCollect,
+    );
+
+    const pairedDeliveryIndexes = findPairedDeliveryIndexesForCollector(
+      normalizedActivities,
+      collectIndex,
+    );
+
+    // When there are multiple delivery steps, each step has its own independent
+    // quantity set by the user. Only propagate the collector's total to each
+    // delivery step if that step has no supplies yet (initial setup).
+    for (const deliveryIndex of pairedDeliveryIndexes) {
+      const deliveryActivity = normalizedActivities[deliveryIndex];
+      const hasOwnSupplies =
+        deliveryActivity.suppliesToCollect != null &&
+        deliveryActivity.suppliesToCollect.length > 0;
+      if (!hasOwnSupplies) {
+        deliveryUpdates.set(deliveryIndex, distributableSupplies);
+      }
+    }
+  }
+
+  if (deliveryUpdates.size === 0) {
+    return normalizedActivities;
+  }
+
+  return normalizedActivities.map((activity, index) =>
+    deliveryUpdates.has(index)
+      ? {
+          ...activity,
+          suppliesToCollect: deliveryUpdates.get(index) ?? null,
+        }
+      : activity,
+  );
+}
+
+function getDistributableSupplyCollections(
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  const distributableSupplies = (cloneSupplyCollections(supplies) ?? []).filter(
+    (supply) => !isReusableSupplyCollection(supply),
+  );
+
+  return distributableSupplies.length > 0
+    ? mergeSupplyCollections(distributableSupplies)
+    : null;
+}
+
+function mergeCollectorReusableSuppliesWithDelivery(
+  collectorSupplies: ClusterSupplyCollection[] | null | undefined,
+  deliverySupplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  const reusableCollectorSupplies = (
+    cloneSupplyCollections(collectorSupplies) ?? []
+  ).filter(isReusableSupplyCollection);
+  const normalizedDeliverySupplies =
+    getDistributableSupplyCollections(deliverySupplies) ?? [];
+
+  return mergeSupplyCollections([
+    ...reusableCollectorSupplies,
+    ...normalizedDeliverySupplies,
+  ]);
+}
+
+function findPairedCollectIndexForDelivery(
+  activities: EditableActivity[],
+  deliveryIndex: number,
+): number {
+  const delivery = activities[deliveryIndex];
+  if (!delivery || delivery.activityType !== "DELIVER_SUPPLIES") {
+    return -1;
+  }
+
+  const deliveryTeamId = toValidTeamId(delivery.suggestedTeam?.teamId);
+  const deliverySosRequestId = toValidSosRequestId(delivery.sosRequestId);
+  const deliveryStep = Number(delivery.step);
+
+  let bestIndex = -1;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (let index = deliveryIndex - 1; index >= 0; index -= 1) {
+    const candidate = activities[index];
+    if (candidate.activityType !== "COLLECT_SUPPLIES") {
+      continue;
+    }
+
+    const candidateTeamId = toValidTeamId(candidate.suggestedTeam?.teamId);
+    const candidateSosRequestId = toValidSosRequestId(candidate.sosRequestId);
+    const candidateStep = Number(candidate.step);
+    let score = 0;
+
+    if (
+      deliveryTeamId != null &&
+      candidateTeamId != null &&
+      deliveryTeamId === candidateTeamId
+    ) {
+      score += 60;
+    }
+
+    if (
+      deliverySosRequestId != null &&
+      candidateSosRequestId != null &&
+      deliverySosRequestId === candidateSosRequestId
+    ) {
+      score += 40;
+    }
+
+    if (Number.isFinite(deliveryStep) && Number.isFinite(candidateStep)) {
+      score += Math.max(0, 20 - Math.abs(deliveryStep - candidateStep));
+    }
+
+    score += index;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function findPairedDeliveryIndexesForCollector(
+  activities: EditableActivity[],
+  collectorIndex: number,
+): number[] {
+  const collector = activities[collectorIndex];
+  if (!collector || collector.activityType !== "COLLECT_SUPPLIES") {
+    return [];
+  }
+
+  const nextCollectorIndex = activities.findIndex(
+    (activity, index) =>
+      index > collectorIndex && activity.activityType === "COLLECT_SUPPLIES",
+  );
+  const searchEnd =
+    nextCollectorIndex >= 0 ? nextCollectorIndex : activities.length;
+  const deliveryIndexes: number[] = [];
+
+  for (let index = collectorIndex + 1; index < searchEnd; index += 1) {
+    if (activities[index].activityType === "DELIVER_SUPPLIES") {
+      deliveryIndexes.push(index);
+    }
+  }
+
+  if (deliveryIndexes.length > 0) {
+    return deliveryIndexes;
+  }
+
+  const collectorTeamId = toValidTeamId(collector.suggestedTeam?.teamId);
+  const collectorSosRequestId = toValidSosRequestId(collector.sosRequestId);
+
+  return activities
+    .map((activity, index) => ({ activity, index }))
+    .filter(({ activity, index }) => {
+      if (
+        index <= collectorIndex ||
+        activity.activityType !== "DELIVER_SUPPLIES"
+      ) {
+        return false;
+      }
+
+      const deliveryTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+      const deliverySosRequestId = toValidSosRequestId(activity.sosRequestId);
+
+      if (
+        collectorTeamId != null &&
+        deliveryTeamId != null &&
+        collectorTeamId !== deliveryTeamId
+      ) {
+        return false;
+      }
+
+      if (
+        collectorSosRequestId != null &&
+        deliverySosRequestId != null &&
+        collectorSosRequestId !== deliverySosRequestId
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map(({ index }) => index);
 }
 
 function buildTeamSupplyRemainingBalance(
@@ -4337,7 +4619,7 @@ function buildTeamSupplyRemainingBalance(
     const mergedSupplies = mergeSupplyCollections(activity.suppliesToCollect);
     for (const supply of mergedSupplies ?? []) {
       const key = buildSupplyComparisonKey(supply);
-      const quantity = Math.max(1, Number(supply.quantity) || 1);
+      const quantity = Math.max(0, Number(supply.quantity) || 0);
       const current = balanceByKey.get(key) ?? 0;
 
       if (
@@ -4377,7 +4659,7 @@ function capReturnSuppliesByRemainingBalance(
     }
 
     const desiredQuantity = Math.min(
-      Math.max(1, Number(supply.quantity) || 1),
+      Math.max(0, Number(supply.quantity) || 0),
       remaining,
     );
 
@@ -5505,7 +5787,7 @@ const MissionRoutePreview = ({
                 attributionControl={false}
                 className="h-full w-full"
               >
-                <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.flatMap((seg, idx) => {
@@ -7319,7 +7601,7 @@ const MissionTeamRoutePreview = ({
             attributionControl={false}
             className="h-full w-full"
           >
-            <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
             <RoutePreviewFitBounds points={mapFitPoints} />
 
             {isUsingOriginConnector ? (
@@ -8067,6 +8349,8 @@ const RescuePlanPanel = ({
   >(null);
   const [mixedMissionOverride, setMixedMissionOverride] =
     useState<MixedMissionOverrideState | null>(null);
+  const [editSuggestionContext, setEditSuggestionContext] =
+    useState<SuggestionPreview | null>(null);
   const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
 
   const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
@@ -8076,28 +8360,14 @@ const RescuePlanPanel = ({
   const isSubmittingMissionEdit = isCreatingMission || isUpdatingMission;
 
   const syncReturnActivitiesWithCollectors = useCallback(
-    (activities: EditableActivity[]): EditableActivity[] => {
-      let normalizedActivities =
-        syncDeliveryActivitiesWithCollectors(activities);
-
-      // Auto-fill DELIVER_SUPPLIES from COLLECT_SUPPLIES if empty
-      let lastCollectSupplies: any[] = [];
-      for (const activity of normalizedActivities) {
-        if (activity.activityType === "COLLECT_SUPPLIES") {
-          lastCollectSupplies = activity.suppliesToCollect ?? [];
-        }
-      }
-
-      const distributableSupplies = lastCollectSupplies.filter(
-        (s) => !isReusableSupplyCollection(s)
+    (
+      activities: EditableActivity[],
+      options?: { sourceActivityId?: string | null },
+    ): EditableActivity[] => {
+      const normalizedActivities = syncDeliveryActivitiesWithCollectors(
+        activities,
+        options,
       );
-
-      normalizedActivities = normalizedActivities.map((activity) => {
-        if (activity.activityType === "DELIVER_SUPPLIES") {
-          return { ...activity, suppliesToCollect: distributableSupplies.length > 0 ? distributableSupplies : null };
-        }
-        return activity;
-      });
 
       const nextActivities: EditableActivity[] = [];
 
@@ -8247,6 +8517,7 @@ const RescuePlanPanel = ({
     setEditingMissionId(null);
     setEditSourceSuggestionId(null);
     setMixedMissionOverride(null);
+    setEditSuggestionContext(null);
     setPendingMixedOverrideReason("");
     setEditActivityErrors({});
     setExpandedEditSupplyKeys({});
@@ -8291,6 +8562,7 @@ const RescuePlanPanel = ({
         buildEditableActivitiesFromSuggestion(suggestion.suggestedActivities),
       );
       setEditSourceSuggestionId(suggestion.sourceSuggestionId ?? null);
+      setEditSuggestionContext(suggestion);
       const normalizedOverrideReason = trimToNull(options?.mixedOverrideReason);
       if (
         trimToNull(suggestion.mixedRescueReliefWarning) &&
@@ -8372,6 +8644,7 @@ const RescuePlanPanel = ({
     setEditingMissionId(null);
     setEditSourceSuggestionId(null);
     setEditActivities([]);
+    setEditSuggestionContext(null);
     setSplitSuggestionPreview(pendingMixedSuggestion);
     setDismissAutoSplitSuggestion(false);
   }, [pendingMixedSuggestion]);
@@ -8511,8 +8784,9 @@ const RescuePlanPanel = ({
         return;
       }
 
-      const isDistributionStep = targetActivity?.activityType === "DELIVER_SUPPLIES";
-      // We pass the incoming item to isReusableSupplyCollection. 
+      const isDistributionStep =
+        targetActivity?.activityType === "DELIVER_SUPPLIES";
+      // We pass the incoming item to isReusableSupplyCollection.
       // It might lack metadata, but it's the safest heuristic we have.
       const isReusable = isReusableSupplyCollection(item as any);
 
@@ -8522,7 +8796,6 @@ const RescuePlanPanel = ({
         );
         return;
       }
-
 
       clearEditActivityErrors();
       setExpandedEditSupplyKeys((previous) => ({
@@ -8612,6 +8885,7 @@ const RescuePlanPanel = ({
               ],
             };
           }),
+          { sourceActivityId: activityId },
         ),
       );
     },
@@ -8641,6 +8915,7 @@ const RescuePlanPanel = ({
             next.splice(supplyIndex, 1);
             return { ...a, suppliesToCollect: next.length > 0 ? next : null };
           }),
+          { sourceActivityId: activityId },
         ),
       );
     },
@@ -8675,6 +8950,7 @@ const RescuePlanPanel = ({
             }
             return { ...a, suppliesToCollect: next };
           }),
+          { sourceActivityId: activityId },
         ),
       );
     },
@@ -8709,6 +8985,7 @@ const RescuePlanPanel = ({
             }
             return { ...a, suppliesToCollect: next };
           }),
+          { sourceActivityId: activityId },
         ),
       );
     },
@@ -9701,6 +9978,7 @@ const RescuePlanPanel = ({
       setDismissAutoSplitSuggestion(false);
       setEditSourceSuggestionId(null);
       setMixedMissionOverride(null);
+      setEditSuggestionContext(null);
     }
   }, [open]);
 
@@ -10105,6 +10383,7 @@ const RescuePlanPanel = ({
       setEditSourceSuggestionId(mission.aiSuggestionId ?? null);
       setMixedMissionOverride(null);
       setPendingMixedOverrideReason("");
+      setEditSuggestionContext(null);
       setEditingMissionId(mission.id);
       setActiveTab("plan");
       setIsEditMode(true);
@@ -10392,6 +10671,161 @@ const RescuePlanPanel = ({
       : pendingRemoval?.type === "supply"
         ? `Bạn có chắc chắn muốn xóa vật phẩm \"${pendingRemoval.supplyName}\" khỏi gợi ý AI này không? vật phẩm này sẽ bị loại khỏi kế hoạch khi bạn xác nhận nhiệm vụ.`
         : "";
+
+  const editSidebarSuggestion =
+    isEditMode && !activeSuggestion ? editSuggestionContext : null;
+  const editSidebarMixedWarning = trimToNull(
+    editSidebarSuggestion?.mixedRescueReliefWarning,
+  );
+  const editSidebarErrorMessage = trimToNull(
+    editSidebarSuggestion?.errorMessage,
+  );
+  const editSidebarLowConfidenceWarning = trimToNull(
+    editSidebarSuggestion?.lowConfidenceWarning,
+  );
+  const editSidebarSpecialNotes = trimToNull(
+    editSidebarSuggestion?.specialNotes,
+  );
+  const editSidebarSupplyShortages =
+    editSidebarSuggestion?.supplyShortages ?? [];
+  const hasEditSidebarWarnings =
+    !!editSidebarSuggestion &&
+    (editSidebarSuggestion.needsManualReview ||
+      editSidebarErrorMessage != null ||
+      editSidebarLowConfidenceWarning != null ||
+      editSidebarSuggestion.multiDepotRecommended ||
+      editSidebarMixedWarning != null ||
+      editSidebarSuggestion.needsAdditionalDepot ||
+      editSidebarSupplyShortages.length > 0);
+  const hasEditSidebarContext =
+    hasEditSidebarWarnings || editSidebarSpecialNotes != null;
+
+  const editSuggestionSidebarSection = editSidebarSuggestion ? (
+    <>
+      {hasEditSidebarWarnings ? (
+        <section className="space-y-2">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Info className="h-3.5 w-3.5" weight="fill" />
+            Cảnh báo hệ thống
+          </h4>
+          {editSidebarMixedWarning ? (
+            <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 rounded-lg p-2.5">
+              <FormattedAINotes
+                text={editSidebarMixedWarning}
+                textClassName="text-sm text-rose-800 dark:text-rose-300 leading-relaxed"
+              />
+            </div>
+          ) : null}
+          {editSidebarErrorMessage ? (
+            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg p-2.5">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                Lỗi AI
+              </p>
+              <p className="mt-0.5 text-sm text-red-800/80 dark:text-red-300/80 leading-relaxed">
+                {editSidebarErrorMessage}
+              </p>
+            </div>
+          ) : null}
+          {editSidebarSuggestion.needsManualReview ? (
+            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-2.5">
+              <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                {editSidebarLowConfidenceWarning ||
+                  "Kế hoạch cần kiểm tra thủ công trước khi phê duyệt."}
+              </p>
+            </div>
+          ) : null}
+          {!editSidebarSuggestion.needsManualReview &&
+          editSidebarLowConfidenceWarning ? (
+            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-2.5">
+              <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                {editSidebarLowConfidenceWarning}
+              </p>
+            </div>
+          ) : null}
+          {editSidebarSuggestion.multiDepotRecommended ? (
+            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg p-2.5">
+              <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
+                Kế hoạch đề xuất phối hợp nhiều kho để đáp ứng đủ vật phẩm.
+              </p>
+            </div>
+          ) : null}
+          {(editSidebarSuggestion.needsAdditionalDepot ||
+            editSidebarSupplyShortages.length > 0) && (
+            <div className="bg-sky-50 dark:bg-sky-900/10 border border-sky-200 dark:border-sky-800/30 rounded-lg p-2.5">
+              <p className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                Kho hiện tại chưa đủ vật phẩm.
+              </p>
+              {editSidebarSupplyShortages.length > 0 ? (
+                <div className="mt-1.5 space-y-1">
+                  {editSidebarSupplyShortages.map((shortage, index) => (
+                    <p
+                      key={`edit-sidebar-shortage-${index}`}
+                      className="text-sm text-sky-800/80 dark:text-sky-300/80"
+                    >
+                      {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
+                      {shortage.selectedDepotName
+                        ? ` • Kho chính: ${shortage.selectedDepotName}`
+                        : ""}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {hasEditSidebarWarnings && editSidebarSpecialNotes ? <Separator /> : null}
+
+      {editSidebarSpecialNotes ? (
+        <section className="space-y-2.5">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
+            <Warning className="h-3.5 w-3.5 text-orange-500" weight="fill" />
+            Lưu ý đặc biệt
+          </h4>
+          <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2.5">
+            <FormattedAINotes
+              text={editSidebarSpecialNotes}
+              textClassName="text-sm text-foreground/75 leading-relaxed"
+            />
+          </div>
+        </section>
+      ) : null}
+    </>
+  ) : null;
+
+  const depotInventorySidebarSection =
+    visibleSidebarDepots.length > 0 ? (
+      <>
+        {activeSuggestion || hasEditSidebarContext ? <Separator /> : null}
+        <section>
+          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
+            <Storefront
+              className="h-3.5 w-3.5 text-amber-500"
+              weight="fill"
+            />
+            Kho vật phẩm
+          </h4>
+          <p className="text-sm text-muted-foreground mb-2">
+            {isEditMode
+              ? "Kéo vật phẩm vào bước thực hiện bên trái"
+              : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
+          </p>
+          <div className="space-y-2">
+            {visibleSidebarDepots.map((depot) => (
+              <DepotInventoryCard
+                key={depot.depotId}
+                depotId={depot.depotId}
+                depotName={depot.depotName}
+                depotAddress={depot.depotAddress}
+                isDraggable={isEditMode}
+                kind={depot.kind}
+              />
+            ))}
+          </div>
+        </section>
+      </>
+    ) : null;
 
   return (
     <div
@@ -11020,7 +11454,10 @@ const RescuePlanPanel = ({
                                       />
                                       Lưu ý
                                     </p>
-                                    <FormattedAINotes text={mission.specialNotes} textClassName="text-sm text-foreground/75 leading-relaxed" />
+                                    <FormattedAINotes
+                                      text={mission.specialNotes}
+                                      textClassName="text-sm text-foreground/75 leading-relaxed"
+                                    />
                                   </div>
                                 )}
 
@@ -11302,65 +11739,65 @@ const RescuePlanPanel = ({
                                                               )}
                                                             >
                                                               <div className="min-w-0 space-y-2">
-                                                                  <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="text-base font-bold text-foreground">
-                                                                      Bước{" "}
-                                                                      {
-                                                                        activity.step
-                                                                      }
-                                                                    </span>
-                                                                    <Badge
-                                                                      variant="outline"
-                                                                      className={cn(
-                                                                        "h-6 border-transparent px-2 text-base font-semibold",
-                                                                        config.color,
-                                                                        config.bgColor,
-                                                                      )}
-                                                                    >
-                                                                      {
-                                                                        config.label
-                                                                      }
-                                                                    </Badge>
-                                                                    <Badge
-                                                                      variant="outline"
-                                                                      className={cn(
-                                                                        "flex h-6 items-center gap-1 border px-2 text-base font-bold",
-                                                                        stepStatus.className,
-                                                                      )}
-                                                                    >
-                                                                      {
-                                                                        stepStatus.icon
-                                                                      }
-                                                                      {
-                                                                        stepStatus.label
-                                                                      }
-                                                                    </Badge>
-                                                                  </div>
-                                                                  <p className="line-clamp-4 text-base font-medium leading-relaxed text-foreground/80">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                  <span className="text-base font-bold text-foreground">
+                                                                    Bước{" "}
                                                                     {
-                                                                      displayDescription
+                                                                      activity.step
                                                                     }
-                                                                  </p>
-                                                                </div>
-                                                                {typeof activity.estimatedTime ===
-                                                                "number" ? (
-                                                                  <div
+                                                                  </span>
+                                                                  <Badge
+                                                                    variant="outline"
                                                                     className={cn(
-                                                                      "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
-                                                                      useCompactMissionCards &&
-                                                                        "self-start",
+                                                                      "h-6 border-transparent px-2 text-base font-semibold",
+                                                                      config.color,
+                                                                      config.bgColor,
                                                                     )}
                                                                   >
-                                                                    <p className="text-sm font-semibold leading-tight text-muted-foreground">
-                                                                      Thời gian dự
-                                                                      kiến đến
-                                                                    </p>
-                                                                    <p className="text-base font-bold text-foreground">
-                                                                      {
-                                                                        activity.estimatedTime
-                                                                      }{" "}
-                                                                      phút
-                                                                    </p>
+                                                                    {
+                                                                      config.label
+                                                                    }
+                                                                  </Badge>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                      "flex h-6 items-center gap-1 border px-2 text-base font-bold",
+                                                                      stepStatus.className,
+                                                                    )}
+                                                                  >
+                                                                    {
+                                                                      stepStatus.icon
+                                                                    }
+                                                                    {
+                                                                      stepStatus.label
+                                                                    }
+                                                                  </Badge>
+                                                                </div>
+                                                                <p className="line-clamp-4 text-base font-medium leading-relaxed text-foreground/80">
+                                                                  {
+                                                                    displayDescription
+                                                                  }
+                                                                </p>
+                                                              </div>
+                                                              {typeof activity.estimatedTime ===
+                                                              "number" ? (
+                                                                <div
+                                                                  className={cn(
+                                                                    "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
+                                                                    useCompactMissionCards &&
+                                                                      "self-start",
+                                                                  )}
+                                                                >
+                                                                  <p className="text-sm font-semibold leading-tight text-muted-foreground">
+                                                                    Thời gian dự
+                                                                    kiến đến
+                                                                  </p>
+                                                                  <p className="text-base font-bold text-foreground">
+                                                                    {
+                                                                      activity.estimatedTime
+                                                                    }{" "}
+                                                                    phút
+                                                                  </p>
                                                                 </div>
                                                               ) : null}
                                                             </div>
@@ -11644,7 +12081,9 @@ const RescuePlanPanel = ({
                                                                                   )
                                                                                 }
                                                                               >
-                                                                                [Xem chi tiết]
+                                                                                [Xem
+                                                                                chi
+                                                                                tiết]
                                                                               </Button>
                                                                             )}
                                                                           </div>
@@ -11956,24 +12395,6 @@ const RescuePlanPanel = ({
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
-                            </div>
-                            <div>
-                              <Label className="text-sm text-muted-foreground uppercase tracking-wider">
-                                Điểm ưu tiên
-                              </Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={10}
-                                step={0.1}
-                                value={editPriorityScore}
-                                onChange={(e) =>
-                                  setEditPriorityScore(
-                                    parseFloat(e.target.value) || 5,
-                                  )
-                                }
-                                className="h-8 text-sm mt-1"
-                              />
                             </div>
                             <div>
                               <Label className="text-sm text-muted-foreground uppercase tracking-wider">
@@ -12477,15 +12898,23 @@ const RescuePlanPanel = ({
                                                   <SelectContent className="z-1200">
                                                     {Object.entries(
                                                       activityTypeConfig,
-                                                    ).map(([key, cfg]) => (
-                                                      <SelectItem
-                                                        key={key}
-                                                        value={key}
-                                                        className="text-sm"
-                                                      >
-                                                        {cfg.label}
-                                                      </SelectItem>
-                                                    ))}
+                                                    )
+                                                      .filter(
+                                                        ([key]) =>
+                                                          key !==
+                                                            "RETURN_TO_ASSEMBLY_POINT" &&
+                                                          key !==
+                                                            "RETURN_ASSEMBLY",
+                                                      )
+                                                      .map(([key, cfg]) => (
+                                                        <SelectItem
+                                                          key={key}
+                                                          value={key}
+                                                          className="text-sm"
+                                                        >
+                                                          {cfg.label}
+                                                        </SelectItem>
+                                                      ))}
                                                   </SelectContent>
                                                 </Select>
                                               ) : (
@@ -13132,17 +13561,25 @@ const RescuePlanPanel = ({
                                                                     </div>
                                                                     <Input
                                                                       type="number"
-                                                                      min={1}
+                                                                      min={0}
                                                                       value={
-                                                                        Number.isNaN(supply.quantity)
+                                                                        Number.isNaN(
+                                                                          supply.quantity,
+                                                                        )
                                                                           ? ""
                                                                           : supply.quantity
                                                                       }
-                                                                      onChange={(event) =>
+                                                                      onChange={(
+                                                                        event,
+                                                                      ) =>
                                                                         handleUpdateSupplyQuantity(
                                                                           activity._id,
                                                                           sIdx,
-                                                                          parseInt(event.target.value),
+                                                                          parseInt(
+                                                                            event
+                                                                              .target
+                                                                              .value,
+                                                                          ),
                                                                         )
                                                                       }
                                                                       disabled={
@@ -13172,11 +13609,17 @@ const RescuePlanPanel = ({
                                                                           value={getSupplyBufferPercentInputValue(
                                                                             supply.bufferRatio,
                                                                           )}
-                                                                          onChange={(event) =>
+                                                                          onChange={(
+                                                                            event,
+                                                                          ) =>
                                                                             handleUpdateSupplyBufferRatio(
                                                                               activity._id,
                                                                               sIdx,
-                                                                              parseFloat(event.target.value),
+                                                                              parseFloat(
+                                                                                event
+                                                                                  .target
+                                                                                  .value,
+                                                                              ),
                                                                             )
                                                                           }
                                                                           disabled={
@@ -13275,15 +13718,20 @@ const RescuePlanPanel = ({
                                     Tách nhiệm vụ theo cảnh báo an toàn
                                   </h3>
                                   <div className="mt-1">
-                                    <FormattedAINotes 
-                                      text={effectiveSplitSuggestionPreview?.mixedRescueReliefWarning || "AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."} 
-                                      textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                    <FormattedAINotes
+                                      text={
+                                        effectiveSplitSuggestionPreview?.mixedRescueReliefWarning ||
+                                        "AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."
+                                      }
+                                      textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                     />
                                     {effectiveSplitSuggestionPreview?.specialNotes && (
                                       <div className="mt-2 pt-2 border-t border-rose-200/50 dark:border-rose-800/50">
-                                        <FormattedAINotes 
-                                          text={effectiveSplitSuggestionPreview.specialNotes} 
-                                          textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                        <FormattedAINotes
+                                          text={
+                                            effectiveSplitSuggestionPreview.specialNotes
+                                          }
+                                          textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                         />
                                       </div>
                                     )}
@@ -13401,15 +13849,20 @@ const RescuePlanPanel = ({
                                   Tách nhiệm vụ theo cảnh báo an toàn
                                 </h3>
                                 <div className="mt-1">
-                                  <FormattedAINotes 
-                                    text={effectiveSplitSuggestionPreview?.mixedRescueReliefWarning || "Gợi ý AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."} 
-                                    textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                  <FormattedAINotes
+                                    text={
+                                      effectiveSplitSuggestionPreview?.mixedRescueReliefWarning ||
+                                      "Gợi ý AI đang gộp cứu hộ/cấp cứu với cứu trợ vật phẩm. Hãy chọn draft phù hợp để tạo từng nhiệm vụ riêng."
+                                    }
+                                    textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                   />
                                   {effectiveSplitSuggestionPreview?.specialNotes && (
                                     <div className="mt-2 pt-2 border-t border-rose-200/50 dark:border-rose-800/50">
-                                      <FormattedAINotes 
-                                        text={effectiveSplitSuggestionPreview.specialNotes} 
-                                        textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed" 
+                                      <FormattedAINotes
+                                        text={
+                                          effectiveSplitSuggestionPreview.specialNotes
+                                        }
+                                        textClassName="text-sm text-rose-700/85 dark:text-rose-300/85 leading-relaxed"
                                       />
                                     </div>
                                   )}
@@ -13928,7 +14381,10 @@ const RescuePlanPanel = ({
                         activeSuggestion.errorMessage ||
                         activeSuggestion.lowConfidenceWarning ||
                         activeSuggestion.multiDepotRecommended ||
-                        (!isEditMode && trimToNull(activeSuggestion.mixedRescueReliefWarning)) ||
+                        (!isEditMode &&
+                          trimToNull(
+                            activeSuggestion.mixedRescueReliefWarning,
+                          )) ||
                         activeSuggestion.needsAdditionalDepot ||
                         (activeSuggestion.supplyShortages?.length ?? 0) >
                           0) && (
@@ -13939,11 +14395,17 @@ const RescuePlanPanel = ({
                               <Info className="h-3.5 w-3.5" weight="fill" />
                               Cảnh báo hệ thống
                             </h4>
-                            {!isEditMode && trimToNull(
+                            {!isEditMode &&
+                            trimToNull(
                               activeSuggestion.mixedRescueReliefWarning,
                             ) ? (
                               <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 rounded-lg p-2.5">
-                                <FormattedAINotes text={activeSuggestion.mixedRescueReliefWarning} textClassName="text-sm text-rose-800 dark:text-rose-300 leading-relaxed" />
+                                <FormattedAINotes
+                                  text={
+                                    activeSuggestion.mixedRescueReliefWarning
+                                  }
+                                  textClassName="text-sm text-rose-800 dark:text-rose-300 leading-relaxed"
+                                />
                               </div>
                             ) : null}
                             {activeSuggestion.errorMessage ? (
@@ -14022,7 +14484,10 @@ const RescuePlanPanel = ({
                               Lưu ý đặc biệt
                             </h4>
                             <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2.5">
-                              <FormattedAINotes text={activeSuggestion.specialNotes} textClassName="text-sm text-foreground/75 leading-relaxed" />
+                              <FormattedAINotes
+                                text={activeSuggestion.specialNotes}
+                                textClassName="text-sm text-foreground/75 leading-relaxed"
+                              />
                             </div>
                           </section>
                         </>
@@ -14302,46 +14767,16 @@ const RescuePlanPanel = ({
                           </>
                         )}
 
-                  {/* Depot Inventory — shown whenever depots are present */}
-                  {visibleSidebarDepots.length > 0 && (
-                    <>
-                      <Separator />
-                      <section>
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
-                          <Storefront
-                            className="h-3.5 w-3.5 text-amber-500"
-                            weight="fill"
-                          />
-                          Kho vật phẩm
-                        </h4>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {isEditMode
-                            ? "Kéo vật phẩm vào bước thực hiện bên trái"
-                            : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
-                        </p>
-                        <div className="space-y-2">
-                          {visibleSidebarDepots.map((depot) => (
-                            <DepotInventoryCard
-                              key={depot.depotId}
-                              depotId={depot.depotId}
-                              depotName={depot.depotName}
-                              depotAddress={depot.depotAddress}
-                              isDraggable={isEditMode}
-                              kind={depot.kind}
-                            />
-                          ))}
-                        </div>
-                      </section>
                     </>
                   )}
-                </>
-              )}
+                  {editSuggestionSidebarSection}
+                  {/* Depot Inventory — shown whenever depots are present */}
+                  {depotInventorySidebarSection}
+                </div>
+              </ScrollArea>
             </div>
-          </ScrollArea>
+          )}
         </div>
-      )}
-        </div>
-
 
         {/* Footer */}
         <div className="p-4 border-t shrink-0 bg-background">

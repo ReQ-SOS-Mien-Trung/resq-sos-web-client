@@ -28,11 +28,13 @@ export const SOS_PRIORITY_LEVELS_QUERY_KEY = [
 
 export interface UseSOSRequestsOptions {
   params?: GetSOSRequestsParams;
+  refetchInterval?: number | false;
 }
 
 export interface UseSOSRequestsInBoundsOptions {
   params?: GetSOSRequestsInBoundsParams;
   enabled?: boolean;
+  refetchInterval?: number | false;
 }
 
 export interface UseSOSRequestByIdOptions {
@@ -89,6 +91,7 @@ export function useSOSRequests(options?: UseSOSRequestsOptions) {
       normalizedSosTypes.join(","),
     ],
     queryFn: () => getSOSRequests(params),
+    refetchInterval: options?.refetchInterval,
   });
 }
 
@@ -146,6 +149,7 @@ export function useSOSRequestsInBounds(
       Number.isFinite(params?.MaxLng),
     placeholderData: (previousData) => previousData,
     staleTime: 60_000,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

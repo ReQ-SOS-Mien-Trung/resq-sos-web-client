@@ -32,6 +32,11 @@ import {
   PRIORITY_BORDER_COLOR,
   PRIORITY_LABELS,
 } from "@/lib/priority";
+import {
+  getSOSClusterMaxSizeBySeverity,
+  getSOSClusterRemainingCapacity,
+  getSOSClusterRequestCount,
+} from "@/lib/sos-cluster-capacity";
 import type {
   ClusterLifecycleStatus,
   ClusterPriorityLevel,
@@ -72,6 +77,8 @@ import {
   X,
   Brain,
   ShieldCheck,
+  ShoppingCart,
+  Trash,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
@@ -225,14 +232,25 @@ function toPositiveSOSRequestId(id: string | number): number | null {
 
 type SOSStatusBucket = "pending" | "active" | "resolved" | "cancelled";
 type SOSStatusBadgeVariant = "warning" | "info" | "success" | "outline";
+type SOSDisplayStatus = SOSRequest["status"] | SOSRequestStatus | null | undefined;
 
-function normalizeSOSStatus(status: SOSRequest["status"]): string {
+type IncidentGeneratedSOSContext = {
+  teamName?: string | null;
+  incidentType?: string | null;
+  incidentDescription?: string | null;
+};
+
+function normalizeSOSStatus(status: SOSDisplayStatus): string {
   return String(status || "")
     .trim()
     .toUpperCase();
 }
 
-function getSOSStatusBucket(status: SOSRequest["status"]): SOSStatusBucket {
+function getSOSEffectiveStatus(sos: SOSRequest): SOSDisplayStatus {
+  return sos.rawStatus ?? sos.status;
+}
+
+function getSOSStatusBucket(status: SOSDisplayStatus): SOSStatusBucket {
   const normalized = normalizeSOSStatus(status);
 
   if (normalized === "PENDING") {
@@ -257,7 +275,7 @@ function getSOSStatusBucket(status: SOSRequest["status"]): SOSStatusBucket {
 
 function canDetachSOSFromCluster(
   clusterStatus: ClusterLifecycleStatus,
-  sosStatus: SOSRequest["status"],
+  sosStatus: SOSDisplayStatus,
 ): boolean {
   if (clusterStatus !== "Pending" && clusterStatus !== "Suggested") {
     return false;
@@ -267,7 +285,7 @@ function canDetachSOSFromCluster(
   return normalized === "PENDING" || normalized === "SUGGESTED";
 }
 
-function getSOSStatusSortWeight(status: SOSRequest["status"]): number {
+function getSOSStatusSortWeight(status: SOSDisplayStatus): number {
   const bucket = getSOSStatusBucket(status);
   if (bucket === "pending") return 0;
   if (bucket === "active") return 1;
@@ -275,7 +293,7 @@ function getSOSStatusSortWeight(status: SOSRequest["status"]): number {
   return 3;
 }
 
-function getSOSStatusLabel(status: SOSRequest["status"]): string {
+function getSOSStatusLabel(status: SOSDisplayStatus): string {
   const normalized = normalizeSOSStatus(status);
 
   if (normalized === "PENDING") {
@@ -306,7 +324,7 @@ function getSOSStatusLabel(status: SOSRequest["status"]): string {
 }
 
 function getSOSStatusBadgeVariant(
-  status: SOSRequest["status"],
+  status: SOSDisplayStatus,
 ): SOSStatusBadgeVariant {
   const bucket = getSOSStatusBucket(status);
 
@@ -326,7 +344,112 @@ function getSOSStatusBadgeVariant(
 }
 
 function canCreateClusterFromSOS(sos: SOSRequest): boolean {
-  return getSOSStatusBucket(sos.status) === "pending" && !sos.clusterId;
+  return (
+    getSOSStatusBucket(getSOSEffectiveStatus(sos)) === "pending" &&
+    !sos.clusterId
+  );
+}
+
+function getIncidentGeneratedSOSContext(
+  sos: SOSRequest,
+): IncidentGeneratedSOSContext | null {
+  const structuredData = sos.structuredData;
+  const operationSupport = structuredData?.operation_support;
+  const teamIncidentContext = structuredData?.team_incident_context;
+  const normalizedOrigin = String(operationSupport?.origin ?? "")
+    .trim()
+    .toLowerCase();
+  const hasIncidentStatus =
+    normalizeSOSStatus(getSOSEffectiveStatus(sos)) === "INCIDENT";
+  const isFromRescuerIncident =
+    normalizedOrigin === "rescuer_incident" ||
+    !!teamIncidentContext ||
+    hasIncidentStatus ||
+    !!sos.latestIncidentNote;
+
+  if (!isFromRescuerIncident) {
+    return null;
+  }
+
+  return {
+    teamName: teamIncidentContext?.team_name ?? null,
+    incidentType: teamIncidentContext?.incident_type ?? null,
+    incidentDescription:
+      teamIncidentContext?.original_incident_description ??
+      sos.latestIncidentNote ??
+      null,
+  };
+}
+
+function isIncidentGeneratedSOS(sos: SOSRequest): boolean {
+  return getIncidentGeneratedSOSContext(sos) != null;
+}
+
+function compareIncomingSOSByNewest(
+  left: SOSRequest,
+  right: SOSRequest,
+): number {
+  const createdAtDelta = right.createdAt.getTime() - left.createdAt.getTime();
+  if (createdAtDelta !== 0) {
+    return createdAtDelta;
+  }
+
+  const leftId = Number(left.id);
+  const rightId = Number(right.id);
+  if (Number.isFinite(leftId) && Number.isFinite(rightId)) {
+    return rightId - leftId;
+  }
+
+  return String(right.id).localeCompare(String(left.id));
+}
+
+function getNewSOSRequestIdsForCluster(
+  cluster: SOSClusterEntity,
+  sosIds: Array<string | number>,
+): number[] {
+  const existingIds = new Set(cluster.sosRequestIds.map(normalizeSOSRequestId));
+  const nextIds: number[] = [];
+  const seenNextIds = new Set<string>();
+
+  for (const sosId of sosIds) {
+    const numericId = toPositiveSOSRequestId(sosId);
+    if (numericId == null) {
+      continue;
+    }
+
+    const normalizedId = normalizeSOSRequestId(numericId);
+    if (existingIds.has(normalizedId) || seenNextIds.has(normalizedId)) {
+      continue;
+    }
+
+    seenNextIds.add(normalizedId);
+    nextIds.push(numericId);
+  }
+
+  return nextIds;
+}
+
+function getClusterCapacityLimitMessage(
+  cluster: SOSClusterEntity,
+  requestCountToAdd: number,
+): string | null {
+  if (requestCountToAdd <= 0) {
+    return null;
+  }
+
+  const maxSize = getSOSClusterMaxSizeBySeverity(cluster.severityLevel);
+  const currentCount = getSOSClusterRequestCount(cluster);
+
+  if (currentCount + requestCountToAdd <= maxSize) {
+    return null;
+  }
+
+  const addingText =
+    requestCountToAdd > 1 ? ` Bạn đang thêm ${requestCountToAdd} SOS.` : "";
+
+  return `Cụm #${cluster.id} mức ${
+    CLUSTER_SEVERITY_LABELS[cluster.severityLevel]
+  } chỉ được tối đa ${maxSize} SOS. Hiện đã có ${currentCount}/${maxSize} SOS.${addingText}`;
 }
 
 const STANDALONE_REQUESTS_PAGE_SIZE = 8;
@@ -540,6 +663,10 @@ const SOSSidebar = ({
   const [clusterSosTypeFilterOpen, setClusterSosTypeFilterOpen] =
     useState(false);
 
+  // Cart state
+  const [cartItems, setCartItems] = useState<SOSRequest[]>([]);
+  const [cartExpanded, setCartExpanded] = useState(false);
+
   const {
     mutate: removeSOSRequestFromCluster,
     isPending: isRemovingSOSRequestFromCluster,
@@ -547,7 +674,7 @@ const SOSSidebar = ({
 
   const {
     mutate: addSOSRequestToCluster,
-    isPending: isAddingSOSRequestToCluster,
+    mutateAsync: addSOSRequestToClusterAsync,
   } = useAddSOSRequestToCluster();
 
   // Dnd state
@@ -564,6 +691,10 @@ const SOSSidebar = ({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
+    if (event.active.id === "cart-bundle") {
+      setActiveDragSOS(null);
+      return;
+    }
     const sosIdStr = String(event.active.id).replace("sos-", "");
     const sos =
       sosRequests.find((s) => String(s.id) === sosIdStr) ||
@@ -589,11 +720,122 @@ const SOSSidebar = ({
     const activeId = String(active.id);
     const overId = String(over.id);
 
+    // Drop SOS to Cart
+    if (activeId.startsWith("sos-") && overId === "cart") {
+      const sosIdStr = activeId.replace("sos-", "");
+      const sosToAdd =
+        sosRequests.find((s) => String(s.id) === sosIdStr) ||
+        incomingRequests?.find((s) => String(s.id) === sosIdStr);
+
+      if (sosToAdd && !cartItems.some((item) => item.id === sosToAdd.id)) {
+        setCartItems((prev) => [...prev, sosToAdd]);
+        toast.success(`Đã thêm SOS ${sosToAdd.id} vào giỏ hàng.`);
+      } else if (sosToAdd) {
+        toast.error(`SOS ${sosToAdd.id} đã có trong giỏ hàng.`);
+      }
+      return;
+    }
+
+    // Drop Cart to Cluster
+    if (activeId === "cart-bundle" && overId.startsWith("cluster-")) {
+      const clusterId = Number(overId.replace("cluster-", ""));
+      if (Number.isFinite(clusterId) && cartItems.length > 0) {
+        const targetCluster = backendClusters.find(
+          (cluster) => cluster.id === clusterId,
+        );
+        if (!targetCluster) {
+          toast.error("Không tìm thấy cụm SOS để thêm vào.");
+          return;
+        }
+
+        const sosRequestIds = getNewSOSRequestIdsForCluster(
+          targetCluster,
+          cartItems.map((item) => item.id),
+        );
+
+        if (sosRequestIds.length === 0) {
+          toast.error("Các SOS này đã thuộc cụm hoặc không hợp lệ.");
+          return;
+        }
+
+        const capacityError = getClusterCapacityLimitMessage(
+          targetCluster,
+          sosRequestIds.length,
+        );
+        if (capacityError) {
+          toast.error(capacityError);
+          return;
+        }
+
+        Promise.allSettled(
+          sosRequestIds.map((sosRequestId) =>
+            addSOSRequestToClusterAsync({ clusterId, sosRequestId }),
+          ),
+        ).then((results) => {
+          const succeededIds = new Set<number>();
+          results.forEach((result, index) => {
+            if (result.status === "fulfilled") {
+              succeededIds.add(sosRequestIds[index]);
+            }
+          });
+
+          const successCount = succeededIds.size;
+          const failCount = results.length - successCount;
+
+          if (successCount > 0) {
+            toast.success(`Đã thêm ${successCount} SOS vào cụm #${clusterId}.`);
+            setCartItems((prev) =>
+              prev.filter((item) => {
+                const numericId = toPositiveSOSRequestId(item.id);
+                return numericId == null || !succeededIds.has(numericId);
+              }),
+            );
+            setExpandedClusters((prev) => {
+              const next = new Set(prev);
+              next.add(clusterId);
+              return next;
+            });
+            setActiveTab("clusters");
+            setManualTabSelectionKey(selectedSOSId);
+          }
+          if (failCount > 0) {
+            toast.error(`Có ${failCount} SOS không thể thêm vào cụm.`);
+          }
+        });
+      }
+      return;
+    }
+
     if (activeId.startsWith("sos-") && overId.startsWith("cluster-")) {
-      const sosId = Number(activeId.replace("sos-", ""));
+      const sosId = toPositiveSOSRequestId(activeId.replace("sos-", ""));
       const clusterId = Number(overId.replace("cluster-", ""));
 
-      if (Number.isFinite(sosId) && Number.isFinite(clusterId)) {
+      if (sosId != null && Number.isFinite(clusterId)) {
+        const targetCluster = backendClusters.find(
+          (cluster) => cluster.id === clusterId,
+        );
+        if (!targetCluster) {
+          toast.error("Không tìm thấy cụm SOS để thêm vào.");
+          return;
+        }
+
+        const sosRequestIds = getNewSOSRequestIdsForCluster(targetCluster, [
+          sosId,
+        ]);
+        if (sosRequestIds.length === 0) {
+          toast.error(`SOS ${sosId} đã thuộc cụm #${clusterId}.`);
+          return;
+        }
+
+        const capacityError = getClusterCapacityLimitMessage(
+          targetCluster,
+          sosRequestIds.length,
+        );
+        if (capacityError) {
+          toast.error(capacityError);
+          return;
+        }
+
         addSOSRequestToCluster(
           { clusterId, sosRequestId: sosId },
           {
@@ -775,28 +1017,39 @@ const SOSSidebar = ({
   };
 
   const pendingRequests = sosRequests.filter(
-    (s) => getSOSStatusBucket(s.status) === "pending",
+    (s) => getSOSStatusBucket(getSOSEffectiveStatus(s)) === "pending",
   );
   const assignedRequests = sosRequests.filter(
-    (s) => getSOSStatusBucket(s.status) === "active",
+    (s) => getSOSStatusBucket(getSOSEffectiveStatus(s)) === "active",
   );
   const availableRescuers = rescuers.filter((r) => r.status === "AVAILABLE");
 
   // IDs that belong to any auto-cluster (to identify standalone requests)
-  const clusteredIds = new Set(autoClusters.flat().map((s) => s.id));
+  const clusteredIds = useMemo(
+    () => new Set(autoClusters.flat().map((s) => s.id)),
+    [autoClusters],
+  );
   // Also exclude SOS that are already in a backend cluster
-  const backendClusteredIds = new Set(
-    backendClusters.flatMap((c) => c.sosRequestIds.map(String)),
+  const backendClusteredIds = useMemo(
+    () =>
+      new Set(
+        backendClusters.flatMap((c) =>
+          c.sosRequestIds.map(normalizeSOSRequestId),
+        ),
+      ),
+    [backendClusters],
   );
   const standaloneRequests = pendingRequests.filter(
-    (s) => !clusteredIds.has(s.id) && !backendClusteredIds.has(s.id),
+    (s) =>
+      !clusteredIds.has(s.id) &&
+      !backendClusteredIds.has(normalizeSOSRequestId(s.id)),
   );
 
   const sosStatusById = useMemo(() => {
     return new Map(
       sosRequests.map((sos) => [
         normalizeSOSRequestId(sos.id),
-        getSOSStatusBucket(sos.status),
+        getSOSStatusBucket(getSOSEffectiveStatus(sos)),
       ]),
     );
   }, [sosRequests]);
@@ -1005,11 +1258,38 @@ const SOSSidebar = ({
       startIndex + STANDALONE_REQUESTS_PAGE_SIZE,
     );
   }, [currentStandalonePage, standaloneRequests]);
+  const serverIncomingRequests = useMemo(() => {
+    const byId = new Map<string, SOSRequest>();
+
+    for (const sos of incomingRequests ?? []) {
+      byId.set(normalizeSOSRequestId(sos.id), sos);
+    }
+
+    for (const sos of sosRequests) {
+      const normalizedId = normalizeSOSRequestId(sos.id);
+      if (byId.has(normalizedId)) {
+        continue;
+      }
+
+      const statusBucket = getSOSStatusBucket(getSOSEffectiveStatus(sos));
+      const isUnclustered =
+        !sos.clusterId && !backendClusteredIds.has(normalizedId);
+      const shouldLiftFromMap =
+        isUnclustered &&
+        (statusBucket === "pending" || isIncidentGeneratedSOS(sos));
+
+      if (shouldLiftFromMap) {
+        byId.set(normalizedId, sos);
+      }
+    }
+
+    return Array.from(byId.values()).sort(compareIncomingSOSByNewest);
+  }, [backendClusteredIds, incomingRequests, sosRequests]);
   const visibleIncomingRequests = hasIncomingServerPagination
-    ? (incomingRequests ?? [])
+    ? serverIncomingRequests
     : paginatedStandaloneRequests;
   const incomingTotalCount = hasIncomingServerPagination
-    ? (incomingPagination?.totalCount ?? 0)
+    ? Math.max(incomingPagination?.totalCount ?? 0, serverIncomingRequests.length)
     : standaloneRequests.length;
   const incomingCurrentPage = hasIncomingServerPagination
     ? (incomingPagination?.page ?? 1)
@@ -1421,15 +1701,21 @@ const SOSSidebar = ({
                         setManualStandalonePageSelectionKey(selectedSOSId);
                       }}
                     />
-                    {visibleIncomingRequests.map((sos) => (
-                      <DraggableSOSCard
-                        key={sos.id}
-                        sos={sos}
-                        className={cn(
-                          "rounded-xl border overflow-hidden",
-                          PRIORITY_BORDER_COLOR[sos.priority],
-                        )}
-                      >
+                    {visibleIncomingRequests.map((sos) => {
+                      const isInCart = cartItems.some((item) => item.id === sos.id);
+                      const effectiveStatus = getSOSEffectiveStatus(sos);
+                      const incidentContext =
+                        getIncidentGeneratedSOSContext(sos);
+                      return (
+                        <DraggableSOSCard
+                          key={sos.id}
+                          sos={sos}
+                          className={cn(
+                            "rounded-xl border overflow-hidden transition-all",
+                            PRIORITY_BORDER_COLOR[sos.priority],
+                            isInCart && "opacity-50 ring-2 ring-primary bg-primary/5"
+                          )}
+                        >
                         <div
                           className={cn(
                             "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
@@ -1451,11 +1737,26 @@ const SOSSidebar = ({
                                   {PRIORITY_LABELS[sos.priority]}
                                 </Badge>
                                 <Badge
-                                  variant={getSOSStatusBadgeVariant(sos.status)}
+                                  variant={getSOSStatusBadgeVariant(
+                                    effectiveStatus,
+                                  )}
                                   className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
                                 >
-                                  {getSOSStatusLabel(sos.status)}
+                                  {getSOSStatusLabel(effectiveStatus)}
                                 </Badge>
+                                {incidentContext ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0 border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300"
+                                    title={
+                                      incidentContext.teamName
+                                        ? `Báo sự cố từ ${incidentContext.teamName}`
+                                        : "SOS sinh từ báo cáo sự cố đội cứu hộ"
+                                    }
+                                  >
+                                    Sự cố đội
+                                  </Badge>
+                                ) : null}
                                 {sos.clusterId ? (
                                   <Badge
                                     variant="outline"
@@ -1570,7 +1871,7 @@ const SOSSidebar = ({
                               {sos.clusterId
                                 ? `SOS này đã thuộc cụm #${sos.clusterId}.`
                                 : `SOS đang ở trạng thái ${getSOSStatusLabel(
-                                    sos.status,
+                                    effectiveStatus,
                                   ).toLowerCase()}.`}
                             </div>
                           )}
@@ -1590,7 +1891,7 @@ const SOSSidebar = ({
                           )}
                         </div>
                       </DraggableSOSCard>
-                    ))}
+                    )})}
                   </>
                 )}
 
@@ -1977,9 +2278,19 @@ const SOSSidebar = ({
                           const isAnalyzing =
                             isAnalyzingCluster &&
                             analyzingClusterId === cluster.id;
-                          const sosCount =
-                            cluster.sosRequestCount ||
-                            cluster.sosRequestIds.length;
+                          const clusterRequestCount =
+                            getSOSClusterRequestCount(cluster);
+                          const clusterMaxSize =
+                            getSOSClusterMaxSizeBySeverity(
+                              cluster.severityLevel,
+                            );
+                          const clusterRemainingCapacity =
+                            getSOSClusterRemainingCapacity(cluster);
+                          const isClusterOverCapacity =
+                            clusterRequestCount > clusterMaxSize;
+                          const isClusterAtCapacity =
+                            clusterRemainingCapacity === 0;
+                          const sosCount = clusterRequestCount;
                           const isExpanded =
                             expandedClusters.has(cluster.id) ||
                             (selectedClusterId === cluster.id &&
@@ -1993,30 +2304,44 @@ const SOSSidebar = ({
                             .filter((s): s is SOSRequest => !!s);
                           const unresolvedClusterSOS = clusterSOS.filter(
                             (s) => {
-                              const bucket = getSOSStatusBucket(s.status);
+                              const bucket = getSOSStatusBucket(
+                                getSOSEffectiveStatus(s),
+                              );
                               return (
                                 bucket === "pending" || bucket === "active"
                               );
                             },
                           );
                           const pendingClusterSOS = unresolvedClusterSOS.filter(
-                            (s) => getSOSStatusBucket(s.status) === "pending",
+                            (s) =>
+                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
+                              "pending",
                           );
                           const activeClusterSOS = unresolvedClusterSOS.filter(
-                            (s) => getSOSStatusBucket(s.status) === "active",
+                            (s) =>
+                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
+                              "active",
                           );
                           const rescuedClusterSOS = clusterSOS.filter(
-                            (s) => getSOSStatusBucket(s.status) === "resolved",
+                            (s) =>
+                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
+                              "resolved",
                           );
                           const cancelledClusterSOS = clusterSOS.filter(
-                            (s) => getSOSStatusBucket(s.status) === "cancelled",
+                            (s) =>
+                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
+                              "cancelled",
                           );
                           const displayClusterSOS = [
                             ...unresolvedClusterSOS,
                           ].sort((left, right) => {
                             const statusDelta =
-                              getSOSStatusSortWeight(left.status) -
-                              getSOSStatusSortWeight(right.status);
+                              getSOSStatusSortWeight(
+                                getSOSEffectiveStatus(left),
+                              ) -
+                              getSOSStatusSortWeight(
+                                getSOSEffectiveStatus(right),
+                              );
 
                             if (statusDelta !== 0) {
                               return statusDelta;
@@ -2101,6 +2426,19 @@ const SOSSidebar = ({
                                     >
                                       {CLUSTER_STATUS_LABELS[clusterStatus]}
                                     </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0",
+                                        isClusterOverCapacity
+                                          ? "border-red-300 bg-red-100 text-red-700 dark:border-red-800/60 dark:bg-red-900/30 dark:text-red-300"
+                                          : isClusterAtCapacity
+                                            ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                            : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-300",
+                                      )}
+                                    >
+                                      {clusterRequestCount}/{clusterMaxSize} SOS
+                                    </Badge>
                                   </div>
                                   <div className="flex items-center gap-1.5 self-end sm:self-auto">
                                     <span className="text-[14px] text-muted-foreground whitespace-nowrap">
@@ -2148,10 +2486,14 @@ const SOSSidebar = ({
                                   <div className="border-t border-inherit divide-y divide-inherit">
                                     {displayClusterSOS.length > 0 ? (
                                       displayClusterSOS.map((sos) => {
+                                        const effectiveStatus =
+                                          getSOSEffectiveStatus(sos);
+                                        const incidentContext =
+                                          getIncidentGeneratedSOSContext(sos);
                                         const canDetachThisSOS =
                                           canDetachSOSFromCluster(
                                             clusterStatus,
-                                            sos.status,
+                                            effectiveStatus,
                                           );
                                         const isRemovingThisSOS =
                                           canDetachThisSOS &&
@@ -2233,14 +2575,27 @@ const SOSSidebar = ({
                                                   </Badge>
                                                   <Badge
                                                     variant={getSOSStatusBadgeVariant(
-                                                      sos.status,
+                                                      effectiveStatus,
                                                     )}
                                                     className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
                                                   >
                                                     {getSOSStatusLabel(
-                                                      sos.status,
+                                                      effectiveStatus,
                                                     )}
                                                   </Badge>
+                                                  {incidentContext ? (
+                                                    <Badge
+                                                      variant="outline"
+                                                      className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0 border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300"
+                                                      title={
+                                                        incidentContext.teamName
+                                                          ? `Báo sự cố từ ${incidentContext.teamName}`
+                                                          : "SOS sinh từ báo cáo sự cố đội cứu hộ"
+                                                      }
+                                                    >
+                                                      Sự cố đội
+                                                    </Badge>
+                                                  ) : null}
                                                 </div>
                                               </div>
                                               <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
@@ -2498,6 +2853,15 @@ const SOSSidebar = ({
           </TabsContent>
         </Tabs>
 
+        {/* SOS Cart Area */}
+        <DroppableCartArea 
+          cartItems={cartItems} 
+          setCartItems={setCartItems}
+          cartExpanded={cartExpanded}
+          setCartExpanded={setCartExpanded}
+          onSOSSelect={onSOSSelect}
+        />
+
         <Dialog open={removeDialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -2534,7 +2898,11 @@ const SOSSidebar = ({
           </DialogContent>
         </Dialog>
         <DragOverlay dropAnimation={null}>
-          <DragOverlaySOSCard sos={activeDragSOS} />
+          {activeDragId === "cart-bundle" ? (
+            <DragOverlayCartBundle cartItems={cartItems} />
+          ) : (
+            <DragOverlaySOSCard sos={activeDragSOS} />
+          )}
         </DragOverlay>
       </DndContext>
     </div>
@@ -2747,6 +3115,148 @@ function DragOverlaySOSCard({ sos }: { sos: SOSRequest | null }) {
       <p className="text-[14px] text-muted-foreground line-clamp-1">
         {sos.message}
       </p>
+    </div>
+  );
+}
+
+function DragOverlayCartBundle({ cartItems }: { cartItems: SOSRequest[] }) {
+  return (
+    <div className="w-[280px] rounded-xl border border-primary/50 shadow-xl bg-primary/10 backdrop-blur-md p-3 pointer-events-none cursor-grabbing flex items-center gap-3">
+      <div className="bg-primary/20 p-2 rounded-full text-primary">
+        <ShoppingCart className="h-5 w-5" weight="fill" />
+      </div>
+      <div>
+        <div className="text-[15px] font-semibold text-foreground">Giỏ hàng SOS</div>
+        <div className="text-[13px] text-muted-foreground">{cartItems.length} yêu cầu đang kéo</div>
+      </div>
+    </div>
+  );
+}
+
+function DroppableCartArea({
+  cartItems,
+  setCartItems,
+  cartExpanded,
+  setCartExpanded,
+  onSOSSelect,
+}: {
+  cartItems: SOSRequest[];
+  setCartItems: React.Dispatch<React.SetStateAction<SOSRequest[]>>;
+  cartExpanded: boolean;
+  setCartExpanded: (expanded: boolean) => void;
+  onSOSSelect: (sos: SOSRequest) => void;
+}) {
+  const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
+    id: "cart",
+  });
+  
+  const { attributes, listeners, setNodeRef: setDraggableNodeRef, isDragging } = useDraggable({
+    id: "cart-bundle",
+    data: { type: "cart-bundle" },
+    disabled: cartItems.length === 0,
+  });
+
+  return (
+    <div 
+      ref={setDroppableNodeRef}
+      className={cn(
+        "border-t bg-background transition-all duration-300",
+        isOver && "bg-primary/5 border-primary ring-2 ring-primary ring-inset"
+      )}
+    >
+      {/* Cart Header (Draggable when has items) */}
+      <div 
+        className={cn(
+          "px-4 py-3 flex items-center justify-between",
+          cartItems.length > 0 ? "cursor-grab active:cursor-grabbing hover:bg-muted/50" : "opacity-70",
+          isDragging && "opacity-40"
+        )}
+        ref={cartItems.length > 0 ? setDraggableNodeRef : undefined}
+        {...(cartItems.length > 0 ? attributes : {})}
+        {...(cartItems.length > 0 ? listeners : {})}
+      >
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "p-2 rounded-full",
+            cartItems.length > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+          )}>
+            <ShoppingCart className="h-5 w-5" weight={cartItems.length > 0 ? "fill" : "regular"} />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-semibold text-[15px]">Giỏ hàng SOS</span>
+            <span className="text-[13px] text-muted-foreground">
+              {cartItems.length > 0 
+                ? `${cartItems.length} yêu cầu (kéo thả vào Cụm)` 
+                : "Kéo thả SOS vào đây"}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {cartItems.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCartItems([]);
+              }}
+              title="Xóa tất cả"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCartExpanded(!cartExpanded);
+            }}
+            disabled={cartItems.length === 0}
+          >
+            {cartExpanded ? <CaretDown className="h-4 w-4" /> : <CaretUp className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Expanded Cart Items */}
+      {cartExpanded && cartItems.length > 0 && (
+        <div className="max-h-[30vh] overflow-y-auto px-4 pb-3 space-y-2 border-t pt-3 bg-muted/20">
+          {cartItems.map((sos) => (
+            <div 
+              key={sos.id}
+              className="flex items-center justify-between p-2 rounded-lg border bg-background hover:border-primary/50 cursor-pointer"
+              onClick={() => onSOSSelect(sos)}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                  SOS {sos.id}
+                </span>
+                <Badge
+                  variant={PRIORITY_BADGE_VARIANT[sos.priority]}
+                  className="text-[12px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                >
+                  {PRIORITY_LABELS[sos.priority]}
+                </Badge>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-red-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCartItems(prev => prev.filter(item => item.id !== sos.id));
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

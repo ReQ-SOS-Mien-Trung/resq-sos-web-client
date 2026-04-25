@@ -27,6 +27,8 @@ import {
   useDeleteAssemblyPointCheckInRadius,
 } from "@/services/assembly_points";
 import type { AssemblyPointEntity } from "@/services/assembly_points";
+import { MapContainer, useMap } from "react-leaflet";
+import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 
 // ── Fly-to helper ──────────────────────────────────────────────────────────
 function statusColor(status: AssemblyPointEntity["status"]) {
@@ -312,7 +314,8 @@ function PointDetailPanel({
 }
 
 // ── The actual map inner component (imperative Leaflet, no react-leaflet) ─
-function CheckInRadiusMapInner({
+// ── The actual map logic component (uses react-leaflet context) ──────────
+function CheckInRadiusMapLogic({
   assemblyPoints,
   customRadiusMap,
   selectedId,
@@ -333,72 +336,24 @@ function CheckInRadiusMapInner({
   onSelect: (id: number) => void;
   flyTo: { lat: number; lng: number } | null;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
+  const map = useMap();
   const markersRef = useRef<Map<number, L.Marker>>(new Map());
   const circlesRef = useRef<Map<number, L.Circle>>(new Map());
   const radiusHandleRef = useRef<L.Marker | null>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const lastViewportKeyRef = useRef<string>("");
+
   // Keep callback in a ref so the handle effect never re-runs just because the fn changed
   const onEditingRadiusChangeRef = useRef(onEditingRadiusChange);
   useEffect(() => {
     onEditingRadiusChangeRef.current = onEditingRadiusChange;
   }, [onEditingRadiusChange]);
+
   const isDraggingRadiusHandleRef = useRef(false);
   const pendingRadiusRafRef = useRef<number | null>(null);
   const pendingDraggedRadiusRef = useRef<number | null>(null);
 
-  // Initialise map once
-  useEffect(() => {
-    if (!containerRef.current) return;
-    if (mapRef.current) return; // already initialised
-
-    const map = L.map(containerRef.current, {
-      center: [16.4637, 107.5909],
-      zoom: 13,
-    });
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
-
-    mapRef.current = map;
-
-    requestAnimationFrame(() => {
-      map.invalidateSize();
-    });
-
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserverRef.current = new ResizeObserver(() => {
-        map.invalidateSize();
-      });
-      resizeObserverRef.current.observe(containerRef.current);
-    }
-
-    const markers = markersRef.current;
-    const circles = circlesRef.current;
-    return () => {
-      if (pendingRadiusRafRef.current != null) {
-        cancelAnimationFrame(pendingRadiusRafRef.current);
-        pendingRadiusRafRef.current = null;
-      }
-      pendingDraggedRadiusRef.current = null;
-      radiusHandleRef.current?.remove();
-      radiusHandleRef.current = null;
-      resizeObserverRef.current?.disconnect();
-      resizeObserverRef.current = null;
-      map.remove();
-      mapRef.current = null;
-      markers.clear();
-      circles.clear();
-    };
-  }, []);
-
   // Sync markers & circles whenever data changes
   useEffect(() => {
-    const map = mapRef.current;
     if (!map) return;
 
     const existingIds = new Set(markersRef.current.keys());
@@ -465,6 +420,7 @@ function CheckInRadiusMapInner({
       circlesRef.current.delete(id);
     });
   }, [
+    map,
     assemblyPoints,
     customRadiusMap,
     onSelect,
@@ -473,7 +429,6 @@ function CheckInRadiusMapInner({
   ]);
 
   useEffect(() => {
-    const map = mapRef.current;
     if (!map) return;
 
     const selectedPoint =
@@ -595,20 +550,18 @@ function CheckInRadiusMapInner({
         handleMarker.setLatLng(handleLatLng);
       }
     }
-    // onEditingRadiusChange is accessed via ref — intentionally omitted from deps
-  }, [assemblyPoints, isEditingRadius, selectedId, selectedRadiusMeters]);
+  }, [map, assemblyPoints, isEditingRadius, selectedId, selectedRadiusMeters]);
 
   // Fly to selected point
   useEffect(() => {
     if (
       !flyTo ||
-      !mapRef.current ||
+      !map ||
       isAwaitingSelectedRadius ||
       isEditingRadius
     ) {
       return;
     }
-    const map = mapRef.current;
     const viewportKey = `${flyTo.lat}:${flyTo.lng}:${selectedRadiusMeters ?? "none"}`;
     if (viewportKey === lastViewportKeyRef.current) {
       return;
@@ -633,14 +586,47 @@ function CheckInRadiusMapInner({
       duration: 0.85,
       easeLinearity: 0.2,
     });
-  }, [flyTo, isAwaitingSelectedRadius, isEditingRadius, selectedRadiusMeters]);
+  }, [map, flyTo, isAwaitingSelectedRadius, isEditingRadius, selectedRadiusMeters]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingRadiusRafRef.current != null) {
+        cancelAnimationFrame(pendingRadiusRafRef.current);
+      }
+      radiusHandleRef.current?.remove();
+      markersRef.current.forEach(m => m.remove());
+      circlesRef.current.forEach(c => c.remove());
+    };
+  }, []);
+
+  return null;
+}
+
+function CheckInRadiusMapInner(props: {
+  assemblyPoints: AssemblyPointEntity[];
+  customRadiusMap: Map<number, number>;
+  selectedId: number | null;
+  selectedRadiusMeters: number | null;
+  isAwaitingSelectedRadius: boolean;
+  isEditingRadius: boolean;
+  onEditingRadiusChange: (nextRadiusMeters: number) => void;
+  onSelect: (id: number) => void;
+  flyTo: { lat: number; lng: number } | null;
+}) {
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full min-w-0"
-      style={{ width: "100%", height: "100%" }}
-    />
+    <div className="h-full w-full relative">
+      <MapContainer
+        center={[16.4637, 107.5909]}
+        zoom={13}
+        className="h-full w-full"
+        zoomControl={false}
+        attributionControl={false}
+      >
+        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <CheckInRadiusMapLogic {...props} />
+      </MapContainer>
+    </div>
   );
 }
 

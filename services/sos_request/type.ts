@@ -135,6 +135,23 @@ export interface SOSSupplyDetails {
   clothing_persons?: SOSClothingPerson[] | null;
 }
 
+export interface SOSOperationSupportContext {
+  origin?: string | null;
+  [key: string]: unknown;
+}
+
+export interface SOSTeamIncidentContext {
+  mission_id?: number | null;
+  mission_team_id?: number | null;
+  mission_activity_id?: number | null;
+  incident_scope?: string | null;
+  incident_type?: string | null;
+  decision_code?: string | null;
+  team_name?: string | null;
+  original_incident_description?: string | null;
+  [key: string]: unknown;
+}
+
 // Structured data from SOS request
 export interface SOSStructuredData {
   situation: SOSSituation | string;
@@ -156,6 +173,8 @@ export interface SOSStructuredData {
   additional_description: string | null;
   injured_persons: InjuredPerson[];
   address?: string | null;
+  operation_support?: SOSOperationSupportContext | null;
+  team_incident_context?: SOSTeamIncidentContext | null;
 }
 
 // Network metadata from mesh relay
@@ -213,6 +232,7 @@ export interface SOSRequestEntity {
   reviewedById: string | null;
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
+  latestIncidentNote?: string | null;
   evaluation?: SOSRequestEvaluationSummary | null;
 }
 
@@ -408,6 +428,8 @@ export interface SOSRequestEvaluationSummary {
   status?: SOSRequestStatus;
   currentPriorityLevel?: SOSPriorityLevel;
   ruleEvaluation?: RuleEvaluation | null;
+  // Backend may return either a single object (aiAnalysis) or an array (aiAnalyses).
+  aiAnalysis?: AiAnalysis | null;
   aiAnalyses?: AiAnalysis[] | null;
   hasAiAnalysis?: boolean | null;
 }
@@ -418,6 +440,8 @@ export interface GetSOSRequestAnalysisResponse extends SOSRequestEvaluationSumma
   status: SOSRequestStatus;
   currentPriorityLevel: SOSPriorityLevel;
   ruleEvaluation: RuleEvaluation;
+  // May be returned as a single object by the backend.
+  aiAnalysis?: AiAnalysis | null;
   aiAnalyses: AiAnalysis[];
   hasAiAnalysis: boolean;
 }

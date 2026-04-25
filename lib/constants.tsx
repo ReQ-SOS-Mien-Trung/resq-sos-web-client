@@ -294,16 +294,16 @@ export const AI_PROVIDER_OPTIONS = [
       },
       {
         label: "Gemini 2.5 Flash",
-        code: "gemini-2.5-flash",
+        code: "gemini-2.0-flash",
       },
 
       {
         label: "Gemini 2 Flash",
-        code: "gemini-2-flash",
+        code: "gemini-2.0-flash",
       },
       {
         label: "Gemini 2 Flash Lite",
-        code: "gemini-2-flash-lite",
+        code: "gemini-2.0-flash-lite-preview-02-05",
       },
     ],
   },

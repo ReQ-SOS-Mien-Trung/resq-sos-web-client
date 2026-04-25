@@ -20,6 +20,7 @@ import {
   updateRescuerAssemblyPointAssignment,
   scheduleAssemblyPointGathering,
   startAssemblyPointGathering,
+  cancelAssemblyPointEvent,
   getAssemblyPointCheckInRadius,
   getAllCheckInRadiusConfigs,
   setAssemblyPointCheckInRadius,
@@ -42,6 +43,7 @@ import {
   ScheduleAssemblyPointGatheringResponse,
   ScheduleAssemblyPointGatheringErrorResponse,
   StartAssemblyPointGatheringRequest,
+  CancelAssemblyPointEventRequest,
   GetAssemblyPointEventsParams,
   GetAssemblyPointEventsResponse,
   GetAssemblyPointCheckedInRescuersParams,
@@ -378,6 +380,31 @@ export function useStartAssemblyPointGathering() {
 
   return useMutation<void, Error, StartAssemblyPointGatheringRequest>({
     mutationFn: startAssemblyPointGathering,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+      if (variables.assemblyPointId) {
+        queryClient.invalidateQueries({
+          queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.assemblyPointId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [
+            ...ASSEMBLY_POINT_EVENTS_QUERY_KEY,
+            variables.assemblyPointId,
+          ],
+        });
+      }
+    },
+  });
+}
+
+/**
+ * Hook to cancel gathering for assembly event
+ */
+export function useCancelAssemblyPointEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, CancelAssemblyPointEventRequest>({
+    mutationFn: cancelAssemblyPointEvent,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
       if (variables.assemblyPointId) {

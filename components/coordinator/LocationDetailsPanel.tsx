@@ -7,6 +7,7 @@ import {
   useAssemblyPointById,
   useAssemblyPointEvents,
   useScheduleAssemblyPointGathering,
+  useCancelAssemblyPointEvent,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
@@ -1117,6 +1118,11 @@ function AssemblyPointDetails({
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
+  const {
+    mutateAsync: cancelAssemblyPointEvent,
+    isPending: isCancelingEvent,
+  } = useCancelAssemblyPointEvent();
+
   const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
     assemblyPointDetail ?? assemblyPoint;
 
@@ -1212,6 +1218,31 @@ function AssemblyPointDetails({
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
       toast.error(backendMessage || "Yêu cầu thất bại. Vui lòng thử lại.");
+    }
+  };
+
+  const handleCancelEvent = async () => {
+    if (!selectedEvent) return;
+
+    // Optional confirmation dialog could be added here, using window.confirm for simplicity
+    if (
+      !window.confirm(
+        "Bạn có chắc chắn muốn hủy sự kiện tập trung này không? Hành động này không thể hoàn tác.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await cancelAssemblyPointEvent({
+        eventId: selectedEvent.eventId,
+        assemblyPointId: assemblyPoint.id,
+      });
+      toast.success("Hủy sự kiện tập trung thành công.");
+      // The event list will automatically refresh due to query invalidation
+    } catch (error) {
+      const backendMessage = extractBackendErrorMessage(error);
+      toast.error(backendMessage || "Không thể hủy sự kiện. Vui lòng thử lại.");
     }
   };
 
@@ -1580,6 +1611,19 @@ function AssemblyPointDetails({
                       icon={<ChartBar className="h-3.5 w-3.5" />}
                     />
                   </div>
+
+                  {selectedEvent.status === "Gathering" && (
+                    <div className="pt-1">
+                      <Button
+                        variant="destructive"
+                        className="w-full text-xs h-8 bg-red-500 hover:bg-red-600 shadow-none border-0"
+                        onClick={handleCancelEvent}
+                        disabled={isCancelingEvent}
+                      >
+                        {isCancelingEvent ? "Đang xử lý..." : "Hủy sự kiện tập trung"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>

@@ -116,6 +116,7 @@ export interface SOSRequest {
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
   isSentOnBehalf?: boolean;
+  latestIncidentNote?: string | null;
   reporterIsOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;

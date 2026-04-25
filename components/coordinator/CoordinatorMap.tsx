@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, memo } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { ServiceZoneEntity } from "@/services/map/type";
@@ -46,7 +46,6 @@ import {
 // and the isMounted guard inside this component.
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Polygon,
   Popup,
@@ -54,6 +53,7 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -118,6 +118,42 @@ const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
+const MapInvalidator = () => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+
+    let rafId: number | null = null;
+    let loopEnd = 0;
+
+    const runLoop = () => {
+      map.invalidateSize({ animate: false });
+      if (Date.now() < loopEnd) {
+        rafId = requestAnimationFrame(runLoop);
+      } else {
+        rafId = null;
+      }
+    };
+
+    const startLoop = () => {
+      // Keep invalidating for slightly longer than the sidebar CSS transition (300ms)
+      loopEnd = Date.now() + 400;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(runLoop);
+      }
+    };
+
+    const observer = new ResizeObserver(startLoop);
+    observer.observe(map.getContainer());
+
+    return () => {
+      observer.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [map]);
+  return null;
+};
+
 const CoordinatorMap = ({
   sosRequests,
   rescuers,
@@ -172,6 +208,7 @@ const CoordinatorMap = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentZoom, setCurrentZoom] = useState(13);
   const [layerFilter, setLayerFilter] = useState(DEFAULT_LAYER_FILTER);
+  const [hideGoongPoi, setHideGoongPoi] = useState(true);
   const risingSOSMarkerIdSet = useMemo(
     () => new Set(risingSOSMarkerIds),
     [risingSOSMarkerIds],
@@ -344,7 +381,8 @@ const CoordinatorMap = ({
       teamIncidents.filter(
         (incident) =>
           Number.isFinite(incident.latitude) &&
-          Number.isFinite(incident.longitude),
+          Number.isFinite(incident.longitude) &&
+          incident.hasSupportRequest === true,
       ),
     [teamIncidents],
   );
@@ -900,6 +938,35 @@ const CoordinatorMap = ({
               </Tooltip>
             </div>
 
+            <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <MapTrifold size={14} weight="fill" />
+                  <span className="truncate">Nền Goong</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHideGoongPoi((current) => !current)}
+                  aria-pressed={hideGoongPoi}
+                  aria-label={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
+                  title={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
+                  className={cn(
+                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors",
+                    hideGoongPoi
+                      ? "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                      : "bg-primary/10 text-primary hover:bg-primary/15",
+                  )}
+                >
+                  {hideGoongPoi ? (
+                    <Eye size={13} weight="bold" />
+                  ) : (
+                    <EyeSlash size={13} weight="bold" />
+                  )}
+                  {hideGoongPoi ? "Hiện POI" : "Ẩn POI"}
+                </button>
+              </div>
+            </div>
+
             <div className="mt-3 flex flex-col gap-2">
               {layerOptions.map((layer) => {
                 const isEnabled = layerFilter[layer.key];
@@ -996,9 +1063,10 @@ const CoordinatorMap = ({
         className="w-full h-full z-0 coordinator-map"
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        <MapInvalidator />
+        <GoongLeafletLayer
+          apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+          hidePointsOfInterest={hideGoongPoi}
         />
 
         {/* Fly to location handler */}
@@ -1182,7 +1250,7 @@ const CoordinatorMap = ({
   );
 };
 
-export default CoordinatorMap;
+export default memo(CoordinatorMap);
 
 function ServiceZoneOverlay({
   zone,

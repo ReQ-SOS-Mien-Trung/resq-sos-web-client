@@ -74,6 +74,7 @@ interface AiStreamPanelProps {
   hidePlanAction?: boolean;
   inline?: boolean;
   size?: "default" | "expanded";
+  clusterSOSRequestCount?: number | null;
   minimized?: boolean;
   onMinimize?: () => void;
   onRestore?: () => void;
@@ -124,6 +125,65 @@ function trimToNull(value?: string | null): string | null {
 function toFiniteNumber(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toPositiveInteger(value: unknown): number | null {
+  const parsed = toFiniteNumber(value);
+  if (parsed == null || parsed <= 0) return null;
+  return Math.trunc(parsed);
+}
+
+function addPositiveSosId(ids: Set<number>, value: unknown) {
+  const id = toPositiveInteger(value);
+  if (id != null) {
+    ids.add(id);
+  }
+}
+
+function addSosIdsFromText(ids: Set<number>, text?: string | null) {
+  if (!text) return;
+
+  for (const match of text.matchAll(/\bSOS\s*#?\s*(\d+)\b/gi)) {
+    addPositiveSosId(ids, match[1]);
+  }
+}
+
+function getDisplaySosRequestCount(
+  result: ClusterRescueSuggestionResponse,
+  fallbackCount?: number | null,
+): number {
+  const explicitCount = toPositiveInteger(result.sosRequestCount);
+  if (explicitCount != null) return explicitCount;
+
+  const clusterCount = toPositiveInteger(fallbackCount);
+  if (clusterCount != null) return clusterCount;
+
+  const ids = new Set<number>();
+
+  if (Array.isArray(result.suggestedActivities)) {
+    for (const activity of result.suggestedActivities) {
+      addPositiveSosId(ids, activity.sosRequestId);
+
+      if (Array.isArray(activity.targetVictims)) {
+        for (const victim of activity.targetVictims) {
+          addPositiveSosId(ids, victim["sosRequestId"]);
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(result.supplyShortages)) {
+    for (const shortage of result.supplyShortages) {
+      addPositiveSosId(ids, shortage.sosRequestId);
+    }
+  }
+
+  addSosIdsFromText(ids, result.specialNotes);
+  addSosIdsFromText(ids, result.overallAssessment);
+  addSosIdsFromText(ids, result.lowConfidenceWarning);
+  addSosIdsFromText(ids, result.mixedRescueReliefWarning);
+
+  return ids.size;
 }
 
 function isReusableItemType(value: unknown): boolean {
@@ -547,6 +607,7 @@ export default function AiStreamPanel({
   hidePlanAction = false,
   inline = false,
   size = "default",
+  clusterSOSRequestCount,
   minimized = false,
   onMinimize,
   onRestore,
@@ -653,7 +714,11 @@ export default function AiStreamPanel({
           />
         )}
         {showActionMap && (
-          <ActionMapView result={result} expanded={isExpanded} />
+          <ActionMapView
+            result={result}
+            expanded={isExpanded}
+            clusterSOSRequestCount={clusterSOSRequestCount}
+          />
         )}
         {showError && (
           <ErrorView error={error} onRetry={onRetry} expanded={isExpanded} />
@@ -1624,9 +1689,11 @@ function SonarRadar({
 function ActionMapView({
   result,
   expanded = false,
+  clusterSOSRequestCount,
 }: {
   result: ClusterRescueSuggestionResponse;
   expanded?: boolean;
+  clusterSOSRequestCount?: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activities = result.suggestedActivities;
@@ -1641,7 +1708,11 @@ function ActionMapView({
         ref={containerRef}
       >
         <MissionBanner result={result} />
-        <StatsRow result={result} />
+        <StatsRow
+          result={result}
+          clusterSOSRequestCount={clusterSOSRequestCount}
+        />
+        <WarningsBlock result={result} />
         <ActionFlowTimeline key={activitiesKey} activities={activities} />
         {result.overallAssessment && (
           <AssessmentBlock text={result.overallAssessment} />
@@ -1649,7 +1720,6 @@ function ActionMapView({
         {result.suggestedResources && result.suggestedResources.length > 0 && (
           <ResourcesBlock resources={result.suggestedResources} />
         )}
-        <WarningsBlock result={result} />
       </div>
     </ScrollArea>
   );
@@ -1755,8 +1825,19 @@ function MissionBanner({
 
 /* ═══ Stats Row ═══ */
 
-function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
+function StatsRow({
+  result,
+  clusterSOSRequestCount,
+}: {
+  result: ClusterRescueSuggestionResponse;
+  clusterSOSRequestCount?: number | null;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const sosRequestCount = getDisplaySosRequestCount(
+    result,
+    clusterSOSRequestCount,
+  );
+
   useEffect(() => {
     if (!ref.current) return;
     const ctx = gsap.context(() => {
@@ -1796,7 +1877,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
     {
       icon: TreeStructure,
       label: "SOS",
-      value: `${result.sosRequestCount || 0}`,
+      value: `${sosRequestCount}`,
       color: "text-cyan-400",
     },
     {
