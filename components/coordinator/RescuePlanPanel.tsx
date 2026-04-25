@@ -2423,7 +2423,7 @@ const RoutePreviewMap = ({
         attributionControl={false}
         className="h-full w-full"
       >
-        <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
         <RoutePreviewFitBounds points={points} />
         <Polyline
           positions={points}
@@ -5530,7 +5530,7 @@ const MissionRoutePreview = ({
                 attributionControl={false}
                 className="h-full w-full"
               >
-                <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.flatMap((seg, idx) => {
@@ -7344,7 +7344,7 @@ const MissionTeamRoutePreview = ({
             attributionControl={false}
             className="h-full w-full"
           >
-            <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
             <RoutePreviewFitBounds points={mapFitPoints} />
 
             {isUsingOriginConnector ? (

@@ -68,7 +68,7 @@ export default function LocationPickerMap({
 
     if (hasMarker) {
       if (!markerRef.current) {
-        markerRef.current = new goongjs.Marker()
+        markerRef.current = new goongjs.Marker({ color: "#ef4444" })
           .setLngLat([lng, lat])
           .addTo(map);
         map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 14) });

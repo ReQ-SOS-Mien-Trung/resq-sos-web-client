@@ -22,6 +22,8 @@ export interface TeamIncidentEntity {
   status: TeamIncidentStatus;
   reportedBy: TeamIncidentReporter | string | null;
   reportedAt: string;
+  hasSupportRequest?: boolean;
+  supportSosRequestId?: number | null;
 }
 
 export interface GetTeamIncidentsParams {

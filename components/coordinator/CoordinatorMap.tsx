@@ -46,7 +46,6 @@ import {
 // and the isMounted guard inside this component.
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Polygon,
   Popup,
@@ -119,6 +118,21 @@ const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
+const MapInvalidator = () => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+      });
+    });
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+};
+
 const CoordinatorMap = ({
   sosRequests,
   rescuers,
@@ -173,6 +187,7 @@ const CoordinatorMap = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentZoom, setCurrentZoom] = useState(13);
   const [layerFilter, setLayerFilter] = useState(DEFAULT_LAYER_FILTER);
+  const [hideGoongPoi, setHideGoongPoi] = useState(true);
   const risingSOSMarkerIdSet = useMemo(
     () => new Set(risingSOSMarkerIds),
     [risingSOSMarkerIds],
@@ -345,7 +360,8 @@ const CoordinatorMap = ({
       teamIncidents.filter(
         (incident) =>
           Number.isFinite(incident.latitude) &&
-          Number.isFinite(incident.longitude),
+          Number.isFinite(incident.longitude) &&
+          incident.hasSupportRequest === true,
       ),
     [teamIncidents],
   );
@@ -901,6 +917,35 @@ const CoordinatorMap = ({
               </Tooltip>
             </div>
 
+            <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <MapTrifold size={14} weight="fill" />
+                  <span className="truncate">Nền Goong</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHideGoongPoi((current) => !current)}
+                  aria-pressed={hideGoongPoi}
+                  aria-label={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
+                  title={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
+                  className={cn(
+                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors",
+                    hideGoongPoi
+                      ? "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                      : "bg-primary/10 text-primary hover:bg-primary/15",
+                  )}
+                >
+                  {hideGoongPoi ? (
+                    <Eye size={13} weight="bold" />
+                  ) : (
+                    <EyeSlash size={13} weight="bold" />
+                  )}
+                  {hideGoongPoi ? "Hiện POI" : "Ẩn POI"}
+                </button>
+              </div>
+            </div>
+
             <div className="mt-3 flex flex-col gap-2">
               {layerOptions.map((layer) => {
                 const isEnabled = layerFilter[layer.key];
@@ -997,7 +1042,11 @@ const CoordinatorMap = ({
         className="w-full h-full z-0 coordinator-map"
         style={{ height: "100%", width: "100%" }}
       >
-        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
+        <GoongLeafletLayer
+          apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+          hidePointsOfInterest={hideGoongPoi}
+        />
 
         {/* Fly to location handler */}
         <FlyToHandler

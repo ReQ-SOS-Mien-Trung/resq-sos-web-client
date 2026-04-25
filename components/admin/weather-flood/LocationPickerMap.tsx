@@ -66,10 +66,10 @@ export default function LocationPickerMap({
 
     if (hasMarker) {
       if (!markerRef.current) {
-        markerRef.current = new goongjs.Marker()
+        markerRef.current = new goongjs.Marker({ color: "#3b82f6" })
           .setLngLat([lon, lat])
           .addTo(map);
-        map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 14) });
+        map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 10) });
       } else {
         const currentLngLat = markerRef.current.getLngLat();
         if (currentLngLat.lng !== lon || currentLngLat.lat !== lat) {
