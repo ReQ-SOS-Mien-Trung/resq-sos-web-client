@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
+import { formatSupplyBufferPercent } from "@/lib/supply-buffer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/sos";
 import type {
   ClusterRescueSuggestionResponse,
+  ClusterSupplyCollection,
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
   ClusterTargetVictim,
@@ -41,6 +43,8 @@ import {
   TreeStructure,
   Sparkle,
   Eye,
+  CaretDown,
+  CaretUp,
   Users,
   FirstAid,
   Truck,
@@ -70,6 +74,9 @@ interface AiStreamPanelProps {
   hidePlanAction?: boolean;
   inline?: boolean;
   size?: "default" | "expanded";
+  minimized?: boolean;
+  onMinimize?: () => void;
+  onRestore?: () => void;
 }
 
 /* ═══ Activity icon map ═══ */
@@ -117,6 +124,54 @@ function trimToNull(value?: string | null): string | null {
 function toFiniteNumber(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isReusableItemType(value: unknown): boolean {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    normalized === "reusable" ||
+    normalized.includes("tai su dung") ||
+    normalized.includes("tái sử dụng")
+  );
+}
+
+function hasReusableUnitMetadata(
+  supply: Pick<
+    ClusterSupplyCollection,
+    | "plannedPickupReusableUnits"
+    | "pickedReusableUnits"
+    | "availableDeliveryReusableUnits"
+    | "deliveredReusableUnits"
+    | "expectedReturnUnits"
+    | "returnedReusableUnits"
+  >,
+): boolean {
+  return (
+    Array.isArray(supply.plannedPickupReusableUnits) ||
+    Array.isArray(supply.pickedReusableUnits) ||
+    Array.isArray(supply.availableDeliveryReusableUnits) ||
+    Array.isArray(supply.deliveredReusableUnits) ||
+    Array.isArray(supply.expectedReturnUnits) ||
+    Array.isArray(supply.returnedReusableUnits)
+  );
+}
+
+function isReusableSupplyCollection(
+  supply: Pick<
+    ClusterSupplyCollection,
+    | "itemType"
+    | "plannedPickupReusableUnits"
+    | "pickedReusableUnits"
+    | "availableDeliveryReusableUnits"
+    | "deliveredReusableUnits"
+    | "expectedReturnUnits"
+    | "returnedReusableUnits"
+  >,
+): boolean {
+  return isReusableItemType(supply.itemType) || hasReusableUnitMetadata(supply);
 }
 
 function formatExecutionModeLabel(value?: string | null): string | null {
@@ -402,6 +457,75 @@ function buildAiErrorStatusLabel(error: string): string {
   return `LỖI: ${compact.trim()}`;
 }
 
+function getLatestStatusMessage(statusLog: StreamLogEntry[]): string | null {
+  for (let index = statusLog.length - 1; index >= 0; index -= 1) {
+    const entry = statusLog[index];
+    if (
+      (entry.type === "status" || entry.type === "result") &&
+      entry.message.trim()
+    ) {
+      return entry.message.trim();
+    }
+  }
+
+  return null;
+}
+
+const AI_STEP_TRANSLATIONS: Record<string, string> = {
+  COLLECT_SUPPLIES: "Tiếp nhận vật phẩm",
+  DELIVER_SUPPLIES: "Phân phát vật phẩm",
+  RESCUE: "Cứu hộ",
+  EVACUATE: "Sơ tán",
+  RETURN_SUPPLIES: "Hoàn trả vật phẩm",
+  MOVE_TO_LOCATION: "Di chuyển",
+  SOS_SUPPORT: "Hỗ trợ SOS",
+};
+
+function translateAIText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(
+      /Activity step (\d+) \(([^)]+)\)/g,
+      (match, step, type) => `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`
+    )
+    .replace(/team_id=(\d+)/g, "đội ID $1")
+    .replace(/pool nearby teams/g, "danh sách đội cứu hộ được quét xung quanh khu vực");
+}
+
+function FormattedAINotes({ text, textClassName }: { text: string; textClassName?: string }) {
+  if (!text) return null;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  return (
+    <div className="space-y-3">
+      {lines.map((line, idx) => {
+        if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
+          const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
+          const items = content.split("|").map(i => i.trim()).filter(Boolean);
+          return (
+            <div key={idx} className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3">
+              <h5 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2.5 flex items-center gap-1.5">
+                <Warning className="w-4 h-4" weight="fill" />
+                CẦN XEM LẠI THỦ CÔNG
+              </h5>
+              <ul className="list-disc list-inside space-y-1.5 text-sm text-red-600/90 dark:text-red-400/90 leading-relaxed">
+                {items.map((item, i) => (
+                  <li key={i}>{translateAIText(item)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return (
+          <p key={idx} className={textClassName || "text-sm text-foreground/80 leading-relaxed"}>
+            {translateAIText(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ═══ Main Component ═══ */
 
 export default function AiStreamPanel({
@@ -423,13 +547,23 @@ export default function AiStreamPanel({
   hidePlanAction = false,
   inline = false,
   size = "default",
+  minimized = false,
+  onMinimize,
+  onRestore,
 }: AiStreamPanelProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isExpanded = size === "expanded";
   const canClose = !loading;
+  const canMinimize = !inline && typeof onMinimize === "function";
+  const handleMinimize = () => {
+    if (canMinimize) {
+      onMinimize();
+    }
+  };
   const handleClose = () => {
     if (!canClose) {
+      handleMinimize();
       return;
     }
 
@@ -458,13 +592,28 @@ export default function AiStreamPanel({
       );
     });
     return () => ctx.revert();
-  }, [open]);
+  }, [minimized, open]);
 
   if (!open) return null;
 
   const showProgress = loading && !result;
   const showActionMap = result !== null;
   const showError = error !== null && !result;
+
+  if (minimized && !inline) {
+    return (
+      <FloatingAiStreamButton
+        clusterId={clusterId}
+        status={status}
+        statusLog={statusLog}
+        result={result}
+        error={error}
+        loading={loading}
+        phase={phase}
+        onRestore={onRestore ?? (() => undefined)}
+      />
+    );
+  }
 
   const panelShell = (
     <div
@@ -488,6 +637,7 @@ export default function AiStreamPanel({
         error={error}
         phase={phase}
         onStop={onStop}
+        onMinimize={canMinimize ? handleMinimize : undefined}
         onClose={handleClose}
         inline={inline}
         expanded={isExpanded}
@@ -535,7 +685,7 @@ export default function AiStreamPanel({
       <div
         className={cn(
           "absolute inset-0 bg-black/50 backdrop-blur-sm",
-          canClose ? "cursor-pointer" : "cursor-not-allowed",
+          canClose || canMinimize ? "cursor-pointer" : "cursor-not-allowed",
         )}
         onClick={handleClose}
       />
@@ -554,6 +704,7 @@ function TopBar({
   error,
   phase,
   onStop,
+  onMinimize,
   onClose,
   inline = false,
   expanded = false,
@@ -565,6 +716,7 @@ function TopBar({
   error: string | null;
   phase: string;
   onStop: () => void;
+  onMinimize?: () => void;
   onClose: () => void;
   inline?: boolean;
   expanded?: boolean;
@@ -638,6 +790,22 @@ function TopBar({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {loading && !inline && onMinimize ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(expanded ? "h-9 px-3 text-sm" : "h-7 text-sm")}
+            onClick={onMinimize}
+            title="Thu nhỏ"
+            aria-label="Thu nhỏ tiến trình AI"
+          >
+            <CaretDown
+              className={cn(expanded ? "h-4 w-4 mr-1.5" : "h-3 w-3 mr-1")}
+              weight="bold"
+            />
+            Thu nhỏ
+          </Button>
+        ) : null}
         {loading && (
           <Button
             variant="destructive"
@@ -668,6 +836,151 @@ function TopBar({
             <X className="h-4 w-4" />
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FloatingAiStreamButton({
+  clusterId,
+  status,
+  statusLog,
+  result,
+  error,
+  loading,
+  phase,
+  onRestore,
+}: {
+  clusterId: number | null;
+  status: string;
+  statusLog: StreamLogEntry[];
+  result: ClusterRescueSuggestionResponse | null;
+  error: string | null;
+  loading: boolean;
+  phase: string;
+  onRestore: () => void;
+}) {
+  const floatingRef = useRef<HTMLDivElement>(null);
+  const latestStatus = getLatestStatusMessage(statusLog);
+  const progressValue = result || error ? 100 : phaseProgressValue(phase);
+  const title = result
+    ? "AI đã hoàn tất"
+    : error
+      ? "AI gặp lỗi"
+      : loading
+        ? "AI đang phân tích"
+        : "Gợi ý nhiệm vụ AI";
+  const description = result
+    ? result.suggestedMissionTitle || "Kế hoạch AI đã sẵn sàng"
+    : error
+      ? normalizeAiErrorText(error)
+      : latestStatus || status || phaseDescription(phase);
+  const toneClasses = error
+    ? {
+        icon: "from-rose-500 to-red-500",
+        dot: "bg-rose-500",
+        progress: "from-rose-500 to-red-400",
+        badge: "border-rose-200 bg-rose-50 text-rose-700",
+      }
+    : result
+      ? {
+          icon: "from-emerald-500 to-teal-500",
+          dot: "bg-emerald-500",
+          progress: "from-emerald-500 to-teal-400",
+          badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        }
+      : {
+          icon: "from-primary to-orange-500",
+          dot: "bg-primary",
+          progress: "from-primary via-orange-500 to-amber-400",
+          badge: "border-primary/20 bg-primary/10 text-primary",
+        };
+  const StatusIcon = error ? Warning : result ? CheckCircle : Brain;
+
+  useEffect(() => {
+    if (!floatingRef.current) return;
+    gsap.fromTo(
+      floatingRef.current,
+      { opacity: 0, y: 18, scale: 0.98 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "power2.out" },
+    );
+  }, []);
+
+  return (
+    <div className="pointer-events-none absolute inset-x-4 bottom-20 z-[60] flex justify-end sm:inset-x-auto sm:right-6 sm:bottom-6">
+      <div
+        ref={floatingRef}
+        className="pointer-events-auto w-full sm:w-[25rem]"
+      >
+        <button
+          type="button"
+          onClick={onRestore}
+          className="group w-full overflow-hidden rounded-lg border border-border/70 bg-background/96 text-left shadow-2xl shadow-black/18 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-label="Mở tiến trình phân tích AI"
+          title="Mở tiến trình phân tích AI"
+        >
+          <div className="flex items-center gap-3 px-3.5 py-3">
+            <div
+              className={cn(
+                "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-md",
+                toneClasses.icon,
+              )}
+            >
+              <StatusIcon className="h-5 w-5" weight="fill" />
+              {loading ? (
+                <span
+                  className={cn(
+                    "absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background shadow-[0_0_14px]",
+                    toneClasses.dot,
+                  )}
+                />
+              ) : null}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate text-sm font-bold text-foreground">
+                  {title}
+                </p>
+                {clusterId ? (
+                  <Badge
+                    variant="outline"
+                    className="h-5 shrink-0 px-1.5 text-sm font-mono"
+                  >
+                    #{clusterId}
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
+                {description}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-1 text-xs font-bold tabular-nums",
+                  toneClasses.badge,
+                )}
+              >
+                {progressValue}%
+              </span>
+              <CaretUp
+                className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:text-primary"
+                weight="bold"
+              />
+            </div>
+          </div>
+          <div className="h-1 overflow-hidden bg-muted">
+            <div
+              className={cn(
+                "h-full rounded-r-full bg-gradient-to-r transition-[width] duration-700 ease-out",
+                toneClasses.progress,
+              )}
+              style={{ width: `${progressValue}%` }}
+            />
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -1431,7 +1744,7 @@ function MissionBanner({
                 : "Chưa rõ mức độ"}
             </Badge>
             <span className="text-sm font-mono text-muted-foreground">
-              {(result.modelName || "AI")} • {result.responseTimeMs}ms
+              {result.modelName || "AI"}
             </span>
           </div>
         </div>
@@ -1466,12 +1779,6 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
 
   const stats = [
     {
-      icon: ShieldCheck,
-      label: "Độ tin cậy",
-      value: `${(result.confidenceScore * 100).toFixed(0)}%`,
-      color: "text-emerald-400",
-    },
-    {
       icon: Lightning,
       label: "Ưu tiên",
       value:
@@ -1501,7 +1808,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
   ];
 
   return (
-    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-5">
+    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-4">
       {stats.map((s) => {
         const Icon = s.icon;
         return (
@@ -1847,6 +2154,12 @@ function ActivityFlowNode({
                     ×{supply.quantity}
                   </span>
                   <span className="text-primary/40">{supply.unit}</span>
+                  {normalizedActivityType === "COLLECT_SUPPLIES" &&
+                  !isReusableSupplyCollection(supply) ? (
+                    <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                      Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
+                    </span>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1970,7 +2283,6 @@ function WarningsBlock({
     !result.needsManualReview &&
     !result.multiDepotRecommended &&
     !result.specialNotes &&
-    !(result.mixedRescueReliefWarning || "").trim() &&
     !result.needsAdditionalDepot &&
     (result.supplyShortages?.length ?? 0) === 0
   )
@@ -1978,19 +2290,6 @@ function WarningsBlock({
 
   return (
     <div className="space-y-2">
-      {(result.mixedRescueReliefWarning || "").trim() ? (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/[0.06] border border-rose-500/15">
-          <Warning className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" weight="fill" />
-          <div>
-            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-0.5">
-              Cảnh báo tách nhiệm vụ
-            </p>
-            <p className="text-sm text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
-              {result.mixedRescueReliefWarning}
-            </p>
-          </div>
-        </div>
-      ) : null}
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
@@ -2054,9 +2353,7 @@ function WarningsBlock({
             <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
-              {result.specialNotes}
-            </p>
+            <FormattedAINotes text={result.specialNotes} textClassName="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed" />
           </div>
         </div>
       )}

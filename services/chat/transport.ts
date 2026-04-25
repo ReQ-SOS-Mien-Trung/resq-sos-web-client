@@ -17,6 +17,8 @@ import {
   CoordinatorChatConnectionState,
 } from "./type";
 
+const STOP_DEBOUNCE_MS = 1200;
+
 function toConnectionLabel(
   state: HubConnectionState,
 ): CoordinatorChatConnectionState {
@@ -37,17 +39,31 @@ function toConnectionLabel(
 
 export class ChatTransportService {
   private connection: HubConnection | null = null;
+  private connectionRetainers = 0;
+  private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
   private startPromise: Promise<void> | null = null;
 
-  private isNegotiationAbortError(error: unknown): boolean {
-    const message =
-      error instanceof Error ? error.message : String(error ?? "");
-    const normalized = message.toLowerCase();
+  private clearPendingStop(): void {
+    if (!this.pendingStopTimer) {
+      return;
+    }
 
-    return (
-      normalized.includes("stopped during negotiation") ||
-      normalized.includes("aborterror")
-    );
+    clearTimeout(this.pendingStopTimer);
+    this.pendingStopTimer = null;
+  }
+
+  private scheduleStop(): void {
+    this.clearPendingStop();
+
+    this.pendingStopTimer = setTimeout(() => {
+      this.pendingStopTimer = null;
+
+      if (this.connectionRetainers > 0) {
+        return;
+      }
+
+      void this.stop().catch(() => null);
+    }, STOP_DEBOUNCE_MS);
   }
 
   private async waitForDisconnected(
@@ -97,6 +113,8 @@ export class ChatTransportService {
   }
 
   async start(): Promise<void> {
+    this.clearPendingStop();
+
     if (this.startPromise) {
       await this.startPromise;
       return;
@@ -116,30 +134,28 @@ export class ChatTransportService {
       return;
     }
 
-    if (connection.state === HubConnectionState.Disconnecting) {
-      await this.waitForDisconnected(connection);
+    const startTask = async () => {
+      if (connection.state === HubConnectionState.Disconnecting) {
+        await this.waitForDisconnected(connection);
+      }
+
       if (connection.state !== HubConnectionState.Disconnected) {
         return;
       }
-    }
 
-    this.startPromise = connection
-      .start()
-      .catch((error) => {
-        if (this.isNegotiationAbortError(error)) {
-          return;
-        }
+      await connection.start();
+    };
 
-        throw error;
-      })
-      .finally(() => {
-        this.startPromise = null;
-      });
+    this.startPromise = startTask().finally(() => {
+      this.startPromise = null;
+    });
 
     await this.startPromise;
   }
 
   async stop(): Promise<void> {
+    this.clearPendingStop();
+
     if (!this.connection) {
       return;
     }
@@ -153,6 +169,21 @@ export class ChatTransportService {
     }
 
     await this.connection.stop();
+  }
+
+  retainConnection(): void {
+    this.connectionRetainers += 1;
+    this.clearPendingStop();
+  }
+
+  async releaseConnection(): Promise<void> {
+    this.connectionRetainers = Math.max(0, this.connectionRetainers - 1);
+
+    if (this.connectionRetainers > 0) {
+      return;
+    }
+
+    this.scheduleStop();
   }
 
   on<T>(event: string, handler: (payload: T) => void): void {

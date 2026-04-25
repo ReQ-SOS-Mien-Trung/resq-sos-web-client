@@ -6,6 +6,7 @@ import {
   createMission,
   getMissionActivities,
   getMissionById,
+  getMissionTeamReport,
   getMissions,
   updateActivityStatus,
   updateActivity,
@@ -23,6 +24,7 @@ import {
   GetMissionsResponse,
   MissionActivity,
   MissionEntity,
+  MissionTeamReportResponse,
   UpdateActivityStatusRequest,
   UpdateActivityStatusResponse,
   UpdateActivityRequest,
@@ -41,6 +43,7 @@ import {
 
 export const MISSIONS_QUERY_KEY = ["missions"] as const;
 export const MISSION_ACTIVITIES_QUERY_KEY = ["mission-activities"] as const;
+export const MISSION_TEAM_REPORT_QUERY_KEY = ["mission-team-report"] as const;
 
 export interface UseMissionsOptions {
   enabled?: boolean;
@@ -63,6 +66,25 @@ export function useMission(missionId: number, options?: UseMissionOptions) {
     queryKey: [...MISSIONS_QUERY_KEY, missionId],
     queryFn: () => getMissionById(missionId),
     enabled: options?.enabled ?? true,
+  });
+}
+
+export interface UseMissionTeamReportOptions {
+  enabled?: boolean;
+}
+
+export function useMissionTeamReport(
+  missionId: number | null,
+  missionTeamId: number | null,
+  options?: UseMissionTeamReportOptions,
+) {
+  return useQuery<MissionTeamReportResponse>({
+    queryKey: [...MISSION_TEAM_REPORT_QUERY_KEY, missionId, missionTeamId],
+    queryFn: () => getMissionTeamReport(missionId!, missionTeamId!),
+    enabled:
+      (options?.enabled ?? true) &&
+      Number.isFinite(missionId) &&
+      Number.isFinite(missionTeamId),
   });
 }
 

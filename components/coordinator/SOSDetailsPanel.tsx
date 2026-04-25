@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { SOSDetailsPanelProps } from "@/type";
 import { cn } from "@/lib/utils";
@@ -11,6 +17,12 @@ import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   MapPin,
   Stethoscope,
@@ -30,7 +42,10 @@ import {
   ChartBar,
   Info,
 } from "@phosphor-icons/react";
-import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
+import {
+  useSOSRequestAnalysis,
+  useSOSRequestById,
+} from "@/services/sos_request/hooks";
 import { useSosFormPriorityRuleConfig } from "@/services/config/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import {
@@ -184,14 +199,68 @@ function formatScoreValue(value: unknown, fallback = "N/A"): string {
   return fallback;
 }
 
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function toCamelCase(value: string): string {
+  return value.replace(/_([a-z])/g, (_, char: string) => char.toUpperCase());
+}
+
+function getNestedValueByKey(source: unknown, key: string): unknown {
+  if (!source || typeof source !== "object") {
+    return undefined;
+  }
+
+  const record = source as Record<string, unknown>;
+  const variants = Array.from(
+    new Set([
+      key,
+      key.toLowerCase(),
+      key.toUpperCase(),
+      toCamelCase(key),
+      key.replace(/_/g, ""),
+    ]),
+  );
+
+  for (const variant of variants) {
+    if (variant in record) {
+      return record[variant];
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    const nestedValue = getNestedValueByKey(value, key);
+    if (nestedValue !== undefined) {
+      return nestedValue;
+    }
+  }
+
+  return undefined;
+}
+
 function getBreakdownNumber(
   breakdown: Record<string, unknown> | null | undefined,
   key: string,
-  fallback = 0,
-): number {
-  const value = breakdown?.[key];
+  fallback?: number | null,
+): number | null {
+  const value = getNestedValueByKey(breakdown, key);
+  const parsedValue = coerceNumber(value);
 
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  if (parsedValue != null) {
+    return parsedValue;
+  }
+
+  return coerceNumber(fallback);
 }
 
 function compactFormulaDetails(
@@ -200,12 +269,65 @@ function compactFormulaDetails(
   return lines.filter((line): line is ReactNode => Boolean(line));
 }
 
-const PRIORITY_SYMBOL_LABELS: Record<string, string> = {
-  K: "hệ số tình huống",
-  M: "điểm y tế",
-  R: "điểm cứu trợ",
-  S: "điểm tổng",
-  T: "điểm loại yêu cầu",
+const ITEMS_NEEDED_LABELS: Record<string, { label: string; icon: string }> = {
+  FIRST_AID_KIT: {
+    label: "Bộ sơ cứu",
+    icon: "ph:first-aid-kit",
+  },
+  MEDICAL_SUPPLIES: {
+    label: "Vật phẩm y tế",
+    icon: "ph:pill",
+  },
+  BANDAGES: {
+    label: "Băng gạc",
+    icon: "ph:bandage",
+  },
+  BLOOD_CLOTTING_AGENTS: {
+    label: "Thuốc cầm máu",
+    icon: "ph:drop",
+  },
+  LIFE_JACKET: {
+    label: "Áo phao",
+    icon: "ph:lifebuoy",
+  },
+  RESCUE_BOAT: {
+    label: "Xuồng cứu hộ",
+    icon: "ph:boat",
+  },
+  ROPE: {
+    label: "Dây thừng",
+    icon: "ph:circles-three",
+  },
+  RESCUE_EQUIPMENT: {
+    label: "Thiết bị cứu hộ",
+    icon: "ph:toolbox",
+  },
+  FIRE_EXTINGUISHER: {
+    label: "Bình chữa cháy",
+    icon: "ph:fire-extinguisher",
+  },
+  PROTECTIVE_GEAR: {
+    label: "Đồ bảo hộ",
+    icon: "ph:shield-check",
+  },
+  FOOD_RATIONS: {
+    label: "Lương thực",
+    icon: "ph:package",
+  },
+  WATER: { label: "Nước uống", icon: "ph:drop" },
+  CLOTHING: {
+    label: "Quần áo",
+    icon: "ph:t-shirt",
+  },
+  BLANKETS: { label: "Chăn mền", icon: "ph:bed" },
+  TRANSPORT_VEHICLE: {
+    label: "Phương tiện vận chuyển",
+    icon: "ph:ambulance",
+  },
+  STRETCHER: {
+    label: "Cáng cứu thương",
+    icon: "ph:first-aid",
+  },
 };
 
 function FormulaVar({
@@ -235,52 +357,35 @@ function SigmaSymbol() {
   );
 }
 
-function MathWord({ children }: { children: ReactNode }) {
-  return (
-    <span className="font-sans text-[0.78em] not-italic text-foreground">
-      {children}
-    </span>
-  );
-}
-
 function FormulaOperator({ children }: { children: ReactNode }) {
   return <span className="mx-2 text-muted-foreground">{children}</span>;
 }
 
 function PriorityFormulaNotation({
-  additiveSymbols,
-  includeSituationMultiplier,
+  formulaTemplate,
+  substitutedFormula,
   totalScore,
 }: {
-  additiveSymbols: string[];
-  includeSituationMultiplier: boolean;
+  formulaTemplate: string;
+  substitutedFormula: string;
   totalScore: string;
 }) {
-  const symbols = additiveSymbols.length > 0 ? additiveSymbols : ["M", "R"];
-
   return (
-    <div className="min-w-max font-serif text-2xl leading-none tracking-normal text-foreground">
-      <FormulaVar name="S" />
-      <FormulaOperator>=</FormulaOperator>
-      <MathWord>làm tròn</MathWord>
-      <span className="mx-1">(</span>
-      <span className="mx-1">(</span>
-      {symbols.map((symbol, index) => (
-        <span key={`${symbol}-${index}`} className="inline-flex items-center">
-          {index > 0 ? <FormulaOperator>+</FormulaOperator> : null}
-          <FormulaVar name={symbol} />
+    <div className="space-y-3 font-serif text-lg leading-snug tracking-normal text-foreground">
+      <div className="text-muted-foreground text-base border-b pb-3 border-border/50">
+        <FormulaVar name="S" />
+        <FormulaOperator>=</FormulaOperator>
+        <span className="font-sans text-[0.85em]">{formulaTemplate}</span>
+      </div>
+      <div className="font-semibold text-xl">
+        <FormulaVar name="S" />
+        <FormulaOperator>=</FormulaOperator>
+        <span className="font-sans text-[0.85em]">{substitutedFormula}</span>
+        <FormulaOperator>≈</FormulaOperator>
+        <span className="font-sans text-[0.9em] not-italic text-indigo-600 dark:text-indigo-400">
+          {totalScore}
         </span>
-      ))}
-      <span className="mx-1">)</span>
-      {includeSituationMultiplier ? (
-        <>
-          <FormulaOperator>×</FormulaOperator>
-          <FormulaVar name="K" />
-        </>
-      ) : null}
-      <span className="mx-1">)</span>
-      <FormulaOperator>≈</FormulaOperator>
-      <span className="font-sans text-[0.9em] not-italic">{totalScore}</span>
+      </div>
     </div>
   );
 }
@@ -320,10 +425,54 @@ function formatPrioritySymbolValues(
     .join("; ")}`;
 }
 
-function formatPrioritySymbols(symbols: string[]): string {
-  return symbols
-    .map((symbol) => `${symbol} là ${PRIORITY_SYMBOL_LABELS[symbol]}`)
-    .join(", ");
+function parseItemsNeeded(
+  items: string[] | string | null | undefined,
+): string[] {
+  try {
+    if (typeof items === "string") {
+      const parsed = JSON.parse(items);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+function getRulePriorityLabel(level?: string | null): string {
+  if (level === "Critical") return "Nguy kịch";
+  if (level === "High") return "Khẩn cấp cao";
+  if (level === "Medium") return "Trung bình";
+  if (level === "Low") return "Thấp";
+  return level || "Chưa rõ";
+}
+
+function getRulePriorityBadgeClass(level?: string | null): string {
+  if (level === "Critical") {
+    return "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800";
+  }
+  if (level === "High") {
+    return "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800";
+  }
+  if (level === "Medium") {
+    return "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800";
+  }
+  if (level === "Low") {
+    return "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800";
+  }
+  return "";
+}
+
+function formatConfidencePercent(value?: number | null): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const normalizedPercent = value > 1 ? value : value * 100;
+  const clampedPercent = Math.max(0, Math.min(100, normalizedPercent));
+
+  return `${clampedPercent.toFixed(clampedPercent >= 10 ? 0 : 1)}%`;
 }
 
 function ParsedMessage({
@@ -524,73 +673,109 @@ function FormulaTooltip({
   description?: string;
   details?: ReactNode[];
 }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const tooltipWidth = 480;
-  const viewportPadding = 12;
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
-  const getTooltipLeft = (rect: DOMRect) => {
-    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
-    return Math.max(viewportPadding, Math.min(rect.left, maxLeft));
-  };
+  const updateCoords = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const popoverWidth = 340;
+    let left = rect.right - popoverWidth;
+    if (left < 8) left = 8;
+    setCoords({ top: rect.bottom + 6, left });
+  }, []);
 
-  const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + 8,
-      left: getTooltipLeft(rect),
-    });
-    setOpen(true);
-  };
+  const open = useCallback(() => {
+    updateCoords();
+    setIsOpen(true);
+  }, [updateCoords]);
 
-  return (
-    <span className="inline-flex items-center">
-      <button
-        type="button"
-        className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
-        aria-label={`Xem công thức: ${title}`}
-        onMouseEnter={handleEnter}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setPos({ top: rect.bottom + 8, left: getTooltipLeft(rect) });
-          setOpen(true);
-        }}
-        onBlur={() => setOpen(false)}
-      >
-        <Info className="h-3.5 w-3.5" weight="fill" />
-      </button>
-      {typeof document !== "undefined" &&
-        open &&
-        createPortal(
+  const close = useCallback(() => setIsOpen(false), []);
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        btnRef.current?.contains(e.target as Node) ||
+        popoverRef.current?.contains(e.target as Node)
+      )
+        return;
+      close();
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isOpen, close]);
+
+  const popover =
+    isOpen && coords
+      ? createPortal(
           <div
-            className="fixed z-[9999] w-[30rem] max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-4 text-sm leading-relaxed shadow-md"
-            style={{ top: pos.top, left: pos.left }}
-            onMouseEnter={() => setOpen(true)}
-            onMouseLeave={() => setOpen(false)}
+            ref={popoverRef}
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: 340,
+              zIndex: 10001,
+            }}
+            className="rounded-lg border bg-popover shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
+            onMouseEnter={open}
+            onMouseLeave={close}
           >
-            <p className="font-semibold text-foreground">{title}</p>
-            {description ? (
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            ) : null}
-            <div className="mt-3 overflow-x-auto rounded-md border bg-background px-4 py-4 shadow-inner">
-              {formula}
+            <div className="p-4">
+              <ScrollArea className="max-h-[55vh]">
+                <div className="pr-4">
+                  <p className="font-bold text-foreground text-sm tracking-tight">
+                    {title}
+                  </p>
+                  {description ? (
+                    <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/90 font-medium">
+                      {description}
+                    </p>
+                  ) : null}
+                  <div className="mt-4">{formula}</div>
+                  {details && details.length > 0 && (
+                    <div className="mt-4 space-y-2.5 text-[11px] leading-relaxed text-muted-foreground/80">
+                      {details.map((line, idx) => (
+                        <div key={idx} className="flex gap-2.5 items-start">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-indigo-500/50" />
+                          <div className="flex-1">{line}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
-            {details && details.length > 0 && (
-              <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
-                {details.map((line, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
-                    <div className="min-w-0">{line}</div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>,
           document.body,
-        )}
+        )
+      : null;
+
+  return (
+    <span className="inline-flex items-center ml-1.5">
+      <button
+        ref={btnRef}
+        type="button"
+        className="inline-flex shrink-0 items-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+        aria-label={`Xem công thức: ${title}`}
+        onMouseEnter={open}
+        onMouseLeave={close}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isOpen) close();
+          else open();
+        }}
+      >
+        <Info className="h-4 w-4" weight="fill" />
+      </button>
+      {popover}
     </span>
   );
 }
@@ -636,17 +821,36 @@ const SOSDetailsPanel = ({
   const currentUser = useAuthStore((state) => state.user);
   const [renderedAt] = useState(() => Date.now());
 
-  const { data: analysisResponse, isLoading: isLoadingAnalysis } =
+  const {
+    data: sosRequestDetailResponse,
+    isLoading: isLoadingSOSRequestDetail,
+  } = useSOSRequestById(Number(sosRequest?.id) || 0, {
+    enabled: !!sosRequest?.id && open && !sosRequest?.evaluation,
+  });
+  const embeddedEvaluation =
+    sosRequestDetailResponse?.sosRequest.evaluation ?? sosRequest?.evaluation;
+  const shouldFetchLegacyAnalysis =
+    !!sosRequest?.id &&
+    open &&
+    !isLoadingSOSRequestDetail &&
+    !embeddedEvaluation;
+  const { data: analysisResponse, isLoading: isLoadingLegacyAnalysis } =
     useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
-      enabled: !!sosRequest?.id && open,
+      enabled: shouldFetchLegacyAnalysis,
     });
   const { data: priorityRuleConfig, isLoading: isLoadingPriorityRuleConfig } =
     useSosFormPriorityRuleConfig(open);
 
   if (!sosRequest && !open) return null;
 
-  const ruleEvaluation = analysisResponse?.ruleEvaluation;
-  const aiAnalyses = analysisResponse?.aiAnalyses || [];
+  const evaluationSnapshot = embeddedEvaluation ?? analysisResponse ?? null;
+  const ruleEvaluation = evaluationSnapshot?.ruleEvaluation ?? null;
+  const aiAnalyses = evaluationSnapshot?.aiAnalyses ?? [];
+  const hasAiAnalysis =
+    evaluationSnapshot?.hasAiAnalysis ?? aiAnalyses.length > 0;
+  const isLoadingEvaluation =
+    isLoadingSOSRequestDetail ||
+    (shouldFetchLegacyAnalysis && isLoadingLegacyAnalysis);
 
   const priorityColors = {
     P1: "bg-red-500",
@@ -794,7 +998,7 @@ const SOSDetailsPanel = ({
 
   const requestedPeople = Array.from(requestedPeopleMap.values());
 
-  const scoreRows = [
+  const legacyScoreRows = [
     {
       key: "medical",
       label: "Y tế",
@@ -842,26 +1046,41 @@ const SOSDetailsPanel = ({
   ] as const;
 
   const displayedTotalScore = ruleEvaluation?.totalScore ?? 0;
-
-  const isV3 = ruleEvaluation?.ruleVersion?.startsWith("3");
   const ruleBreakdown = ruleEvaluation?.breakdown ?? null;
   const medicalScoreValue = getBreakdownNumber(
     ruleBreakdown,
     "medical_score",
-    ruleEvaluation?.medicalScore ?? 0,
+    ruleEvaluation?.medicalScore ?? null,
   );
   const reliefScoreValue = getBreakdownNumber(
     ruleBreakdown,
     "relief_score",
-    ruleEvaluation?.foodScore ?? 0,
+    ruleEvaluation?.foodScore ?? null,
+  );
+  const supplyUrgencyScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "supply_urgency_score",
+    ruleEvaluation?.injuryScore ?? null,
+  );
+  const vulnerabilityScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "vulnerability_score",
+    ruleEvaluation?.mobilityScore ?? null,
   );
   // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
-  let requestTypeScore = 10;
-  const sosTypeStr = ((sosRequest as any).sosType || "").toLowerCase();
+  const sosTypeKey = (sosRequest.sosType || "").toUpperCase();
+  let requestTypeScore =
+    priorityRuleConfig?.request_type_scores?.[sosTypeKey] ?? 10;
+  const sosTypeStr = (sosRequest.sosType || "").toLowerCase();
   if (sosTypeStr.includes("rescue")) {
-    requestTypeScore = 30;
+    requestTypeScore =
+      priorityRuleConfig?.request_type_scores?.RESCUE ?? requestTypeScore ?? 30;
   } else if (sosTypeStr.includes("relief") || sosTypeStr.includes("support")) {
-    requestTypeScore = 20;
+    requestTypeScore =
+      priorityRuleConfig?.request_type_scores?.RELIEF ?? requestTypeScore ?? 20;
+  } else if (sosTypeStr.includes("both")) {
+    requestTypeScore =
+      priorityRuleConfig?.request_type_scores?.BOTH ?? requestTypeScore ?? 10;
   }
 
   let situationMultiplier = 1.0;
@@ -887,13 +1106,105 @@ const SOSDetailsPanel = ({
   const situationMultiplierValue = getBreakdownNumber(
     ruleBreakdown,
     "situation_multiplier",
-    ruleEvaluation?.environmentScore ?? situationMultiplier,
+    situationMultiplier,
   );
+
+  const backendBreakdownRows = [
+    {
+      key: "medical_score",
+      label: "Y tế",
+      value: medicalScoreValue,
+      icon: FirstAid,
+      colorClass: "text-red-600 dark:text-red-400",
+      formula:
+        "Điểm y tế do backend cộng từ từng vấn đề y khoa và hệ số tuổi/nhóm đối tượng.",
+    },
+    {
+      key: "request_type_score",
+      label: "Loại yêu cầu",
+      value: requestTypeScoreValue,
+      icon: Anchor,
+      colorClass: "text-orange-600 dark:text-orange-400",
+      formula: "Điểm nền theo loại SOS như cứu hộ, cứu trợ hoặc kết hợp.",
+    },
+    {
+      key: "relief_score",
+      label: "Cứu trợ",
+      value: reliefScoreValue,
+      icon: ForkKnife,
+      colorClass: "text-green-600 dark:text-green-400",
+      formula:
+        "Điểm cứu trợ là phần backend gộp từ nhu yếu phẩm khẩn cấp và mức dễ tổn thương.",
+    },
+    {
+      key: "supply_urgency_score",
+      label: "Nhu yếu phẩm",
+      value: supplyUrgencyScoreValue,
+      icon: Warning,
+      colorClass: "text-amber-600 dark:text-amber-400",
+      formula:
+        "Mức khẩn cấp của nước, thực phẩm, chăn mền, quần áo và các nhu cầu thiết yếu.",
+    },
+    {
+      key: "vulnerability_score",
+      label: "Dễ tổn thương",
+      value: vulnerabilityScoreValue,
+      icon: Users,
+      colorClass: "text-sky-600 dark:text-sky-400",
+      formula:
+        "Điểm dễ tổn thương của trẻ em, người già, thai phụ hoặc các nhóm cần ưu tiên.",
+    },
+    {
+      key: "situation_multiplier",
+      label: "Hệ số tình huống",
+      value: situationMultiplierValue,
+      icon: Lightning,
+      colorClass: "text-indigo-600 dark:text-indigo-400",
+      formula:
+        "Hệ số nhân cuối cùng theo bối cảnh như mắc kẹt, ngập, vùng nguy hiểm hoặc khó di chuyển.",
+    },
+  ].filter((row) => row.value != null);
+
+  const hasBackendBreakdownRows = backendBreakdownRows.length >= 3;
+  const displayScoreRows = hasBackendBreakdownRows
+    ? backendBreakdownRows
+    : legacyScoreRows;
+
+  const reliefFormulaScore =
+    medicalScoreValue != null &&
+    reliefScoreValue != null &&
+    situationMultiplierValue != null
+      ? Math.round(
+          (medicalScoreValue + reliefScoreValue) * situationMultiplierValue,
+        )
+      : null;
+  const requestTypeFormulaScore =
+    medicalScoreValue != null &&
+    requestTypeScoreValue != null &&
+    situationMultiplierValue != null
+      ? Math.round(
+          (medicalScoreValue + requestTypeScoreValue) *
+            situationMultiplierValue,
+        )
+      : null;
+  const shouldUseRequestTypeFormula =
+    requestTypeFormulaScore != null &&
+    Math.abs(requestTypeFormulaScore - displayedTotalScore) <= 0.5
+      ? true
+      : reliefFormulaScore != null &&
+          Math.abs(reliefFormulaScore - displayedTotalScore) <= 0.5
+        ? false
+        : Boolean(priorityRuleConfig?.priority_score?.use_request_type_score);
+  const derivedFormulaTemplate = shouldUseRequestTypeFormula
+    ? "ROUND((request_type_score + medical_score) * situation_multiplier)"
+    : "ROUND((medical_score + relief_score) * situation_multiplier)";
   const priorityConfigFormula =
-    priorityRuleConfig?.priority_score?.formula?.trim() ||
-    (isV3
-      ? "ROUND((request_type_score + medical_score) * situation_multiplier)"
-      : "ROUND((medical_score + relief_score) * situation_multiplier)");
+    priorityRuleConfig?.config_version &&
+    ruleEvaluation?.configVersion &&
+    priorityRuleConfig.config_version === ruleEvaluation.configVersion
+      ? priorityRuleConfig.priority_score?.formula?.trim() ||
+        derivedFormulaTemplate
+      : derivedFormulaTemplate;
   const priorityFormulaUsesRequestType =
     priorityConfigFormula.includes("request_type_score");
   const priorityFormulaUsesMedical =
@@ -903,11 +1214,6 @@ const SOSDetailsPanel = ({
   const priorityFormulaUsesSituation = priorityConfigFormula.includes(
     "situation_multiplier",
   );
-  const priorityFormulaSymbols = [
-    priorityFormulaUsesRequestType ? "T" : null,
-    priorityFormulaUsesMedical ? "M" : null,
-    priorityFormulaUsesRelief ? "R" : null,
-  ].filter((symbol): symbol is string => Boolean(symbol));
   const priorityValueEntries: Array<[symbol: string, value: unknown]> = [
     priorityFormulaUsesRequestType ? ["T", requestTypeScoreValue] : null,
     priorityFormulaUsesMedical ? ["M", medicalScoreValue] : null,
@@ -916,10 +1222,50 @@ const SOSDetailsPanel = ({
   ].filter((entry): entry is [symbol: string, value: unknown] =>
     Boolean(entry),
   );
+  const readableFormula = priorityConfigFormula
+    .replace(/request_type_score/g, "Điểm Loại YC")
+    .replace(/medical_score/g, "Y Tế")
+    .replace(/injury_score/g, "Chấn Thương")
+    .replace(/environment_score/g, "Môi Trường")
+    .replace(/mobility_score/g, "Di Chuyển")
+    .replace(/food_score/g, "Thực Phẩm")
+    .replace(/relief_score/g, "Cứu Trợ")
+    .replace(/situation_multiplier/g, "Hệ số Tình Huống")
+    .replace(/ROUND/g, "làm tròn");
+
+  const substitutedFormula = priorityConfigFormula
+    .replace(
+      /request_type_score/g,
+      formatScoreValue(requestTypeScoreValue, "?"),
+    )
+    .replace(/medical_score/g, formatScoreValue(medicalScoreValue, "?"))
+    .replace(
+      /injury_score/g,
+      formatScoreValue(ruleEvaluation?.injuryScore ?? null, "?"),
+    )
+    .replace(
+      /environment_score/g,
+      formatScoreValue(ruleEvaluation?.environmentScore ?? null, "?"),
+    )
+    .replace(
+      /mobility_score/g,
+      formatScoreValue(ruleEvaluation?.mobilityScore ?? null, "?"),
+    )
+    .replace(
+      /food_score/g,
+      formatScoreValue(ruleEvaluation?.foodScore ?? null, "?"),
+    )
+    .replace(/relief_score/g, formatScoreValue(reliefScoreValue, "?"))
+    .replace(
+      /situation_multiplier/g,
+      formatScoreValue(situationMultiplierValue, "?"),
+    )
+    .replace(/ROUND/g, "làm tròn");
+
   const priorityFormulaContent = (
     <PriorityFormulaNotation
-      additiveSymbols={priorityFormulaSymbols}
-      includeSituationMultiplier={priorityFormulaUsesSituation}
+      formulaTemplate={readableFormula}
+      substitutedFormula={substitutedFormula}
       totalScore={displayedTotalScore.toFixed(1)}
     />
   );
@@ -934,23 +1280,22 @@ const SOSDetailsPanel = ({
         .filter(Boolean)
         .join(" ")
     : null;
-  const priorityReadableSymbols = [
-    "S",
-    ...priorityFormulaSymbols,
-    priorityFormulaUsesSituation ? "K" : null,
-  ].filter((symbol): symbol is string => Boolean(symbol));
-  const priorityFormulaDescription =
-    "Công thức rút gọn để đọc nhanh cách hệ thống cộng điểm và nhân hệ số tình huống.";
+
   const priorityFormulaDetails = compactFormulaDetails([
+    ruleEvaluation?.configVersion
+      ? `Config đã chấm request: ${ruleEvaluation.configVersion}`
+      : null,
     priorityRuleConfig?.config_version
-      ? `Phiên bản config: ${priorityRuleConfig.config_version}`
-      : ruleEvaluation?.configVersion
-        ? `Phiên bản config: ${ruleEvaluation.configVersion}`
-        : null,
+      ? `Config form đang active: ${priorityRuleConfig.config_version}`
+      : null,
+    ruleEvaluation?.configVersion &&
+    priorityRuleConfig?.config_version &&
+    ruleEvaluation.configVersion !== priorityRuleConfig.config_version
+      ? "Config đang active trên form khác với config đã chấm request này, nên tooltip ưu tiên bám theo breakdown backend."
+      : null,
     isLoadingPriorityRuleConfig
       ? "Đang tải công thức active từ backend..."
       : null,
-    formatPrioritySymbols(priorityReadableSymbols),
     formatPrioritySymbolValues(priorityValueEntries),
     priorityFormulaUsesMedical ? (
       <span>
@@ -966,13 +1311,101 @@ const SOSDetailsPanel = ({
     ) : null,
     priorityThresholdText,
   ]);
+  const latestAiAnalysis =
+    aiAnalyses.length > 0
+      ? [...aiAnalyses].sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )[0]
+      : null;
+  const aiConfidencePercent = formatConfidencePercent(
+    latestAiAnalysis?.confidenceScore,
+  );
+  const aiPriorityLabel =
+    latestAiAnalysis?.suggestedPriority != null
+      ? getRulePriorityLabel(latestAiAnalysis.suggestedPriority)
+      : null;
+  const aiExplanation =
+    latestAiAnalysis?.metadata?.analysisResult?.explanation?.trim() ||
+    latestAiAnalysis?.explanation?.trim() ||
+    null;
 
-  // Filter out 0-value factors for v3.0
-  const displayScoreRows = isV3
-    ? scoreRows.filter(
-        (r) => !["injury", "mobility", "food"].includes(r.key) || r.value > 0,
-      )
-    : scoreRows;
+  const aiPriorityFormulaContent = latestAiAnalysis ? (
+    <div className="space-y-3 p-1 max-w-[320px]">
+      <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-violet-500" weight="fill" />
+          <span className="font-bold text-base">Phân tích AI</span>
+        </div>
+        {latestAiAnalysis.suggestedPriorityScore != null && (
+          <Badge className="font-mono bg-violet-600 text-white">
+            {latestAiAnalysis.suggestedPriorityScore.toFixed(1)}
+          </Badge>
+        )}
+      </div>
+
+      {aiExplanation && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Nhận định chi tiết
+          </p>
+          <p className="text-sm leading-relaxed text-foreground/90">
+            {aiExplanation}
+          </p>
+        </div>
+      )}
+
+      {latestAiAnalysis.handlingReason && (
+        <div className="space-y-1 bg-violet-50 dark:bg-violet-900/20 p-2.5 rounded-md border border-violet-100 dark:border-violet-800/50">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+            Lý do xử lý
+          </p>
+          <p className="text-[13px] italic leading-snug text-violet-900/90 dark:text-violet-200/90">
+            {latestAiAnalysis.handlingReason}
+          </p>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  const aiPriorityFormulaDetails = compactFormulaDetails([
+    latestAiAnalysis?.modelName ? (
+      <div className="flex items-center gap-1.5">
+        <Icon
+          icon="ph:cpu-bold"
+          className="w-3.5 h-3.5 text-muted-foreground"
+        />
+        <span>Model: {latestAiAnalysis.modelName}</span>
+      </div>
+    ) : null,
+    latestAiAnalysis?.suggestedSeverityLevel ? (
+      <div className="flex items-center gap-1.5">
+        <Icon
+          icon="ph:warning-circle-bold"
+          className="w-3.5 h-3.5 text-muted-foreground"
+        />
+        <span>
+          Mức độ: {severityLabel(latestAiAnalysis.suggestedSeverityLevel)}
+        </span>
+      </div>
+    ) : null,
+    latestAiAnalysis?.needsImmediateSafeTransfer ? (
+      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-medium">
+        <Icon icon="ph:warning-bold" className="w-3.5 h-3.5" />
+        <span>Cần chuyển đi ngay lập tức</span>
+      </div>
+    ) : null,
+    latestAiAnalysis?.canWaitForCombinedMission === false ? (
+      <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-medium">
+        <Icon icon="ph:hourglass-simple-bold" className="w-3.5 h-3.5" />
+        <span>Không nên chờ ghép đoàn</span>
+      </div>
+    ) : null,
+    aiConfidencePercent ? `Độ tin cậy: ${aiConfidencePercent}` : null,
+  ]);
+
+  const itemsNeeded = parseItemsNeeded(ruleEvaluation?.itemsNeeded);
 
   const normalizeContactText = (value?: string | null) => {
     const trimmed = value?.trim();
@@ -1593,284 +2026,167 @@ const SOSDetailsPanel = ({
 
           {/* System Analysis & AI Scores */}
           {(ruleEvaluation ||
-            isLoadingAnalysis ||
-            aiAnalyses.length > 0 ||
+            isLoadingEvaluation ||
+            hasAiAnalysis ||
             riskFactors.length > 0) && (
-            <div className="space-y-4 pt-4 border-t">
-              {isLoadingAnalysis ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+            <div className="space-y-4 border-t pt-4">
+              {isLoadingEvaluation ? (
+                <div className="flex animate-pulse items-center gap-2 text-sm text-muted-foreground">
                   <Brain className="h-4 w-4" weight="fill" />
-                  Đang tải đánh giá hệ thống...
+                  Đang tải điểm hệ thống và AI...
                 </div>
               ) : (
-                <>
-                  {ruleEvaluation && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <ChartBar
-                          className="h-4 w-4 text-indigo-500"
-                          weight="fill"
-                        />
-                        Đánh giá độ nguy cấp (Hệ thống)
-                      </h4>
-                      <div className="bg-muted/30 rounded-lg p-3.5 border shadow-sm">
-                        <div className="flex items-center justify-between mb-3 pb-3 border-b border-border/50">
-                          <span className="text-sm font-medium inline-flex items-center gap-1.5">
-                            Điểm rủi ro tổng hợp:
+                <div className="space-y-3">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold">
+                    <ChartBar
+                      className="h-4 w-4 text-indigo-500"
+                      weight="fill"
+                    />
+                    Điểm số Rulebase & AI
+                  </h4>
+
+                  <div className="space-y-3">
+                    {ruleEvaluation && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2 rounded-md border bg-background p-2.5 shadow-sm">
+                          <div className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold whitespace-nowrap pl-1">
+                            Rule base
                             <FormulaTooltip
-                              title="Công thức tính chuẩn hóa"
-                              description={priorityFormulaDescription}
+                              title="Công thức tính điểm ưu tiên"
                               formula={priorityFormulaContent}
                               details={priorityFormulaDetails}
                             />
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {ruleEvaluation.priorityLevel && (
-                              <Badge
-                                variant={
-                                  ruleEvaluation.priorityLevel === "Critical"
-                                    ? "destructive"
-                                    : ruleEvaluation.priorityLevel === "High"
-                                      ? "warning"
-                                      : ruleEvaluation.priorityLevel === "Low"
-                                        ? "success"
-                                        : "secondary"
-                                }
-                                className={cn(
-                                  "text-sm px-2 h-6",
-                                  ruleEvaluation.priorityLevel === "Critical" &&
-                                    "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-                                  ruleEvaluation.priorityLevel === "High" &&
-                                    "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800",
-                                  ruleEvaluation.priorityLevel === "Medium" &&
-                                    "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
-                                  ruleEvaluation.priorityLevel === "Low" &&
-                                    "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-                                )}
-                              >
-                                {ruleEvaluation.priorityLevel === "Critical"
-                                  ? "Nguy kịch"
-                                  : ruleEvaluation.priorityLevel === "High"
-                                    ? "Khẩn cấp cao"
-                                    : ruleEvaluation.priorityLevel === "Medium"
-                                      ? "Trung bình"
-                                      : ruleEvaluation.priorityLevel === "Low"
-                                        ? "Thấp"
-                                        : ruleEvaluation.priorityLevel}
-                              </Badge>
-                            )}
-                            <Badge
-                              variant={
-                                ruleEvaluation.totalScore > 80
-                                  ? "destructive"
-                                  : ruleEvaluation.totalScore > 50
-                                    ? "warning"
-                                    : "secondary"
-                              }
-                              className="text-sm px-2.5"
-                            >
-                              {ruleEvaluation.totalScore.toFixed(1)} đ
-                            </Badge>
                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
-                          {displayScoreRows.map((row) => {
-                            const RowIcon = row.icon;
-                            return (
-                              <div
-                                key={row.key}
-                                className="flex justify-between items-center"
-                              >
-                                <span className="text-muted-foreground flex items-center gap-1.5">
-                                  <RowIcon className="w-3.5 h-3.5" />
-                                  {row.label}:
-                                </span>
-                                <span
-                                  className={cn(
-                                    "font-semibold",
-                                    row.colorClass,
-                                  )}
-                                >
-                                  {row.value.toFixed(1)}
-                                </span>
+
+                          <div className="flex items-center gap-3 pr-1">
+                            <div className="flex items-center gap-2 text-right">
+                              <div className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                Tổng
                               </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Items Needed */}
-                        {(() => {
-                          let parsedItems: string[] = [];
-                          try {
-                            if (
-                              typeof ruleEvaluation.itemsNeeded === "string"
-                            ) {
-                              parsedItems = JSON.parse(
-                                ruleEvaluation.itemsNeeded,
-                              );
-                            } else if (
-                              Array.isArray(ruleEvaluation.itemsNeeded)
-                            ) {
-                              parsedItems = ruleEvaluation.itemsNeeded;
-                            }
-                          } catch {}
-
-                          if (!parsedItems || parsedItems.length === 0)
-                            return null;
-
-                          const ITEMS_NEEDED_LABELS: Record<
-                            string,
-                            { label: string; icon: string }
-                          > = {
-                            FIRST_AID_KIT: {
-                              label: "Bộ sơ cứu",
-                              icon: "ph:first-aid-kit",
-                            },
-                            MEDICAL_SUPPLIES: {
-                              label: "Vật phẩm y tế",
-                              icon: "ph:pill",
-                            },
-                            BANDAGES: {
-                              label: "Băng gạc",
-                              icon: "ph:bandage",
-                            },
-                            BLOOD_CLOTTING_AGENTS: {
-                              label: "Thuốc cầm máu",
-                              icon: "ph:drop",
-                            },
-                            LIFE_JACKET: {
-                              label: "Áo phao",
-                              icon: "ph:lifebuoy",
-                            },
-                            RESCUE_BOAT: {
-                              label: "Xuồng cứu hộ",
-                              icon: "ph:boat",
-                            },
-                            ROPE: {
-                              label: "Dây thừng",
-                              icon: "ph:circles-three",
-                            },
-                            RESCUE_EQUIPMENT: {
-                              label: "Thiết bị cứu hộ",
-                              icon: "ph:toolbox",
-                            },
-                            FIRE_EXTINGUISHER: {
-                              label: "Bình chữa cháy",
-                              icon: "ph:fire-extinguisher",
-                            },
-                            PROTECTIVE_GEAR: {
-                              label: "Đồ bảo hộ",
-                              icon: "ph:shield-check",
-                            },
-                            FOOD_RATIONS: {
-                              label: "Lương thực",
-                              icon: "ph:package",
-                            },
-                            WATER: { label: "Nước uống", icon: "ph:drop" },
-                            CLOTHING: {
-                              label: "Quần áo",
-                              icon: "ph:t-shirt",
-                            },
-                            BLANKETS: { label: "Chăn mền", icon: "ph:bed" },
-                            TRANSPORT_VEHICLE: {
-                              label: "Phương tiện vận chuyển",
-                              icon: "ph:ambulance",
-                            },
-                            STRETCHER: {
-                              label: "Cáng cứu thương",
-                              icon: "ph:first-aid",
-                            },
-                          };
-
-                          return (
-                            <div className="mt-3 pt-3 border-t border-border/50">
-                              <h5 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-                                <FirstAid className="w-3.5 h-3.5" /> Vật phẩm
-                                gợi ý:
-                              </h5>
-                              <div className="flex flex-wrap gap-1.5">
-                                {parsedItems.map((item, idx) => {
-                                  const config = ITEMS_NEEDED_LABELS[item];
-                                  return (
-                                    <Badge
-                                      key={idx}
-                                      variant="outline"
-                                      className="text-sm px-2.5 py-1 h-auto font-medium bg-background border-border/60 inline-flex items-center gap-1.5"
-                                    >
-                                      {config ? (
-                                        <>
-                                          <Icon
-                                            icon={config.icon}
-                                            className="h-3.5 w-3.5 text-muted-foreground"
-                                          />
-                                          <span>{config.label}</span>
-                                        </>
-                                      ) : (
-                                        item
-                                      )}
-                                    </Badge>
-                                  );
-                                })}
+                              <div className="text-base font-bold text-foreground">
+                                {ruleEvaluation.totalScore.toFixed(1)}
                               </div>
                             </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
 
-                  {(aiAnalyses.length > 0 || riskFactors.length > 0) && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <Brain
-                          className="h-4 w-4 text-violet-500"
-                          weight="fill"
-                        />
-                        Phân tích AI
-                      </h4>
-
-                      {riskFactors.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {riskFactors.map((factor, idx) => (
-                            <Badge
-                              key={idx}
-                              variant="outline"
-                              className="text-sm bg-violet-50/30 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800"
-                            >
-                              {factor}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      {aiAnalyses.length > 0 && (
-                        <div className="bg-violet-50/50 dark:bg-violet-900/10 rounded-lg p-3.5 border border-violet-200 dark:border-violet-800/30 shadow-sm relative overflow-hidden">
-                          <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full pointer-events-none" />
-                          <div className="flex items-center justify-between mb-2 relative z-10">
-                            <span className="text-sm font-semibold text-violet-900 dark:text-violet-300">
-                              Nhận định tình hình
-                            </span>
-                            {aiAnalyses[0].confidenceScore && (
-                              <Badge
-                                variant="secondary"
-                                className="text-sm bg-white/60 dark:bg-black/40 text-violet-700 dark:text-violet-300 hover:bg-white/80 border border-violet-200/50 dark:border-violet-800/50"
-                              >
-                                Tin cậy:{" "}
-                                {(aiAnalyses[0].confidenceScore * 100).toFixed(
-                                  0,
-                                )}
-                                %
-                              </Badge>
-                            )}
+                            {ruleEvaluation.priorityLevel ? (
+                              <>
+                                <div className="h-4 w-px bg-border/60 shrink-0"></div>
+                                <Badge
+                                  variant={
+                                    ruleEvaluation.priorityLevel === "Critical"
+                                      ? "destructive"
+                                      : ruleEvaluation.priorityLevel === "High"
+                                        ? "warning"
+                                        : ruleEvaluation.priorityLevel === "Low"
+                                          ? "success"
+                                          : "secondary"
+                                  }
+                                  className={cn(
+                                    "h-6 px-2 text-xs shrink-0",
+                                    getRulePriorityBadgeClass(
+                                      ruleEvaluation.priorityLevel,
+                                    ),
+                                  )}
+                                >
+                                  {getRulePriorityLabel(
+                                    ruleEvaluation.priorityLevel,
+                                  )}
+                                </Badge>
+                              </>
+                            ) : null}
                           </div>
-                          <p className="text-sm text-violet-800/80 dark:text-violet-300/80 leading-relaxed italic relative z-10">
-                            "{aiAnalyses[0].explanation}"
-                          </p>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </>
+
+                        {latestAiAnalysis && (
+                          <div className="flex items-center justify-between gap-2 rounded-md border bg-background p-2.5 shadow-sm">
+                            <div className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold whitespace-nowrap pl-1">
+                              <Brain
+                                className="h-4 w-4 text-violet-500"
+                                weight="fill"
+                              />
+                              AI Phân tích
+                              <FormulaTooltip
+                                title="Nhận định từ AI"
+                                formula={aiPriorityFormulaContent}
+                                details={aiPriorityFormulaDetails}
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-3 pr-1">
+                              <div className="flex items-center gap-2 text-right">
+                                <div className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                                  Tổng
+                                </div>
+                                <div className="text-base font-bold text-foreground">
+                                  {latestAiAnalysis.suggestedPriorityScore.toFixed(
+                                    1,
+                                  )}
+                                </div>
+                              </div>
+
+                              {latestAiAnalysis.suggestedPriority && (
+                                <>
+                                  <div className="h-4 w-px bg-border/60 shrink-0"></div>
+                                  <Badge
+                                    variant={
+                                      PRIORITY_BADGE_VARIANT[
+                                        latestAiAnalysis.suggestedPriority as keyof typeof PRIORITY_BADGE_VARIANT
+                                      ] || "secondary"
+                                    }
+                                    className={cn(
+                                      "h-6 px-2 text-xs shrink-0",
+                                      getRulePriorityBadgeClass(
+                                        latestAiAnalysis.suggestedPriority,
+                                      ),
+                                    )}
+                                  >
+                                    {getRulePriorityLabel(
+                                      latestAiAnalysis.suggestedPriority,
+                                    )}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {itemsNeeded.length > 0 && (
+                          <div className="border-t border-border/50 pt-3">
+                            <div className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+                              <FirstAid className="h-3.5 w-3.5" />
+                              Vật phẩm gợi ý
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {itemsNeeded.map((item, idx) => {
+                                const config = ITEMS_NEEDED_LABELS[item];
+
+                                return (
+                                  <Badge
+                                    key={`${item}-${idx}`}
+                                    variant="outline"
+                                    className="inline-flex h-auto items-center gap-1.5 border-border/60 bg-background px-2.5 py-1 text-sm font-medium"
+                                  >
+                                    {config ? (
+                                      <>
+                                        <Icon
+                                          icon={config.icon}
+                                          className="h-3.5 w-3.5 text-muted-foreground"
+                                        />
+                                        <span>{config.label}</span>
+                                      </>
+                                    ) : (
+                                      item
+                                    )}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           )}

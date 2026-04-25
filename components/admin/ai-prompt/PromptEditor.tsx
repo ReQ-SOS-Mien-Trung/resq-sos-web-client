@@ -444,6 +444,11 @@ function mapPromptTestResponseToReviewResult(
             imageUrl: item.imageUrl ?? null,
             quantity: Number(item.quantity) || 0,
             unit: item.unit ?? "đơn vị",
+            bufferRatio: item.bufferRatio ?? null,
+            bufferQuantity: item.bufferQuantity ?? null,
+            bufferUsedQuantity: item.bufferUsedQuantity ?? null,
+            bufferUsedReason: item.bufferUsedReason ?? null,
+            actualDeliveredQuantity: item.actualDeliveredQuantity ?? null,
           }))
         : null,
       suggestedTeam: activity.suggestedTeam

@@ -1,4 +1,5 @@
 import api from "@/config/axios";
+import { resolveSupplyBufferRatio } from "@/lib/supply-buffer";
 import {
   CreateActivityResponse,
   ActivityStatus,
@@ -24,6 +25,7 @@ import {
   MissionTeamRouteResponse,
   ConfirmReturnSuppliesRequest,
   ConfirmReturnResponse,
+  MissionTeamReportResponse,
 } from "./type";
 
 function toNumberOrZero(value: unknown): number {
@@ -234,6 +236,8 @@ function normalizeCreateMissionRequest(
             .replace(/^RETURN_TO_ASSEMBLY_POINT_/, "RETURN_ASSEMBLY_POINT_")
             .replace(/^RETURN_ASSEMBLY_/, "RETURN_ASSEMBLY_POINT_")
         : `${normalizedActivityType}_${index + 1}`;
+      const shouldSendSupplyBuffer =
+        normalizedActivityType === "COLLECT_SUPPLIES";
 
       return {
         step: toNumberOrZero(activity.step) || index + 1,
@@ -272,6 +276,9 @@ function normalizeCreateMissionRequest(
           name: supply.name ? String(supply.name) : null,
           quantity: toNumberOrZero(supply.quantity),
           unit: String(supply.unit || "").trim(),
+          ...(shouldSendSupplyBuffer
+            ? { bufferRatio: resolveSupplyBufferRatio(supply.bufferRatio) }
+            : {}),
         })),
         target: String(activity.target || "").trim(),
         targetLatitude: toNumberOrZero(activity.targetLatitude),
@@ -326,6 +333,7 @@ function normalizeMissionReusableUnit(
 
 function normalizeUpdateMissionActivityItem(
   item: UpdateMissionActivityItemPayload,
+  shouldSendSupplyBuffer = true,
 ): UpdateMissionActivityItemPayload {
   const normalizedItem: UpdateMissionActivityItemPayload = {
     itemId: toNumberOrNull(item?.itemId),
@@ -375,19 +383,19 @@ function normalizeUpdateMissionActivityItem(
     );
   }
 
-  if (item?.bufferRatio != null) {
+  if (shouldSendSupplyBuffer && item?.bufferRatio != null) {
     normalizedItem.bufferRatio = toNumberOrZero(item.bufferRatio);
   }
 
-  if (item?.bufferQuantity != null) {
+  if (shouldSendSupplyBuffer && item?.bufferQuantity != null) {
     normalizedItem.bufferQuantity = toNumberOrZero(item.bufferQuantity);
   }
 
-  if (item?.bufferUsedQuantity != null) {
+  if (shouldSendSupplyBuffer && item?.bufferUsedQuantity != null) {
     normalizedItem.bufferUsedQuantity = toNumberOrZero(item.bufferUsedQuantity);
   }
 
-  if (item?.bufferUsedReason !== undefined) {
+  if (shouldSendSupplyBuffer && item?.bufferUsedReason !== undefined) {
     normalizedItem.bufferUsedReason = toTrimmedStringOrNull(
       item.bufferUsedReason,
     );
@@ -412,6 +420,10 @@ function normalizeUpdateMissionRequest(
           parsedAssemblyPointId != null && parsedAssemblyPointId > 0
             ? parsedAssemblyPointId
             : null;
+        const shouldSendSupplyBuffer =
+          activity?.activityType == null ||
+          normalizeMissionActivityType(activity.activityType) ===
+            "COLLECT_SUPPLIES";
 
         return {
           activityId: toNumberOrZero(activity?.activityId),
@@ -426,7 +438,9 @@ function normalizeUpdateMissionRequest(
               }
             : {}),
           items: Array.isArray(activity?.items)
-            ? activity.items.map(normalizeUpdateMissionActivityItem)
+            ? activity.items.map((item) =>
+                normalizeUpdateMissionActivityItem(item, shouldSendSupplyBuffer),
+              )
             : [],
         };
       })
@@ -541,6 +555,36 @@ function normalizeConfirmReturnSuppliesRequest(
   };
 }
 
+function normalizeMissionTeamReportResponse(
+  response: MissionTeamReportResponse,
+): MissionTeamReportResponse {
+  return {
+    ...response,
+    reportStatus: toTrimmedStringOrNull(response?.reportStatus) ?? "NotStarted",
+    executionStatus: toTrimmedStringOrNull(response?.executionStatus) ?? "",
+    teamSummary: toTrimmedStringOrNull(response?.teamSummary),
+    teamNote: toTrimmedStringOrNull(response?.teamNote),
+    issuesJson: toTrimmedStringOrNull(response?.issuesJson),
+    resultJson: toTrimmedStringOrNull(response?.resultJson),
+    evidenceJson: toTrimmedStringOrNull(response?.evidenceJson),
+    activities: Array.isArray(response?.activities)
+      ? response.activities.map((activity) => ({
+          ...activity,
+          activityType: toTrimmedStringOrNull(activity?.activityType),
+          activityStatus: toTrimmedStringOrNull(activity?.activityStatus),
+          executionStatus: toTrimmedStringOrNull(activity?.executionStatus),
+          summary: toTrimmedStringOrNull(activity?.summary),
+          issuesJson: toTrimmedStringOrNull(activity?.issuesJson),
+          resultJson: toTrimmedStringOrNull(activity?.resultJson),
+          evidenceJson: toTrimmedStringOrNull(activity?.evidenceJson),
+        }))
+      : [],
+    memberEvaluations: Array.isArray(response?.memberEvaluations)
+      ? response.memberEvaluations
+      : [],
+  };
+}
+
 export async function getMissions(
   params: GetMissionsParams,
 ): Promise<GetMissionsResponse> {
@@ -563,6 +607,16 @@ export async function getMissionById(
 ): Promise<MissionEntity> {
   const { data } = await api.get(`/operations/missions/${missionId}`);
   return data;
+}
+
+export async function getMissionTeamReport(
+  missionId: number,
+  missionTeamId: number,
+): Promise<MissionTeamReportResponse> {
+  const { data } = await api.get(
+    `/operations/missions/${missionId}/teams/${missionTeamId}/report`,
+  );
+  return normalizeMissionTeamReportResponse(data as MissionTeamReportResponse);
 }
 
 export async function updateMission(

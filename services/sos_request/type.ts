@@ -10,6 +10,7 @@ export type SOSRequestStatus =
 
 // SOS Request Priority Level
 export type SOSPriorityLevel = "Low" | "Medium" | "High" | "Critical";
+export type SOSRequestTypeFilter = "Rescue" | "Relief" | "Both";
 
 export interface SOSMetadataOption<T extends string = string> {
   key: T;
@@ -212,6 +213,7 @@ export interface SOSRequestEntity {
   reviewedById: string | null;
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
+  evaluation?: SOSRequestEvaluationSummary | null;
 }
 
 // Paginated Response
@@ -230,7 +232,8 @@ export interface GetSOSRequestsParams {
   pageNumber?: number;
   pageSize?: number;
   Statuses?: SOSRequestStatus[];
-  PriorityLevels?: SOSPriorityLevel[];
+  Priorities?: SOSPriorityLevel[];
+  SosTypes?: SOSRequestTypeFilter[];
 }
 
 export interface GetSOSRequestsInBoundsParams {
@@ -239,7 +242,8 @@ export interface GetSOSRequestsInBoundsParams {
   MinLng: number;
   MaxLng: number;
   Statuses?: SOSRequestStatus[];
-  PriorityLevels?: SOSPriorityLevel[];
+  Priorities?: SOSPriorityLevel[];
+  SosTypes?: SOSRequestTypeFilter[];
 }
 
 // Get SOS Request By ID Response
@@ -360,8 +364,8 @@ export interface RuleEvaluation {
   itemsNeeded: string[];
   breakdown?: Record<string, unknown> | null;
   createdAt: string;
-  priorityThresholds: PriorityThresholds;
-  scoreWeights: ScoreWeights;
+  priorityThresholds?: PriorityThresholds | null;
+  scoreWeights?: ScoreWeights | null;
 }
 
 export interface AiAnalysisResult {
@@ -385,7 +389,12 @@ export interface AiAnalysis {
   analysisType: string;
   suggestedSeverityLevel: SeverityLevel;
   suggestedPriority: SOSPriorityLevel;
+  suggestedPriorityScore: number;
+  agreesWithRuleBase: boolean;
+  needsImmediateSafeTransfer: boolean;
+  canWaitForCombinedMission: boolean;
   explanation: string;
+  handlingReason?: string;
   confidenceScore: number;
   suggestionScope: string;
   metadata: AiAnalysisMetadata;
@@ -393,7 +402,17 @@ export interface AiAnalysis {
   adoptedAt: string | null;
 }
 
-export interface GetSOSRequestAnalysisResponse {
+export interface SOSRequestEvaluationSummary {
+  sosRequestId?: number;
+  sosType?: string;
+  status?: SOSRequestStatus;
+  currentPriorityLevel?: SOSPriorityLevel;
+  ruleEvaluation?: RuleEvaluation | null;
+  aiAnalyses?: AiAnalysis[] | null;
+  hasAiAnalysis?: boolean | null;
+}
+
+export interface GetSOSRequestAnalysisResponse extends SOSRequestEvaluationSummary {
   sosRequestId: number;
   sosType: string;
   status: SOSRequestStatus;

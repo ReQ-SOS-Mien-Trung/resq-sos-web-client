@@ -207,6 +207,10 @@ function getMinimumGatheringDate(now = new Date()): Date {
   return date;
 }
 
+function getDefaultCheckInDeadline(assemblyDate: Date): Date {
+  return new Date(assemblyDate);
+}
+
 function formatRetryTime(blockedUntil: number | null): string | null {
   if (!blockedUntil) return null;
 
@@ -1160,7 +1164,7 @@ function AssemblyPointDetails({
     }
 
     if (!checkInDeadlineInput) {
-      toast.error("Vui lòng chọn hạn xác nhận (có mặt).");
+      toast.error("Vui lòng chọn Thời hạn điểm danh.");
       return;
     }
 
@@ -1172,7 +1176,7 @@ function AssemblyPointDetails({
     }
 
     if (Number.isNaN(checkInDeadline.getTime())) {
-      toast.error("Hạn xác nhận (có mặt) không hợp lệ.");
+      toast.error("Thời hạn điểm danh không hợp lệ.");
       return;
     }
 
@@ -1186,15 +1190,13 @@ function AssemblyPointDetails({
 
     if (checkInDeadline.getTime() < minAllowedDate.getTime()) {
       toast.error(
-        `Hạn xác nhận (có mặt) không được ở quá khứ. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
+        `Thời hạn điểm danh không được ở quá khứ. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
       );
       return;
     }
 
-    if (checkInDeadline.getTime() > assemblyDate.getTime()) {
-      toast.error(
-        "Hạn xác nhận (có mặt) phải trước hoặc bằng thời gian tập kết.",
-      );
+    if (checkInDeadline.getTime() < assemblyDate.getTime()) {
+      toast.error("Thời hạn điểm danh phải sau hoặc bằng thời gian tập kết.");
       return;
     }
 
@@ -1223,7 +1225,9 @@ function AssemblyPointDetails({
     : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
 
   const shouldShowCreateTeam =
-    hasActiveEvent && selectedEvent?.status === "Gathering";
+    !hasActiveEvent ||
+    (selectedEvent?.status === "Scheduled" ||
+      selectedEvent?.status === "Gathering");
   const isAssemblyPointAvailable = displayAssemblyPoint.status === "Available";
   const canToggleSchedule = isAssemblyPointAvailable && !hasActiveEvent;
   const effectiveShowScheduleForm = canToggleSchedule && showScheduleForm;
@@ -1234,7 +1238,7 @@ function AssemblyPointDetails({
   const isScheduleOrderInvalid =
     !!assemblyDateInput &&
     !!checkInDeadlineInput &&
-    checkInDeadlineInput.getTime() > assemblyDateInput.getTime();
+    checkInDeadlineInput.getTime() < assemblyDateInput.getTime();
 
   const handleRefreshAssemblyData = useCallback(() => {
     void refetchAssemblyPointDetail();
@@ -1243,9 +1247,7 @@ function AssemblyPointDetails({
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? effectiveSelectedEventId;
-    const query = eventId
-      ? `?assemblyPointId=${assemblyPoint.id}&eventId=${eventId}`
-      : "";
+    const query = `?assemblyPointId=${assemblyPoint.id}${eventId ? `&eventId=${eventId}` : ""}`;
     router.push(`/dashboard/coordinator/rescue-teams/create${query}`);
   };
 
@@ -1425,10 +1427,10 @@ function AssemblyPointDetails({
                   setAssemblyDateInput(nextValue);
                   setCheckInDeadlineInput((previous) => {
                     if (!nextValue) return null;
-                    if (!previous) return nextValue;
-                    return previous.getTime() <= nextValue.getTime()
+                    if (!previous) return getDefaultCheckInDeadline(nextValue);
+                    return previous.getTime() >= nextValue.getTime()
                       ? previous
-                      : nextValue;
+                      : getDefaultCheckInDeadline(nextValue);
                   });
                 }}
               />
@@ -1436,7 +1438,7 @@ function AssemblyPointDetails({
 
             <div className="space-y-1">
               <p className="text-xs font-medium text-[#FF5722]">
-                Hạn xác nhận (có mặt)
+                Thời hạn điểm danh
               </p>
               <AssemblyDateTimePicker
                 value={checkInDeadlineInput}
@@ -1446,11 +1448,12 @@ function AssemblyPointDetails({
 
             <p className="text-xs text-muted-foreground">
               Giờ triệu tập là thời điểm người cứu hộ cần có mặt tại điểm tập
-              kết. Hạn xác nhận (có mặt) phải trước hoặc bằng thời gian tập kết.
+              kết. Thời hạn điểm danh có thể sau giờ tập kết để dự trù thời gian
+              check-in.
             </p>
             {isScheduleOrderInvalid && (
               <p className="text-xs text-red-600">
-                Hạn xác nhận (có mặt) phải trước hoặc bằng thời gian tập kết.
+                Thời hạn điểm danh phải sau hoặc bằng thời gian tập kết.
               </p>
             )}
             <div className="flex items-center gap-2">

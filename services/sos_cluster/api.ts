@@ -8,6 +8,7 @@ import {
   CreateSOSClusterResponse,
   GetMissionSuggestionsResponse,
   ClusterRescueSuggestionResponse,
+  MissionSuggestionEntity,
   AlternativeDepotsResponse,
   SseMissionEvent,
 } from "./type";
@@ -219,6 +220,73 @@ function normalizeSOSClustersPage(
   };
 }
 
+function normalizeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+type MissionSuggestionActivityGroup =
+  MissionSuggestionEntity["activities"][number];
+
+function normalizeMissionSuggestionActivity(
+  activityGroup: MissionSuggestionActivityGroup | null | undefined,
+): MissionSuggestionActivityGroup | null {
+  if (!activityGroup || typeof activityGroup !== "object") {
+    return null;
+  }
+
+  return {
+    ...activityGroup,
+    suggestedActivities: normalizeArray(activityGroup.suggestedActivities),
+  };
+}
+
+function normalizeMissionSuggestion(
+  suggestion: MissionSuggestionEntity | null | undefined,
+): MissionSuggestionEntity | null {
+  if (!suggestion || typeof suggestion !== "object") {
+    return null;
+  }
+
+  return {
+    ...suggestion,
+    suggestedActivities: normalizeArray(suggestion.suggestedActivities),
+    activities: normalizeArray(suggestion.activities)
+      .map(normalizeMissionSuggestionActivity)
+      .filter(
+        (
+          activityGroup,
+        ): activityGroup is MissionSuggestionActivityGroup =>
+          activityGroup != null,
+      ),
+    supplyShortages: normalizeArray(suggestion.supplyShortages),
+    suggestedResources: normalizeArray(suggestion.suggestedResources),
+  };
+}
+
+function normalizeMissionSuggestionsResponse(
+  payload: GetMissionSuggestionsResponse | null | undefined,
+  fallbackClusterId: number,
+): GetMissionSuggestionsResponse {
+  const missionSuggestions = normalizeArray(payload?.missionSuggestions)
+    .map(normalizeMissionSuggestion)
+    .filter(
+      (suggestion): suggestion is MissionSuggestionEntity => suggestion != null,
+    );
+
+  return {
+    ...(payload ?? {}),
+    clusterId:
+      typeof payload?.clusterId === "number"
+        ? payload.clusterId
+        : fallbackClusterId,
+    totalSuggestions:
+      typeof payload?.totalSuggestions === "number"
+        ? payload.totalSuggestions
+        : missionSuggestions.length,
+    missionSuggestions,
+  };
+}
+
 export function formatAiAnalysisErrorMessage(
   rawError: unknown,
   statusCode?: number,
@@ -280,11 +348,31 @@ export async function getSOSClusters(
         .filter((status) => status.length > 0),
     ),
   );
+  const requestedPriorities = Array.from(
+    new Set(
+      (params?.priorities ?? [])
+        .filter((priority): priority is string => typeof priority === "string")
+        .map((priority) => priority.trim())
+        .filter((priority) => priority.length > 0),
+    ),
+  );
+  const requestedSOSTypes = Array.from(
+    new Set(
+      (params?.sosTypes ?? [])
+        .filter((sosType): sosType is string => typeof sosType === "string")
+        .map((sosType) => sosType.trim())
+        .filter((sosType) => sosType.length > 0),
+    ),
+  );
   const shouldUseSinglePageRequest =
-    requestedPageNumber != null ||
-    requestedPageSize != null ||
-    requestedSOSRequestId != null ||
-    requestedStatuses.length > 0;
+    requestedPageNumber != null || requestedPageSize != null;
+  const requestFilters = {
+    sosRequestId: requestedSOSRequestId,
+    statuses: requestedStatuses.length > 0 ? requestedStatuses : undefined,
+    priorities:
+      requestedPriorities.length > 0 ? requestedPriorities : undefined,
+    sosTypes: requestedSOSTypes.length > 0 ? requestedSOSTypes : undefined,
+  };
 
   if (shouldUseSinglePageRequest) {
     const pageNumber = requestedPageNumber ?? 1;
@@ -293,8 +381,7 @@ export async function getSOSClusters(
       params: {
         pageNumber,
         pageSize,
-        sosRequestId: requestedSOSRequestId,
-        statuses: requestedStatuses.length > 0 ? requestedStatuses : undefined,
+        ...requestFilters,
       },
       paramsSerializer: { indexes: null },
     });
@@ -320,7 +407,9 @@ export async function getSOSClusters(
       params: {
         pageNumber: nextPageNumber,
         pageSize: AGGREGATED_PAGE_SIZE,
+        ...requestFilters,
       },
+      paramsSerializer: { indexes: null },
     });
 
     const payload = data as RawSOSClustersResponse;
@@ -387,6 +476,19 @@ export async function removeSOSRequestFromCluster(
 }
 
 /**
+ * Add a SOS request to an existing cluster
+ * POST /emergency/sos-clusters/{clusterId}/sos-requests/{sosRequestId}
+ */
+export async function addSOSRequestToCluster(
+  clusterId: number,
+  sosRequestId: number,
+): Promise<void> {
+  await api.post(
+    `/emergency/sos-clusters/${clusterId}/sos-requests/${sosRequestId}`,
+  );
+}
+
+/**
  * Get mission suggestions for a SOS cluster
  * GET /emergency/sos-clusters/{clusterId}/mission-suggestions
  */
@@ -396,7 +498,7 @@ export async function getMissionSuggestions(
   const { data } = await api.get(
     `/emergency/sos-clusters/${clusterId}/mission-suggestions`,
   );
-  return data;
+  return normalizeMissionSuggestionsResponse(data, clusterId);
 }
 
 /**
