@@ -134,7 +134,7 @@ const COL = {
   GHICHU: "Mô tả vật phẩm",
   SOLUONG: "Số lượng (*)",
   DONGIA: "Đơn giá (VNĐ)",
-  THETICH: "Thể tích / đơn vị (dm3)",
+  THETICH: "Thể tích / đơn vị (dm³)",
   CANNANG: "Cân nặng / đơn vị (kg)",
 } as const;
 
@@ -1710,6 +1710,7 @@ export default function FundingRequestPage() {
             <Bank size={20} />
             Quỹ kho
           </button>
+          {/* HIDDEN TAB - Sổ quản lý quyết toán (ẩn tạm thời, không xóa code)
           <button
             onClick={() => setActiveTab("ledger")}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
@@ -1730,6 +1731,7 @@ export default function FundingRequestPage() {
               </Badge>
             )}
           </button>
+          */}
         </motion.div>
 
         {/* ─── CREATE TAB ────────────────────────────────── */}
@@ -2140,10 +2142,10 @@ export default function FundingRequestPage() {
                                 Đơn giá *
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
-                                Thể tích / đơn vị
+                                Thể tích / dm³
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
-                                Cân nặng / đơn vị
+                                Cân nặng / kg
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
                                 Thành tiền

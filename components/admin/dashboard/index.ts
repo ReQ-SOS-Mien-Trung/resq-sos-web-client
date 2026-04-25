@@ -10,3 +10,4 @@ export { default as RetentionRate } from "./RetentionRate";
 export { default as SOSOverview } from "./SOSOverview";
 export { default as RescuerOverview } from "./RescuerOverview";
 export { default as VictimsBarChart } from "./VictimsBarChart";
+export { default as MissionReportComplianceChart } from "./MissionReportComplianceChart";

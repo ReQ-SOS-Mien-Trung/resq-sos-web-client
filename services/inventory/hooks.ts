@@ -32,6 +32,7 @@ import {
   rejectSupplyRequest,
   importInventory,
   importRegularInventory,
+  getMyDepotFundsMetadata,
   getDepotStockMovements,
   exportInventoryMovements,
   getInventoryLots,
@@ -119,6 +120,7 @@ import {
   SearchDepotReusableUnitsResponse,
   UpdateReusableStatusParams,
   UpdateReusableStatusResponse,
+  DepotFundMetadataItem,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -175,6 +177,8 @@ export const INVENTORY_KEYS = {
   reusableItemStatuses: () =>
     [...INVENTORY_KEYS.all, "reusableItemStatuses"] as const,
   itemModels: () => [...INVENTORY_KEYS.all, "itemModels"] as const,
+  myDepotFundsMetadata: (depotId: number) =>
+    [...INVENTORY_KEYS.all, "myDepotFundsMetadata", depotId] as const,
   reusableUnitSearch: (params: SearchDepotReusableUnitsParams) =>
     [...INVENTORY_KEYS.all, "reusableUnitSearch", params] as const,
 };
@@ -479,6 +483,23 @@ export function useImportRegularInventory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
+  });
+}
+
+export function useMyDepotFundsMetadata(
+  depotId: number,
+  options?: Omit<
+    UseQueryOptions<DepotFundMetadataItem[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<DepotFundMetadataItem[]>({
+    queryKey: INVENTORY_KEYS.myDepotFundsMetadata(depotId),
+    queryFn: () => getMyDepotFundsMetadata(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
+    staleTime: 60_000,
+    ...options,
   });
 }
 

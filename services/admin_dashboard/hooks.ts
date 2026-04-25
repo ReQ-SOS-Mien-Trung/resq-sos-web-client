@@ -5,6 +5,7 @@ import {
   getRescuersDailyStatistics,
   getMissionSuccessRateSummary,
   getSosRequestsSummary,
+  getMissionTeamReportsSummary,
 } from "./api";
 import {
   SosStatusOption,
@@ -13,6 +14,7 @@ import {
   RescuersDailyStatisticsResponse,
   MissionSuccessRateSummaryResponse,
   SosRequestsSummaryResponse,
+  MissionTeamReportsSummaryResponse,
 } from "./type";
 
 export const ADMIN_DASHBOARD_KEYS = {
@@ -26,6 +28,8 @@ export const ADMIN_DASHBOARD_KEYS = {
     [...ADMIN_DASHBOARD_KEYS.all, "mission-success-rate-summary"] as const,
   sosRequestsSummary: () =>
     [...ADMIN_DASHBOARD_KEYS.all, "sos-requests-summary"] as const,
+  missionTeamReportsSummary: () =>
+    [...ADMIN_DASHBOARD_KEYS.all, "mission-team-reports-summary"] as const,
 };
 
 /**
@@ -108,6 +112,22 @@ export function useSosRequestsSummary(
   return useQuery<SosRequestsSummaryResponse>({
     queryKey: ADMIN_DASHBOARD_KEYS.sosRequestsSummary(),
     queryFn: getSosRequestsSummary,
+    ...options,
+  });
+}
+
+/**
+ * Fetch mission team reports summary.
+ */
+export function useMissionTeamReportsSummary(
+  options?: Omit<
+    UseQueryOptions<MissionTeamReportsSummaryResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<MissionTeamReportsSummaryResponse>({
+    queryKey: ADMIN_DASHBOARD_KEYS.missionTeamReportsSummary(),
+    queryFn: getMissionTeamReportsSummary,
     ...options,
   });
 }

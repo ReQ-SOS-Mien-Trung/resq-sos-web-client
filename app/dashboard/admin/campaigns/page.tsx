@@ -396,7 +396,10 @@ export default function CampaignsPage() {
     [txTypesMeta],
   );
   const campaignStatusMap = useMemo(
-    () => Object.fromEntries(campaignStatuses.map((status) => [status.key, status.value])),
+    () =>
+      Object.fromEntries(
+        campaignStatuses.map((status) => [status.key, status.value]),
+      ),
     [campaignStatuses],
   );
   const txRefTypeMap = useMemo(
@@ -616,10 +619,11 @@ export default function CampaignsPage() {
                           {stat.label}
                         </p>
                         <p
-                          className={`${"isText" in stat && stat.isText
-                            ? "text-lg"
-                            : "text-2xl"
-                            } tracking-tighter font-bold text-foreground`}
+                          className={`${
+                            "isText" in stat && stat.isText
+                              ? "text-lg"
+                              : "text-2xl"
+                          } tracking-tighter font-bold text-foreground`}
                         >
                           {isLoading && !("isText" in stat && stat.isText)
                             ? "—"
@@ -700,10 +704,11 @@ export default function CampaignsPage() {
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                     >
                       <span
-                        className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-border bg-background"
-                          }`}
+                        className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
+                          checked
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-border bg-background"
+                        }`}
                       >
                         {checked && <Check size={11} weight="bold" />}
                       </span>
@@ -757,11 +762,12 @@ export default function CampaignsPage() {
                 const progress =
                   campaign.targetAmount > 0
                     ? Math.min(
-                      (campaign.totalAmount / campaign.targetAmount) * 100,
-                      100,
-                    )
+                        (campaign.totalAmount / campaign.targetAmount) * 100,
+                        100,
+                      )
                     : 0;
                 const isActive = campaign.status === "Active";
+                const isDraft = campaign.status === "Draft";
                 const campaignStatusLabel =
                   campaignStatusMap[campaign.status] ?? campaign.status;
                 return (
@@ -779,10 +785,13 @@ export default function CampaignsPage() {
                           </h3>
                         </div>
                         <Badge
-                          className={`shrink-0 border ${isActive
-                            ? "text-[13px] bg-emerald-500/8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                            : "text-[13px] bg-rose-500/8 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800"
-                            }`}
+                          className={`shrink-0 border ${
+                            isActive
+                              ? "text-[13px] bg-emerald-500/8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                              : isDraft
+                                ? "text-[13px] bg-slate-500/8 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                : "text-[13px] bg-rose-500/8 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800"
+                          }`}
                         >
                           {campaignStatusLabel}
                         </Badge>
@@ -800,8 +809,9 @@ export default function CampaignsPage() {
                         </div>
                         <div className="h-2 rounded-full bg-muted overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${isActive ? "bg-emerald-500" : "bg-rose-400"
-                              }`}
+                            className={`h-full rounded-full transition-all ${
+                              isActive ? "bg-emerald-500" : "bg-rose-400"
+                            }`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
@@ -911,7 +921,7 @@ export default function CampaignsPage() {
           if (!open) resetCreateForm();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md overflow-visible">
           <DialogHeader>
             <DialogTitle className="text-2xl flex items-center gap-2">
               <Money size={24} weight="fill" className="text-blue-600" />
@@ -1017,8 +1027,8 @@ export default function CampaignsPage() {
                     >
                       {createForm.campaignStartDate
                         ? parseYmdToDate(
-                          createForm.campaignStartDate,
-                        )?.toLocaleDateString("vi-VN")
+                            createForm.campaignStartDate,
+                          )?.toLocaleDateString("vi-VN")
                         : "dd/mm/yyyy"}
                       <CalendarBlank
                         size={20}
@@ -1058,8 +1068,8 @@ export default function CampaignsPage() {
                     >
                       {createForm.campaignEndDate
                         ? parseYmdToDate(
-                          createForm.campaignEndDate,
-                        )?.toLocaleDateString("vi-VN")
+                            createForm.campaignEndDate,
+                          )?.toLocaleDateString("vi-VN")
                         : "dd/mm/yyyy"}
                       <CalendarBlank
                         size={20}
@@ -1296,39 +1306,39 @@ export default function CampaignsPage() {
                       {!["Archived", "Closed"].includes(
                         selectedCampaign.status,
                       ) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              ensureProvincesLoaded();
-                              setEditInfoForm({
-                                name: selectedCampaign.name,
-                                region: selectedCampaign.region,
-                              });
-                              setEditInfoOpen(true);
-                            }}
-                          >
-                            Sửa thông tin
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            ensureProvincesLoaded();
+                            setEditInfoForm({
+                              name: selectedCampaign.name,
+                              region: selectedCampaign.region,
+                            });
+                            setEditInfoOpen(true);
+                          }}
+                        >
+                          Sửa thông tin
+                        </Button>
+                      )}
                       {/* Gia hạn */}
                       {!["Archived", "Closed"].includes(
                         selectedCampaign.status,
                       ) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setExtendForm({
-                                endDate:
-                                  selectedCampaign.campaignEndDate.split("T")[0],
-                              });
-                              setExtendOpen(true);
-                            }}
-                          >
-                            Gia hạn thời gian
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setExtendForm({
+                              endDate:
+                                selectedCampaign.campaignEndDate.split("T")[0],
+                            });
+                            setExtendOpen(true);
+                          }}
+                        >
+                          Gia hạn thời gian
+                        </Button>
+                      )}
                       {/* Sửa mục tiêu */}
                       {selectedCampaign.status === "Draft" && (
                         <Button
@@ -1464,7 +1474,7 @@ export default function CampaignsPage() {
                         disabled={
                           !targetForm.targetAmount ||
                           Number(targetForm.targetAmount.replace(/\D/g, "")) <=
-                          0 ||
+                            0 ||
                           updateTargetMutation.isPending
                         }
                         onClick={() => {
@@ -1536,8 +1546,8 @@ export default function CampaignsPage() {
                           >
                             {extendForm.endDate
                               ? parseYmdToDate(
-                                extendForm.endDate,
-                              )?.toLocaleDateString("vi-VN")
+                                  extendForm.endDate,
+                                )?.toLocaleDateString("vi-VN")
                               : "dd/mm/yyyy"}
                             <CalendarBlank
                               size={14}
@@ -1589,9 +1599,9 @@ export default function CampaignsPage() {
                                 setSelectedCampaign((p) =>
                                   p
                                     ? {
-                                      ...p,
-                                      campaignEndDate: extendForm.endDate,
-                                    }
+                                        ...p,
+                                        campaignEndDate: extendForm.endDate,
+                                      }
                                     : null,
                                 );
                                 queryClient.invalidateQueries({
@@ -1768,8 +1778,9 @@ export default function CampaignsPage() {
                               </TableCell>
                               <TableCell className="text-sm font-medium">
                                 <span
-                                  className={`inline-flex items-center gap-1 ${isIn ? "text-emerald-600" : "text-rose-600"
-                                    }`}
+                                  className={`inline-flex items-center gap-1 ${
+                                    isIn ? "text-emerald-600" : "text-rose-600"
+                                  }`}
                                 >
                                   {isIn ? (
                                     <ArrowUp size={12} weight="bold" />
@@ -1785,8 +1796,9 @@ export default function CampaignsPage() {
                                   : "—"}
                               </TableCell>
                               <TableCell
-                                className={`text-sm font-bold text-right ${isIn ? "text-emerald-600" : "text-rose-600"
-                                  }`}
+                                className={`text-sm font-bold text-right ${
+                                  isIn ? "text-emerald-600" : "text-rose-600"
+                                }`}
                               >
                                 {formatMoney(tx.amount)}
                               </TableCell>

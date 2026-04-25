@@ -47,12 +47,19 @@ import {
   Plus,
   Trash,
   WarningCircle,
+  MapPin,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { SupplyRequestPriorityConfigCard } from "@/components/admin/inventory/SupplyRequestPriorityConfigCard";
 import { WarningBandConfigCard } from "@/components/admin/inventory/WarningBandConfigCard";
+import dynamic from "next/dynamic";
+
+const CheckInRadiusMapTab = dynamic(
+  () => import("@/components/admin/assembly-points/CheckInRadiusMapTab"),
+  { ssr: false },
+);
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -2580,15 +2587,13 @@ const SYSTEM_CONFIG_CARD_TONES: Record<
     border: "border-l-amber-400",
     card: "bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(255,249,235,0.94))]",
     chip: "border-amber-200 bg-amber-50/85 text-amber-700 hover:bg-amber-100",
-    chipActive:
-      "border-amber-500 bg-amber-500 text-white hover:bg-amber-500",
+    chipActive: "border-amber-500 bg-amber-500 text-white hover:bg-amber-500",
   },
   radius: {
     border: "border-l-sky-400",
     card: "bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(240,249,255,0.94))]",
     chip: "border-sky-200 bg-sky-50/85 text-sky-700 hover:bg-sky-100",
-    chipActive:
-      "border-sky-500 bg-sky-500 text-white hover:bg-sky-500",
+    chipActive: "border-sky-500 bg-sky-500 text-white hover:bg-sky-500",
   },
 };
 
@@ -2826,7 +2831,9 @@ function SystemParameterConfigCard() {
       return;
     }
 
-    const toastId = toast.loading("Đang cập nhật cấu hình thông số hệ thống...");
+    const toastId = toast.loading(
+      "Đang cập nhật cấu hình thông số hệ thống...",
+    );
 
     try {
       await Promise.all(requests);
@@ -2881,7 +2888,9 @@ function SystemParameterConfigCard() {
             onClick={() => {
               void handleSave();
             }}
-            disabled={isBusy || rescuerInvalid || clusterInvalid || radiusInvalid}
+            disabled={
+              isBusy || rescuerInvalid || clusterInvalid || radiusInvalid
+            }
           >
             <FloppyDisk size={14} className="mr-1.5" />
             Lưu cấu hình
@@ -2902,15 +2911,12 @@ function SystemParameterConfigCard() {
           onSuggestionSelect={(value) => setRescuerDraft(String(value))}
           updatedAtLabel={formatSystemConfigUpdatedAt(rescuerQuery.data)}
           invalidMessage={
-            rescuerInvalid
-              ? "Vui lòng nhập số nguyên không âm."
-              : null
+            rescuerInvalid ? "Vui lòng nhập số nguyên không âm." : null
           }
           disabled={isBusy}
           footer={
             <p className="text-xs tracking-tight text-muted-foreground">
-              Dùng cho màn hiển thị điểm tổng hợp của cứu hộ viên trên hệ
-              thống.
+              Dùng cho màn hiển thị điểm tổng hợp của cứu hộ viên trên hệ thống.
             </p>
           }
         />

@@ -32,11 +32,21 @@ import {
   Warning,
   CheckCircle,
   XCircle,
+  FileText,
 } from "@phosphor-icons/react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { StockMovementEntity } from "@/services/inventory/type";
-import { useInventoryItemTypes } from "@/services/inventory/hooks";
+import {
+  useInventoryActionTypes,
+  useInventoryItemTypes,
+  useInventorySourceTypes,
+} from "@/services/inventory/hooks";
+import {
+  getInventoryActionFallback,
+  getInventorySourceLabelFallback,
+  type InventoryActionTone,
+} from "@/lib/inventory-movement-taxonomy";
 
 interface StockMovementDetailSheetProps {
   movement: StockMovementEntity | null;
@@ -44,49 +54,16 @@ interface StockMovementDetailSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ACTION_TYPE_MAP: Record<
-  string,
-  { label: string; className: string; icon: React.ElementType }
-> = {
-  Import: {
-    label: "Nhập kho",
-    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    icon: ArrowDown,
-  },
-  Export: {
-    label: "Xuất kho",
-    className: "bg-red-100 text-red-700 border-red-200",
-    icon: ArrowUp,
-  },
-  Adjust: {
-    label: "Điều chỉnh",
-    className: "bg-orange-100 text-orange-700 border-orange-200",
-    icon: SlidersHorizontal,
-  },
-  Return: {
-    label: "Hoàn trả",
-    className: "bg-blue-100 text-blue-700 border-blue-200",
-    icon: ArrowCounterClockwise,
-  },
-  TransferIn: {
-    label: "Chuyển nhập",
-    className: "bg-teal-100 text-teal-700 border-teal-200",
-    icon: ArrowDown,
-  },
-  TransferOut: {
-    label: "Chuyển xuất",
-    className: "bg-purple-100 text-purple-700 border-purple-200",
-    icon: ArrowsLeftRight,
-  },
-};
-
-const SOURCE_TYPE_MAP: Record<string, string> = {
-  Donation: "Quyên góp",
-  Mission: "Nhiệm vụ",
-  Purchase: "Mua sắm",
-  Adjustment: "Điều chỉnh",
-  Transfer: "Chuyển kho",
-  Manual: "Thủ công",
+const ACTION_ICON_BY_TONE: Record<InventoryActionTone, React.ElementType> = {
+  emerald: ArrowDown,
+  red: ArrowUp,
+  orange: SlidersHorizontal,
+  blue: ArrowCounterClockwise,
+  teal: ArrowDown,
+  purple: ArrowsLeftRight,
+  amber: Warning,
+  slate: XCircle,
+  cyan: CheckCircle,
 };
 
 const TARGET_GROUP_MAP: Record<string, string> = {
@@ -137,14 +114,22 @@ export function StockMovementDetailSheet({
   onOpenChange,
 }: StockMovementDetailSheetProps) {
   const { data: itemTypesData } = useInventoryItemTypes();
+  const { data: actionTypesData = [] } = useInventoryActionTypes();
+  const { data: sourceTypesData = [] } = useInventorySourceTypes();
 
   const itemTypeLabel = (key: string) =>
     itemTypesData?.find((t) => t.key === key)?.value ?? key;
 
   if (!movement) return null;
 
-  const actionConfig = ACTION_TYPE_MAP[movement.actionType];
-  const ActionIcon = actionConfig?.icon ?? Package;
+  const actionFallback = getInventoryActionFallback(movement.actionType);
+  const actionLabel =
+    actionTypesData.find((item) => item.key === movement.actionType)?.value ??
+    actionFallback.label;
+  const sourceLabel =
+    sourceTypesData.find((item) => item.key === movement.sourceType)?.value ??
+    getInventorySourceLabelFallback(movement.sourceType);
+  const ActionIcon = ACTION_ICON_BY_TONE[actionFallback.tone] ?? Package;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -155,7 +140,7 @@ export function StockMovementDetailSheet({
         <SheetHeader className="pb-4">
           <div className="flex items-start gap-3">
             <div
-              className={`p-2 rounded-lg border ${actionConfig?.className ?? "bg-muted"}`}
+              className={`p-2 rounded-lg border ${actionFallback.className}`}
             >
               <ActionIcon size={20} />
             </div>
@@ -169,9 +154,9 @@ export function StockMovementDetailSheet({
               <div className="mt-1">
                 <Badge
                   variant="outline"
-                  className={`text-xs ${actionConfig?.className ?? ""}`}
+                  className={`text-xs ${actionFallback.className}`}
                 >
-                  {actionConfig?.label ?? movement.actionType}
+                  {actionLabel}
                 </Badge>
               </div>
             </div>
@@ -209,14 +194,22 @@ export function StockMovementDetailSheet({
                   <Tag size={16} /> Loại hành động
                 </span>
                 <span className="font-medium tracking-tighter">
-                  {SOURCE_TYPE_MAP[movement.sourceType] ??
-                    (movement.sourceType || "—")}
+                  {actionLabel}
                 </span>
               </div>
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
-                  <Warehouse size={16} /> Nguồn
+                  <Warehouse size={16} /> Loại nguồn
+                </span>
+                <span className="font-medium tracking-tighter">
+                  {sourceLabel}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
+                  <ClipboardText size={16} /> Nguồn
                 </span>
                 <span className="font-medium tracking-tighter">
                   {movement.sourceName || "—"}
@@ -250,6 +243,92 @@ export function StockMovementDetailSheet({
 
           <Separator />
 
+          {/* ── VAT Invoice Info ── */}
+          {movement.vatInvoiceId != null && (
+            <>
+              <section className="space-y-3">
+                <h3 className="text-base font-semibold tracking-tighter flex items-center gap-2">
+                  <ClipboardText size={24} className="text-muted-foreground" />
+                  Hóa đơn VAT
+                </h3>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-muted-foreground tracking-tighter">
+                        Ký hiệu
+                      </span>
+                      <span className="font-medium tracking-tighter">
+                        {movement.invoiceSerial || "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-muted-foreground tracking-tighter">
+                        Số hóa đơn
+                      </span>
+                      <span className="font-medium tracking-tighter">
+                        {movement.invoiceNumber || "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 col-span-2">
+                      <span className="text-xs text-muted-foreground tracking-tighter">
+                        Nhà cung cấp
+                      </span>
+                      <span className="font-medium tracking-tighter text-sm">
+                        {movement.supplierName || "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-muted-foreground tracking-tighter">
+                        Mã số thuế
+                      </span>
+                      <span className="font-medium tracking-tighter font-mono">
+                        {movement.supplierTaxCode || "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-muted-foreground tracking-tighter">
+                        Ngày hóa đơn
+                      </span>
+                      <span className="font-medium tracking-tighter">
+                        {formatDateShort(movement.invoiceDate)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-muted-foreground tracking-tighter">
+                        Tổng tiền
+                      </span>
+                      <span className="font-semibold tracking-tighter text-emerald-700">
+                        {movement.invoiceTotalAmount != null
+                          ? movement.invoiceTotalAmount.toLocaleString("vi-VN")
+                          : "—"}{" "}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          VNĐ
+                        </span>
+                      </span>
+                    </div>
+                    {movement.invoiceFileUrl && (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-muted-foreground tracking-tighter">
+                          File hóa đơn
+                        </span>
+                        <a
+                          href={movement.invoiceFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline tracking-tighter transition-colors"
+                        >
+                          <FileText size={14} />
+                          Xem PDF
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <Separator />
+            </>
+          )}
           {/* ── Items Table ── */}
           <section className="space-y-3">
             <h3 className="text-base font-semibold tracking-tighter flex items-center gap-2">

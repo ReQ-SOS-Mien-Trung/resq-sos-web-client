@@ -5,9 +5,12 @@ import {
   HubConnectionBuilder,
   HubConnectionState,
   HttpTransportType,
-  LogLevel,
 } from "@microsoft/signalr";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  applySignalRConnectionDefaults,
+  SIGNALR_CLIENT_LOG_LEVEL,
+} from "@/lib/signalr";
 import {
   DEPOT_REALTIME_EVENTS,
   DEPOT_REALTIME_METHODS,
@@ -40,10 +43,22 @@ const SEEN_EVENT_TTL_MS = 10 * 60 * 1000;
 
 export class DepotRealtimeClient {
   private connection: HubConnection | null = null;
+  private startPromise: Promise<void> | null = null;
   private joinedGroups = new Map<DepotKey, JoinedDepotGroup>();
   private lastVersionByDepot = new Map<DepotKey, number>();
   private seenEventIds = new Map<string, number>();
   private reconnectListeners = new Set<() => void>();
+
+  private isNegotiationAbortError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message : String(error ?? "");
+    const normalized = message.toLowerCase();
+
+    return (
+      normalized.includes("stopped during negotiation") ||
+      normalized.includes("aborterror")
+    );
+  }
 
   private async waitForDisconnected(
     connection: HubConnection,
@@ -98,18 +113,20 @@ export class DepotRealtimeClient {
       throw new Error("Missing NEXT_PUBLIC_BASE_URL for depot realtime.");
     }
 
-    const connection = new HubConnectionBuilder()
-      .withUrl(`${baseUrl}/hubs/notifications`, {
-        accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
-        withCredentials: false,
-        transport:
-          HttpTransportType.WebSockets |
-          HttpTransportType.ServerSentEvents |
-          HttpTransportType.LongPolling,
-      })
-      .withAutomaticReconnect([0, 1000, 3000, 5000, 10000])
-      .configureLogging(LogLevel.Warning)
-      .build();
+    const connection = applySignalRConnectionDefaults(
+      new HubConnectionBuilder()
+        .withUrl(`${baseUrl}/hubs/notifications`, {
+          accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
+          withCredentials: false,
+          transport:
+            HttpTransportType.WebSockets |
+            HttpTransportType.ServerSentEvents |
+            HttpTransportType.LongPolling,
+        })
+        .withAutomaticReconnect([0, 1000, 3000, 5000, 10000])
+        .configureLogging(SIGNALR_CLIENT_LOG_LEVEL)
+        .build(),
+    );
 
     connection.onreconnected(() => {
       void this.rejoinGroups();
@@ -162,6 +179,11 @@ export class DepotRealtimeClient {
   }
 
   async start(): Promise<void> {
+    if (this.startPromise) {
+      await this.startPromise;
+      return;
+    }
+
     const connection = this.getOrCreateConnection();
 
     if (connection.state === HubConnectionState.Connected) {
@@ -173,7 +195,20 @@ export class DepotRealtimeClient {
     }
 
     if (connection.state === HubConnectionState.Disconnected) {
-      await connection.start();
+      this.startPromise = connection
+        .start()
+        .catch((error) => {
+          if (this.isNegotiationAbortError(error)) {
+            return;
+          }
+
+          throw error;
+        })
+        .finally(() => {
+          this.startPromise = null;
+        });
+
+      await this.startPromise;
     }
 
     await this.waitForConnected(connection);
@@ -182,6 +217,10 @@ export class DepotRealtimeClient {
   async stop(): Promise<void> {
     if (!this.connection) {
       return;
+    }
+
+    if (this.startPromise) {
+      await this.startPromise.catch(() => null);
     }
 
     if (this.connection.state === HubConnectionState.Disconnected) {

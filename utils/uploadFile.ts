@@ -34,6 +34,19 @@ export async function uploadRawToCloudinary(
   file: File,
   folder = "resq/invoices",
 ): Promise<string> {
+  const result = await uploadRawToCloudinaryWithId(file, folder);
+  return result.secureUrl;
+}
+
+/**
+ * Upload a raw file (PDF, etc.) to Cloudinary.
+ * Returns both the secure URL and public_id so the file can be deleted later
+ * if downstream operations fail.
+ */
+export async function uploadRawToCloudinaryWithId(
+  file: File,
+  folder = "resq/invoices",
+): Promise<{ secureUrl: string; publicId: string }> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", UPLOAD_PRESET);
@@ -49,5 +62,31 @@ export async function uploadRawToCloudinary(
   if (!res.ok) throw new Error("Upload file thất bại");
   const data = await res.json();
   if (!data.secure_url) throw new Error("Upload file thất bại");
-  return data.secure_url as string;
+  return {
+    secureUrl: data.secure_url as string,
+    publicId: data.public_id as string,
+  };
+}
+
+/**
+ * Delete raw files from Cloudinary via server-side proxy.
+ * Silently catches errors – this is a best-effort cleanup.
+ */
+export async function deleteCloudinaryRawFiles(
+  publicIds: string[],
+): Promise<void> {
+  if (publicIds.length === 0) return;
+  try {
+    await fetch("/api/cloudinary/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicIds }),
+    });
+  } catch {
+    // Best-effort cleanup – log but don't throw
+    console.warn(
+      "[Cloudinary Cleanup] Failed to delete files:",
+      publicIds,
+    );
+  }
 }
