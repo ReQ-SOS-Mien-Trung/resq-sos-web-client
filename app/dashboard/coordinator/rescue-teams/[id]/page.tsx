@@ -606,7 +606,7 @@ export default function RescueTeamDetailPage() {
 
           <CardContent className="p-3.5 md:p-4">
             <div className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <div className="border border-black/20 bg-white px-3 py-2">
                   <p className="text-xs text-black/60">Quân số hiện tại</p>
                   <p className="mt-1 text-xl font-bold text-black">
@@ -617,12 +617,6 @@ export default function RescueTeamDetailPage() {
                   <p className="text-xs text-black/60">Chỗ trống còn lại</p>
                   <p className="mt-1 text-xl font-bold text-black">
                     {remainingSlots}
-                  </p>
-                </div>
-                <div className="border border-black/20 bg-white px-3 py-2">
-                  <p className="text-xs text-black/60">Ứng viên khả dụng</p>
-                  <p className="mt-1 text-xl font-bold text-black">
-                    {availableRescuers.length}
                   </p>
                 </div>
               </div>

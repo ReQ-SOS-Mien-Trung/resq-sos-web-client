@@ -322,8 +322,8 @@ function buildAutoClusters(
 
     // P1: không gom thêm, chỉ tạo cụm 1 mình
     if (maxClusterSize <= 1) {
-      cluster.forEach((request) => clusteredIds.add(request.id));
-      clusters.push(cluster);
+      clusteredIds.add(seed.id);
+      clusters.push([seed]);
       continue;
     }
 
@@ -1624,6 +1624,21 @@ const CoordinatorDashboardContent = () => {
         : null,
     [activeClusterId, clusters],
   );
+  const aiStreamClusterSOSRequestCount = useMemo(() => {
+    if (!aiStreamClusterId) return null;
+
+    const cluster = clusters.find((item) => item.id === aiStreamClusterId);
+    if (!cluster) return null;
+
+    const count = Number(cluster.sosRequestCount);
+    if (Number.isFinite(count) && count > 0) {
+      return Math.trunc(count);
+    }
+
+    return Array.isArray(cluster.sosRequestIds)
+      ? cluster.sosRequestIds.length
+      : null;
+  }, [aiStreamClusterId, clusters]);
   const isActiveRescuePlanClusterLocked = isClusterMissionLocked(
     activeRescuePlanCluster,
   );
@@ -2075,6 +2090,7 @@ const CoordinatorDashboardContent = () => {
                 error={aiStream.error}
                 loading={aiStream.loading}
                 phase={aiStream.phase}
+                clusterSOSRequestCount={aiStreamClusterSOSRequestCount}
                 onStop={() => aiStream.stopStream()}
                 onRetry={() => {
                   if (aiStreamClusterId) {

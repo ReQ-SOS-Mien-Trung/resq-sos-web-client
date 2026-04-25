@@ -573,7 +573,7 @@ export default function DepotsPage() {
         ...prev,
         address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       }));
-      toast.error("Không đọc được địa chỉ từ OpenStreetMap.");
+      toast.error("Không đọc được địa chỉ từ bản đồ.");
     } finally {
       setIsResolvingAddress(false);
     }

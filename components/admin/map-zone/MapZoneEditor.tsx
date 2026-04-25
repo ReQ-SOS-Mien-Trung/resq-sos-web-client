@@ -1,9 +1,11 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
-import "leaflet-draw/dist/leaflet.draw.css";
-import { useEffect, useRef } from "react";
-import L from "leaflet";
+import "@goongmaps/goong-js/dist/goong-js.css";
+import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
+import { useEffect, useRef, useState } from "react";
+// @ts-ignore
+import goongjs from "@goongmaps/goong-js";
+import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import type { Coordinate, ServiceZoneEntity } from "@/services/map/type";
 
 // ─── Props ───
@@ -15,72 +17,211 @@ interface MapZoneEditorProps {
   highlightedZoneId?: number | null;
 }
 
-// ─── Draw style ───
-const DRAW_STYLE: L.PathOptions = {
-  color: "#FF5722",
-  weight: 2,
-  fillColor: "#FF5722",
-  fillOpacity: 0.15,
-};
-
-// ─── Helpers ───
-function latLngsToCoordinates(latLngs: L.LatLng[]): Coordinate[] {
-  const coords = latLngs.map((ll) => ({ latitude: ll.lat, longitude: ll.lng }));
-  if (
-    coords.length > 0 &&
-    (coords[0].latitude !== coords[coords.length - 1].latitude ||
-      coords[0].longitude !== coords[coords.length - 1].longitude)
-  ) {
-    coords.push({ ...coords[0] });
-  }
-  return coords;
-}
-
-function boundsToCoordinates(bounds: L.LatLngBounds): Coordinate[] {
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  return [
-    { latitude: ne.lat, longitude: sw.lng },
-    { latitude: ne.lat, longitude: ne.lng },
-    { latitude: sw.lat, longitude: ne.lng },
-    { latitude: sw.lat, longitude: sw.lng },
-    { latitude: ne.lat, longitude: sw.lng },
-  ];
-}
-
-// ─── i18n ───
-function applyI18n() {
-  if (!L.drawLocal) return;
-  L.drawLocal.draw.toolbar.buttons.polygon = "Vẽ đa giác";
-  L.drawLocal.draw.toolbar.buttons.rectangle = "Vẽ hình chữ nhật";
-  L.drawLocal.draw.toolbar.actions.title = "Hủy vẽ";
-  L.drawLocal.draw.toolbar.actions.text = "Hủy";
-  L.drawLocal.draw.toolbar.finish.title = "Hoàn thành";
-  L.drawLocal.draw.toolbar.finish.text = "Xong";
-  L.drawLocal.draw.toolbar.undo.title = "Xóa điểm cuối";
-  L.drawLocal.draw.toolbar.undo.text = "Xóa điểm cuối";
-  L.drawLocal.draw.handlers.polygon.tooltip.start = "Nhấp để bắt đầu vẽ";
-  L.drawLocal.draw.handlers.polygon.tooltip.cont = "Nhấp để tiếp tục vẽ";
-  L.drawLocal.draw.handlers.polygon.tooltip.end = "Nhấp điểm đầu để đóng";
-  L.drawLocal.draw.handlers.rectangle.tooltip.start = "Nhấp và kéo để vẽ";
-  L.drawLocal.edit.toolbar.buttons.edit = "Chỉnh sửa vùng";
-  L.drawLocal.edit.toolbar.buttons.editDisabled = "Không có vùng để sửa";
-  L.drawLocal.edit.toolbar.buttons.remove = "Xóa vùng";
-  L.drawLocal.edit.toolbar.buttons.removeDisabled = "Không có vùng để xóa";
-  L.drawLocal.edit.toolbar.actions.save.title = "Lưu thay đổi";
-  L.drawLocal.edit.toolbar.actions.save.text = "Lưu";
-  L.drawLocal.edit.toolbar.actions.cancel.title = "Hủy thay đổi";
-  L.drawLocal.edit.toolbar.actions.cancel.text = "Hủy";
-  L.drawLocal.edit.toolbar.actions.clearAll.title = "Xóa tất cả";
-  L.drawLocal.edit.toolbar.actions.clearAll.text = "Xóa tất cả";
-}
-
 // ─── Zone colors ───
 const ACTIVE_COLOR = "#16A34A"; // dark green for active zones
 const INACTIVE_COLOR = "#94a3b8"; // gray for inactive zones
 const HIGHLIGHT_COLOR = "#FF5722"; // orange when hovered from sidebar
 
-// ─── Component ───
+// ─── Custom Draw Styles ───
+// Fix: default mapbox-gl-draw theme uses data-driven expressions for line-dasharray
+// which Goong JS cannot parse (arrays starting with numbers are treated as expressions).
+// We split the line layer into active/inactive with static dasharray values.
+const drawBlue = "#3bb2d0";
+const drawOrange = "#fbb03b";
+const drawWhite = "#fff";
+
+const customDrawStyles: object[] = [
+  // Polygon fill
+  {
+    id: "gl-draw-polygon-fill",
+    type: "fill",
+    filter: ["all", ["==", "$type", "Polygon"]],
+    paint: {
+      "fill-color": [
+        "case",
+        ["==", ["get", "active"], "true"],
+        drawOrange,
+        drawBlue,
+      ],
+      "fill-opacity": 0.1,
+    },
+  },
+  // Lines – inactive (solid) — legacy filter: ["!=", "active", "true"]
+  {
+    id: "gl-draw-lines-inactive",
+    type: "line",
+    filter: [
+      "all",
+      ["any", ["==", "$type", "LineString"], ["==", "$type", "Polygon"]],
+      ["!=", "active", "true"],
+    ],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: {
+      "line-color": drawBlue,
+      "line-dasharray": [2, 0],
+      "line-width": 2,
+    },
+  },
+  // Lines – active (dashed) — legacy filter: ["==", "active", "true"]
+  {
+    id: "gl-draw-lines-active",
+    type: "line",
+    filter: [
+      "all",
+      ["any", ["==", "$type", "LineString"], ["==", "$type", "Polygon"]],
+      ["==", "active", "true"],
+    ],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: {
+      "line-color": drawOrange,
+      "line-dasharray": [0.2, 2],
+      "line-width": 2,
+    },
+  },
+  // Points – outer circle (inactive)
+  {
+    id: "gl-draw-point-outer-inactive",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "feature"],
+      ["!=", "active", "true"],
+    ],
+    paint: {
+      "circle-radius": 5,
+      "circle-color": drawWhite,
+    },
+  },
+  // Points – outer circle (active)
+  {
+    id: "gl-draw-point-outer-active",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "feature"],
+      ["==", "active", "true"],
+    ],
+    paint: {
+      "circle-radius": 7,
+      "circle-color": drawWhite,
+    },
+  },
+  // Points – inner circle (inactive)
+  {
+    id: "gl-draw-point-inner-inactive",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "feature"],
+      ["!=", "active", "true"],
+    ],
+    paint: {
+      "circle-radius": 3,
+      "circle-color": drawBlue,
+    },
+  },
+  // Points – inner circle (active)
+  {
+    id: "gl-draw-point-inner-active",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "feature"],
+      ["==", "active", "true"],
+    ],
+    paint: {
+      "circle-radius": 5,
+      "circle-color": drawOrange,
+    },
+  },
+  // Vertex – outer (inactive)
+  {
+    id: "gl-draw-vertex-outer-inactive",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "vertex"],
+      ["!=", "mode", "simple_select"],
+      ["!=", "active", "true"],
+    ],
+    paint: {
+      "circle-radius": 5,
+      "circle-color": drawWhite,
+    },
+  },
+  // Vertex – outer (active)
+  {
+    id: "gl-draw-vertex-outer-active",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "vertex"],
+      ["!=", "mode", "simple_select"],
+      ["==", "active", "true"],
+    ],
+    paint: {
+      "circle-radius": 7,
+      "circle-color": drawWhite,
+    },
+  },
+  // Vertex – inner
+  {
+    id: "gl-draw-vertex-inner",
+    type: "circle",
+    filter: [
+      "all",
+      ["==", "$type", "Point"],
+      ["==", "meta", "vertex"],
+      ["!=", "mode", "simple_select"],
+    ],
+    paint: {
+      "circle-radius": 3,
+      "circle-color": drawOrange,
+    },
+  },
+  // Midpoint
+  {
+    id: "gl-draw-midpoint",
+    type: "circle",
+    filter: ["all", ["==", "meta", "midpoint"]],
+    paint: {
+      "circle-radius": 3,
+      "circle-color": drawOrange,
+    },
+  },
+];
+
+
+// ─── Helpers ───
+function coordinatesToPolygonGeoJSON(
+  coords: Coordinate[],
+  properties: any = {},
+): GeoJSON.Feature<GeoJSON.Polygon> {
+  const coordinates = coords.map((c) => [c.longitude, c.latitude]);
+  // Ensure polygon is closed
+  if (
+    coordinates.length > 0 &&
+    (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+      coordinates[0][1] !== coordinates[coordinates.length - 1][1])
+  ) {
+    coordinates.push([...coordinates[0]]);
+  }
+  return {
+    type: "Feature",
+    properties,
+    geometry: {
+      type: "Polygon",
+      coordinates: [coordinates],
+    },
+  };
+}
+
 export default function MapZoneEditor({
   existingCoordinates,
   onCoordinatesChange,
@@ -89,14 +230,14 @@ export default function MapZoneEditor({
   highlightedZoneId,
 }: MapZoneEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const featureGroupRef = useRef<L.FeatureGroup | null>(null);
-  const bgLayersRef = useRef<L.Layer[]>([]);
-  const bgPolygonsRef = useRef<
-    Map<number, { polygon: L.Polygon; isActive: boolean }>
-  >(new Map());
+  const mapRef = useRef<any>(null);
+  const drawRef = useRef<any>(null);
+  const popupRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const hoveredStateIdRef = useRef<number | null>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  // Keep latest callback in ref — avoids re-initializing map when callback changes
+  // Keep latest callback in ref to avoid re-initializing map events
   const onChangeRef = useRef(onCoordinatesChange);
   useEffect(() => {
     onChangeRef.current = onCoordinatesChange;
@@ -107,194 +248,317 @@ export default function MapZoneEditor({
     const container = containerRef.current;
     if (!container || mapRef.current) return;
 
-    applyI18n();
+    const goongApiKey = process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || "";
+    goongjs.accessToken = goongApiKey;
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require("leaflet-draw");
-    if ((container as any)._leaflet_id != null) {
-      delete (container as any)._leaflet_id;
-    }
-
-    const map = L.map(container, {
-      center: [16.047, 108.206],
-      zoom: 6,
+    const map = new goongjs.Map({
+      container: container,
+      style: `https://tiles.goong.io/assets/goong_map_web.json?api_key=${goongApiKey}`,
+      center: [108.206, 16.047],
+      zoom: 5.5,
+      maxZoom: 20,
+      transformRequest: (url: string) => {
+        if (url.includes("tiles.goong.io") && !url.includes("api_key=")) {
+          const sep = url.includes("?") ? "&" : "?";
+          return { url: `${url}${sep}api_key=${goongApiKey}` };
+        }
+        return { url };
+      },
     });
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    // Add map controls
+    map.addControl(new goongjs.NavigationControl(), "bottom-right");
 
-    const fg = new L.FeatureGroup();
-    fg.addTo(map);
-    featureGroupRef.current = fg;
+    // Wait for map style to load before adding sources and MapboxDraw
+    // Using style.load to ensure it fires if style changes, but we use safety checks
+    map.on("load", () => {
+      // ── Initialize Mapbox Draw ──
+      // Add only once
+      if (!drawRef.current) {
+        try {
+          const draw = new MapboxDraw({
+            displayControlsDefault: false,
+            controls: {
+              polygon: true,
+              trash: true,
+            },
+            styles: customDrawStyles,
+          });
+          map.addControl(draw as any, "top-right");
+          drawRef.current = draw;
 
-    const drawControl = new (L.Control as any).Draw({
-      position: "topright",
-      edit: { featureGroup: fg },
-      draw: {
-        polygon: {
-          allowIntersection: false,
-          showArea: true,
-          shapeOptions: DRAW_STYLE,
-        },
-        rectangle: { shapeOptions: DRAW_STYLE },
-        circle: false,
-        circlemarker: false,
-        marker: false,
-        polyline: false,
-      },
-    });
-    drawControl.addTo(map);
+          // Handle Draw Events
+          const updateCoords = (e: any) => {
+            const data = draw.getAll();
+            if (data.features.length > 0) {
+              if (data.features.length > 1 && e.features && e.features.length > 0) {
+                const latestId = e.features[0].id;
+                data.features.forEach((f: any) => {
+                  if (f.id !== latestId) draw.delete(f.id);
+                });
+              }
+              
+              const feature = draw.getAll().features[0];
+              if (feature && feature.geometry.type === "Polygon") {
+                const coords = feature.geometry.coordinates[0].map((c: any) => ({
+                  longitude: c[0],
+                  latitude: c[1],
+                }));
+                onChangeRef.current(coords);
+              }
+            } else {
+              onChangeRef.current(null);
+            }
+          };
 
-    // Draw events
-    map.on(L.Draw.Event.CREATED, (e: L.DrawEvents.Created) => {
-      fg.clearLayers();
-      fg.addLayer(e.layer);
-
-      let coords: Coordinate[];
-      if (e.layerType === "rectangle") {
-        coords = boundsToCoordinates((e.layer as L.Rectangle).getBounds());
-      } else {
-        coords = latLngsToCoordinates(
-          (e.layer as L.Polygon).getLatLngs()[0] as L.LatLng[],
-        );
+          map.on("draw.create", updateCoords);
+          map.on("draw.update", updateCoords);
+          map.on("draw.delete", () => onChangeRef.current(null));
+        } catch (err) {
+          console.error("[MapZoneEditor] MapboxDraw init failed:", err);
+        }
       }
-      onChangeRef.current(coords);
-    });
 
-    map.on(L.Draw.Event.EDITED, (e: L.DrawEvents.Edited) => {
-      e.layers.eachLayer((layer) => {
-        if (layer instanceof L.Rectangle) {
-          onChangeRef.current(boundsToCoordinates(layer.getBounds()));
-        } else if (layer instanceof L.Polygon) {
-          onChangeRef.current(
-            latLngsToCoordinates(layer.getLatLngs()[0] as L.LatLng[]),
+      // ── Add Background Zones Source & Layers ──
+      if (!map.getSource("all-zones")) {
+        map.addSource("all-zones", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [],
+          },
+        });
+      }
+
+      // Fill Layer
+      map.addLayer({
+        id: "all-zones-fill",
+        type: "fill",
+        source: "all-zones",
+        paint: {
+          "fill-color": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            HIGHLIGHT_COLOR,
+            ["==", ["get", "isActive"], true],
+            ACTIVE_COLOR,
+            INACTIVE_COLOR,
+          ],
+          "fill-opacity": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            0.28,
+            0.12,
+          ],
+        },
+      });
+
+      // Line Layer
+      map.addLayer({
+        id: "all-zones-line",
+        type: "line",
+        source: "all-zones",
+        paint: {
+          "line-color": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            HIGHLIGHT_COLOR,
+            ["==", ["get", "isActive"], true],
+            ACTIVE_COLOR,
+            INACTIVE_COLOR,
+          ],
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            4,
+            2,
+          ],
+        },
+      });
+
+      // ── Hover & Popup Logic ──
+      const popup = new goongjs.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 10,
+        className: "zone-tooltip",
+      });
+      popupRef.current = popup;
+
+      map.on("mousemove", "all-zones-fill", (e: any) => {
+        if (e.features && e.features.length > 0) {
+          map.getCanvas().style.cursor = "pointer";
+          const feature = e.features[0];
+          const props = feature.properties;
+          const statusText = props.isActive ? "🟢 Hoạt động" : "⚫ Tắt";
+
+          // Set feature state hover manually for map interactions
+          if (hoveredStateIdRef.current !== null && hoveredStateIdRef.current !== feature.id) {
+            map.setFeatureState(
+              { source: "all-zones", id: hoveredStateIdRef.current },
+              { hover: false }
+            );
+          }
+          hoveredStateIdRef.current = feature.id;
+          map.setFeatureState(
+            { source: "all-zones", id: feature.id },
+            { hover: true }
           );
+
+          popup
+            .setLngLat(e.lngLat)
+            .setHTML(
+              `<div style="font-size:14px;line-height:1.5;min-width:140px;padding:4px">
+                <div style="font-weight:700;font-size:15px;margin-bottom:3px">${props.name}</div>
+                <div style="color:#888;font-size:12px">ID: ${props.id} · ${props.pointCount} điểm</div>
+                <div style="font-size:13px;margin-top:3px">${statusText}</div>
+              </div>`
+            )
+            .addTo(map);
         }
       });
+
+      map.on("mouseleave", "all-zones-fill", () => {
+        map.getCanvas().style.cursor = "";
+        popup.remove();
+        if (hoveredStateIdRef.current !== null) {
+          map.setFeatureState(
+            { source: "all-zones", id: hoveredStateIdRef.current },
+            { hover: false }
+          );
+          hoveredStateIdRef.current = null;
+        }
+      });
+
+      setIsMapLoaded(true);
     });
 
-    map.on(L.Draw.Event.DELETED, () => {
-      onChangeRef.current(null);
-    });
-
-    // Cleanup on unmount
+    // Cleanup
     return () => {
-      map.off();
+      popupRef.current?.remove();
+      markersRef.current.forEach((m) => m.remove());
       map.remove();
       mapRef.current = null;
-      featureGroupRef.current = null;
-      bgLayersRef.current = [];
+      drawRef.current = null;
     };
   }, []);
 
-  // ── Sync existing coordinates into the draw feature group ──
+  // ── Sync Existing Coordinates into Draw ──
   useEffect(() => {
-    const fg = featureGroupRef.current;
+    const draw = drawRef.current;
     const map = mapRef.current;
-    if (!fg) return;
+    if (!draw || !map || !isMapLoaded) return;
 
-    fg.clearLayers();
-    if (existingCoordinates?.length) {
-      const polygon = L.polygon(
-        existingCoordinates.map(
-          (c) => [c.latitude, c.longitude] as [number, number],
-        ),
-        DRAW_STYLE,
-      );
-      fg.addLayer(polygon);
+    // Check if current drawn polygon matches existingCoordinates to avoid interrupting draw
+    let currentCoords: Coordinate[] = [];
+    const features = draw.getAll().features;
+    if (features.length > 0 && features[0].geometry.type === "Polygon") {
+      const ring = features[0].geometry.coordinates[0];
+      currentCoords = ring.map((c: any) => ({
+        longitude: c[0],
+        latitude: c[1],
+      }));
+    }
 
-      if (map) {
-        map.fitBounds(polygon.getBounds(), {
-          padding: [24, 24],
-          maxZoom: 12,
-        });
+    // A simple heuristic to skip update if lengths match (assuming user is just dragging points)
+    if (existingCoordinates && currentCoords.length === existingCoordinates.length) {
+      // In a more robust implementation, we might deep compare coordinates.
+      // But for drawing, keeping the internal state is preferred.
+      return;
+    }
+    
+    // Clear and re-add if truly different (like switching zones to edit)
+    draw.deleteAll();
+
+    if (existingCoordinates && existingCoordinates.length > 0) {
+      const coords = existingCoordinates.map((c) => [c.longitude, c.latitude]);
+      if (
+        coords[0][0] !== coords[coords.length - 1][0] ||
+        coords[0][1] !== coords[coords.length - 1][1]
+      ) {
+        coords.push([...coords[0]]);
+      }
+      draw.add({
+        id: "active-zone",
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Polygon",
+          coordinates: [coords],
+        },
+      });
+
+      // Fit bounds
+      const bounds = new goongjs.LngLatBounds();
+      coords.forEach((c) => bounds.extend(c as [number, number]));
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
       }
     }
-  }, [existingCoordinates]);
+  }, [existingCoordinates, isMapLoaded]);
 
-  // ── Render background (all other zones) with tooltips + hover highlight ──
+  // ── Render background (all other zones) ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !isMapLoaded) return;
 
-    bgLayersRef.current.forEach((l) => {
+    let source = map.getSource("all-zones");
+    if (!source) {
+      // Safety: if source is somehow missing but map is loaded, try to re-add it
+      // This can happen if style changes or in some race conditions
+      console.warn("[MapZoneEditor] 'all-zones' source not found, attempting to add...");
       try {
-        map.removeLayer(l);
-      } catch {
-        // already removed
-      }
-    });
-    bgLayersRef.current = [];
-    bgPolygonsRef.current.clear();
-
-    allZones?.forEach((zone) => {
-      if (!zone.coordinates?.length) return;
-
-      const baseColor = zone.isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
-      const normalStyle: L.PathOptions = {
-        color: baseColor,
-        weight: 2,
-        fillColor: baseColor,
-        fillOpacity: 0.12,
-        dashArray: zone.isActive ? undefined : "6 4",
-      };
-
-      const polygon = L.polygon(
-        zone.coordinates.map(
-          (c) => [c.latitude, c.longitude] as [number, number],
-        ),
-        normalStyle,
-      );
-
-      // Store polygon ref for sidebar hover highlight
-      bgPolygonsRef.current.set(zone.id, { polygon, isActive: zone.isActive });
-
-      // Sticky tooltip with zone info
-      const statusText = zone.isActive ? "🟢 Hoạt động" : "⚫ Tắt";
-      polygon.bindTooltip(
-        `<div style="font-size:14px;line-height:1.5;min-width:140px">
-          <div style="font-weight:700;font-size:15px;margin-bottom:3px">${zone.name}</div>
-          <div style="color:#888;font-size:12px">ID: ${zone.id} · ${zone.coordinates.length} điểm</div>
-          <div style="font-size:13px;margin-top:3px">${statusText}</div>
-        </div>`,
-        {
-          sticky: true,
-          direction: "top",
-          offset: [0, -8],
-          className: "zone-tooltip",
-        },
-      );
-
-      // Hover highlight on map polygon itself
-      polygon.on("mouseover", () => {
-        polygon.setStyle({
-          color: HIGHLIGHT_COLOR,
-          weight: 4,
-          fillColor: HIGHLIGHT_COLOR,
-          fillOpacity: 0.28,
-          dashArray: undefined,
+        map.addSource("all-zones", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
         });
-      });
-      polygon.on("mouseout", () => {
-        // Only reset if this zone is NOT the one highlighted from sidebar
-        if (highlightedZoneId !== zone.id) {
-          polygon.setStyle(normalStyle);
-        }
-      });
+        source = map.getSource("all-zones");
+      } catch (e) {
+        console.error("[MapZoneEditor] Failed to add source:", e);
+        return;
+      }
+    }
 
-      polygon.addTo(map);
-      bgLayersRef.current.push(polygon);
+    const validZones = (allZones || []).filter((z) => z.coordinates?.length);
 
-      // Center label marker (always visible — helps distinguish overlapping zones)
-      const bounds = polygon.getBounds();
-      const center = bounds.getCenter();
-      const label = L.marker(center, {
-        icon: L.divIcon({
-          className: "",
-          html: `<div style="
+    const geojsonData: GeoJSON.FeatureCollection<GeoJSON.Polygon> = {
+      type: "FeatureCollection",
+      features: validZones.map((zone) => {
+        const feature = coordinatesToPolygonGeoJSON(zone.coordinates || [], {
+          id: zone.id,
+          name: zone.name,
+          isActive: zone.isActive,
+          pointCount: zone.coordinates?.length || 0,
+        });
+        feature.id = zone.id; // required for feature-state
+        return feature;
+      }),
+    };
+
+    if (source) {
+      (source as any).setData(geojsonData);
+    }
+
+    // Update center markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    validZones.forEach((zone) => {
+      const baseColor = zone.isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+      let lngSum = 0;
+      let latSum = 0;
+      zone.coordinates!.forEach((c) => {
+        lngSum += c.longitude;
+        latSum += c.latitude;
+      });
+      const center = [
+        lngSum / zone.coordinates!.length,
+        latSum / zone.coordinates!.length,
+      ];
+
+      const el = document.createElement("div");
+      el.innerHTML = `<div style="
             background:${baseColor};
             color:#fff;
             font-size:11px;
@@ -307,56 +571,55 @@ export default function MapZoneEditor({
             opacity:0.9;
             line-height:1.4;
             text-align:center;
-          ">#${zone.id} ${zone.name}</div>`,
-          iconAnchor: [0, 0],
-        }),
-        interactive: false,
-      });
-      label.addTo(map);
-      bgLayersRef.current.push(label);
+          ">#${zone.id} ${zone.name}</div>`;
+
+      const marker = new goongjs.Marker({ element: el })
+        .setLngLat(center as [number, number])
+        .addTo(map);
+      markersRef.current.push(marker);
     });
-  }, [allZones, highlightedZoneId]);
+  }, [allZones, isMapLoaded]);
 
   // ── Highlight zone from sidebar hover ──
   useEffect(() => {
-    bgPolygonsRef.current.forEach(({ polygon, isActive }, zoneId) => {
-      const baseColor = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
-      if (zoneId === highlightedZoneId) {
-        polygon.setStyle({
-          color: HIGHLIGHT_COLOR,
-          weight: 4,
-          fillColor: HIGHLIGHT_COLOR,
-          fillOpacity: 0.28,
-          dashArray: undefined,
-        });
-        polygon.bringToFront();
-      } else {
-        polygon.setStyle({
-          color: baseColor,
-          weight: 2,
-          fillColor: baseColor,
-          fillOpacity: 0.12,
-          dashArray: isActive ? undefined : "6 4",
-        });
-      }
-    });
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (
+      hoveredStateIdRef.current !== null &&
+      hoveredStateIdRef.current !== highlightedZoneId
+    ) {
+      map.setFeatureState(
+        { source: "all-zones", id: hoveredStateIdRef.current },
+        { hover: false }
+      );
+    }
+
+    if (highlightedZoneId !== null && highlightedZoneId !== undefined) {
+      map.setFeatureState(
+        { source: "all-zones", id: highlightedZoneId },
+        { hover: true }
+      );
+      hoveredStateIdRef.current = highlightedZoneId;
+    } else {
+      hoveredStateIdRef.current = null;
+    }
   }, [highlightedZoneId]);
 
-  // ── Invalidate map size whenever the container resizes (covers ALL sidebar toggles) ──
+  // ── Resize on sidebar toggle ──
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const observer = new ResizeObserver(() => {
-      mapRef.current?.invalidateSize();
+      mapRef.current?.resize();
     });
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
-  // ── Also invalidate after local panel sidebar transition (belt & suspenders) ──
   useEffect(() => {
-    const t = setTimeout(() => mapRef.current?.invalidateSize(), 320);
+    const t = setTimeout(() => mapRef.current?.resize(), 320);
     return () => clearTimeout(t);
   }, [sidebarOpen]);
 
