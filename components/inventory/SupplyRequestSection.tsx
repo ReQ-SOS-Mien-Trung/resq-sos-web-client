@@ -58,6 +58,7 @@ import {
 } from "@/services/inventory/type";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { toast } from "sonner";
+import { AxiosError } from "axios";
 
 type RequestLine = {
   id: string;
@@ -90,6 +91,42 @@ type SelectedDepotByItem = {
   availableQuantity: number;
   distanceKm: number;
 };
+
+function getApiError(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    const data = err.response?.data as
+      | {
+        message?: unknown;
+        title?: unknown;
+        error?: unknown;
+        errors?: unknown;
+      }
+      | undefined;
+    const directMessage = data?.message ?? data?.title ?? data?.error;
+    if (typeof directMessage === "string" && directMessage.trim()) {
+      return directMessage.trim();
+    }
+    if (data?.errors && typeof data.errors === "object") {
+      const messages = Object.values(data.errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (messages.length > 0) return messages.join("\n");
+    }
+  }
+  return fallback;
+}
+
+function getSupplyRequestCapacityError(err: unknown): string {
+  const apiMessage = getApiError(err, "");
+  if (err instanceof AxiosError && err.response?.status === 409) {
+    return [
+      apiMessage || "Vui lòng giảm số lượng hoặc chọn kho nguồn khác.",
+    ].join(" ");
+  }
+  return apiMessage || "Gửi yêu cầu thất bại. Vui lòng thử lại";
+}
 
 interface SupplyRequestSectionProps {
   onSelectionSidebarOpen?: () => void;
@@ -544,12 +581,12 @@ export default function SupplyRequestSection({
       setSubmittedParams(
         nextSnapshot.length > 0
           ? {
-              itemModelIds: nextSnapshot.map((line) => line.itemModelId),
-              quantities: nextSnapshot.map((line) => line.quantity),
-              activeDepotsOnly: true,
-              pageNumber: 1,
-              pageSize: 10,
-            }
+            itemModelIds: nextSnapshot.map((line) => line.itemModelId),
+            quantities: nextSnapshot.map((line) => line.quantity),
+            activeDepotsOnly: true,
+            pageNumber: 1,
+            pageSize: 10,
+          }
           : null,
       );
 
@@ -689,7 +726,7 @@ export default function SupplyRequestSection({
           requestQuantity: Math.max(
             1,
             requestedQuantityByResultItemId[item.itemModelId] ??
-              getRequestedQuantity(item.itemModelId),
+            getRequestedQuantity(item.itemModelId),
           ),
           depotId: warehouse.depotId,
           depotName: warehouse.depotName,
@@ -834,8 +871,8 @@ export default function SupplyRequestSection({
       setFlyTokens([]);
       setAnimatedDepotId(null);
       setSelectionSheetOpen(false);
-    } catch {
-      toast.error("Gửi yêu cầu thất bại. Vui lòng thử lại");
+    } catch (err) {
+      toast.error(getSupplyRequestCapacityError(err));
     }
   };
 
@@ -1062,11 +1099,10 @@ export default function SupplyRequestSection({
                                         );
                                       }
                                     }}
-                                    className={`rounded-lg border p-4 transition-all duration-300 cursor-pointer bg-muted/20 hover:-translate-y-0.5 hover:shadow-sm ${
-                                      isSelected
-                                        ? "border-primary ring-1 ring-primary/30 bg-primary/5"
-                                        : "border-border/60"
-                                    }`}
+                                    className={`rounded-lg border p-4 transition-all duration-300 cursor-pointer bg-muted/20 hover:-translate-y-0.5 hover:shadow-sm ${isSelected
+                                      ? "border-primary ring-1 ring-primary/30 bg-primary/5"
+                                      : "border-border/60"
+                                      }`}
                                   >
                                     <div className="flex items-start justify-between gap-3">
                                       <div className="min-w-0">
@@ -1248,7 +1284,7 @@ export default function SupplyRequestSection({
                           const isInsufficient =
                             !!selectedItem &&
                             selectedItem.availableQuantity <
-                              selectedItem.requestQuantity;
+                            selectedItem.requestQuantity;
                           return (
                             <div
                               key={`${depot.depotId}-${item.itemModelId}`}
@@ -1257,9 +1293,9 @@ export default function SupplyRequestSection({
                                 isInsufficient
                                   ? "border-amber-300 bg-amber-50"
                                   : itemColor.badge.replace(
-                                      "border-",
-                                      "border-",
-                                    ),
+                                    "border-",
+                                    "border-",
+                                  ),
                                 isInsufficient
                                   ? "text-amber-900"
                                   : "bg-muted/20",
@@ -1343,14 +1379,14 @@ export default function SupplyRequestSection({
                               ).toUpperCase() === "URGENT"
                                 ? "text-red-700 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/60 dark:text-red-300"
                                 : (
-                                      depotPriorities[depot.depotId] ||
-                                      (priorityLevels[0]?.key ?? "URGENT")
-                                    ).toUpperCase() === "HIGH"
+                                  depotPriorities[depot.depotId] ||
+                                  (priorityLevels[0]?.key ?? "URGENT")
+                                ).toUpperCase() === "HIGH"
                                   ? "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/60 dark:text-amber-300"
                                   : (
-                                        depotPriorities[depot.depotId] ||
-                                        (priorityLevels[0]?.key ?? "URGENT")
-                                      ).toUpperCase() === "MEDIUM"
+                                    depotPriorities[depot.depotId] ||
+                                    (priorityLevels[0]?.key ?? "URGENT")
+                                  ).toUpperCase() === "MEDIUM"
                                     ? "text-sky-700 bg-sky-50 border-sky-200 dark:bg-sky-950/20 dark:border-sky-800/60 dark:text-sky-300"
                                     : "",
                             )}

@@ -41,6 +41,7 @@ import {
   useInventorySourceTypes,
 } from "@/services/inventory/hooks";
 import type { ExpiringLotItem } from "@/services/inventory/type";
+import { getInventorySourceLabelFallback } from "@/lib/inventory-movement-taxonomy";
 
 // ─── Constants ───
 
@@ -157,7 +158,9 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
   const expiringCount = (lots?.length ?? 0) - expiredCount;
 
   const getSourceTypeLabel = useCallback(
-    (sourceType: string) => sourceTypeLabels.get(sourceType) ?? sourceType,
+    (sourceType: string) =>
+      sourceTypeLabels.get(sourceType) ??
+      getInventorySourceLabelFallback(sourceType),
     [sourceTypeLabels],
   );
 

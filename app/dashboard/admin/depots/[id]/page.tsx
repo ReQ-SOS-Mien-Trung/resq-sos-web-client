@@ -107,10 +107,39 @@ import {
 /* ── helpers ──────────────────────────────────────────────────── */
 function getApiError(err: unknown, fallback: string): string {
   if (err instanceof AxiosError) {
-    const msg = err.response?.data?.message;
-    if (typeof msg === "string" && msg.trim()) return msg.trim();
+    const data = err.response?.data as
+      | {
+          message?: unknown;
+          title?: unknown;
+          error?: unknown;
+          errors?: unknown;
+        }
+      | undefined;
+    const directMessage = data?.message ?? data?.title ?? data?.error;
+    if (typeof directMessage === "string" && directMessage.trim()) {
+      return directMessage.trim();
+    }
+    if (data?.errors && typeof data.errors === "object") {
+      const messages = Object.values(data.errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (messages.length > 0) return messages.join("\n");
+    }
   }
   return fallback;
+}
+
+function getDepotClosureTransferCapacityError(err: unknown): string {
+  const apiMessage = getApiError(err, "");
+  if (err instanceof AxiosError && err.response?.status === 409) {
+    return [
+      "Không thể tạo chuyển kho vì kho đích không còn đủ dung tích hoặc tải trọng sau khi tính cả hàng đang chuyển đến nhưng chưa nhận.",
+      apiMessage || "Vui lòng giảm số lượng hoặc chọn kho đích khác.",
+    ].join(" ");
+  }
+  return apiMessage || "Khởi tạo chuyển kho thất bại.";
 }
 
 function computeCountdown(deadline: string | null | undefined): string {
@@ -365,6 +394,14 @@ function ClosureTransferRecordCard({
                 </th>
                 <th
                   className={cn(
+                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                    tone.tableHeadStickyBg,
+                  )}
+                >
+                  Số Serial
+                </th>
+                <th
+                  className={cn(
                     "sticky top-0 z-10 text-right px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
                     tone.tableHeadStickyBg,
                   )}
@@ -376,7 +413,7 @@ function ClosureTransferRecordCard({
             <tbody>
               {resolvedTransfer.items.map((item) => (
                 <tr
-                  key={`${resolvedTransfer.id}-${item.itemModelId}-${item.itemType}`}
+                  key={`${resolvedTransfer.id}-${item.itemModelId}-${item.reusableItemId ?? item.serialNumber ?? item.itemType}`}
                   className="border-b border-border/20 last:border-0"
                 >
                   <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
@@ -384,6 +421,9 @@ function ClosureTransferRecordCard({
                   </td>
                   <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
                     {getInventoryItemTypeLabel(item.itemType, itemTypeValueMap)}
+                  </td>
+                  <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
+                    {item.serialNumber || "—"}
                   </td>
                   <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
                     {item.quantity.toLocaleString("vi-VN")} {item.unit || ""}
@@ -513,8 +553,8 @@ function getTransferCapacityValidationMessage(
   }
 
   return issueParts.length
-    ? `${depotLabel} ${issueParts.join(" và ")} cho phần hàng tiêu hao.`
-    : `${depotLabel} không còn đủ sức chứa cho phần hàng tiêu hao.`;
+    ? `${depotLabel} ${issueParts.join(" và ")} cho phần hàng tiêu hao. Sức chứa thực tế còn có thể thấp hơn nếu kho đang có hàng chờ nhập từ transfer khác.`
+    : `${depotLabel} không còn đủ sức chứa cho phần hàng tiêu hao. Sức chứa thực tế còn có thể thấp hơn nếu kho đang có hàng chờ nhập từ transfer khác.`;
 }
 
 interface TransferAssignmentItemDraft {
@@ -3647,7 +3687,7 @@ export default function DepotDetailPage() {
             handleRefresh();
           },
           onError: (err) =>
-            toast.error(getApiError(err, "Khởi tạo chuyển kho thất bại.")),
+            toast.error(getDepotClosureTransferCapacityError(err)),
         },
       );
       return;
@@ -3729,7 +3769,7 @@ export default function DepotDetailPage() {
             handleRefresh();
           },
           onError: (err) =>
-            toast.error(getApiError(err, "Khởi tạo chuyển kho thất bại.")),
+            toast.error(getDepotClosureTransferCapacityError(err)),
         },
       );
       return;

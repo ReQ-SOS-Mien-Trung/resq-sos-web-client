@@ -66,6 +66,7 @@ import {
   SearchDepotReusableUnitsResponse,
   UpdateReusableStatusParams,
   UpdateReusableStatusResponse,
+  DepotFundMetadataItem,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -658,6 +659,19 @@ export async function importRegularInventory(
   await api.post("/logistics/inventory/import-purchase", payload, {
     timeout: 60000,
   });
+}
+
+/**
+ * Get valid depot funds for purchase import payment
+ * GET /finance/depot-funds/my/funds-metadata
+ */
+export async function getMyDepotFundsMetadata(
+  depotId: number,
+): Promise<DepotFundMetadataItem[]> {
+  const { data } = await api.get("/finance/depot-funds/my/funds-metadata", {
+    params: { depotId },
+  });
+  return Array.isArray(data) ? data : [];
 }
 
 export async function updateItemModel(

@@ -53,6 +53,10 @@ import {
 import { type StockMovementEntity } from "@/services/inventory/type";
 import { StockMovementDetailSheet } from "./StockMovementDetailSheet";
 import { motion } from "framer-motion";
+import {
+  getInventoryActionFallback,
+  getInventorySourceLabelFallback,
+} from "@/lib/inventory-movement-taxonomy";
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -130,6 +134,26 @@ const StockMovementTable: React.FC = () => {
   const { data: actionTypes = [] } = useInventoryActionTypes();
 
   const { data: sourceTypes = [] } = useInventorySourceTypes();
+  const actionTypeLabelMap = useMemo(
+    () =>
+      new Map(
+        actionTypes.flatMap((actionType) => [
+          [actionType.key, actionType.value],
+          [actionType.value, actionType.value],
+        ]),
+      ),
+    [actionTypes],
+  );
+  const sourceTypeLabelMap = useMemo(
+    () =>
+      new Map(
+        sourceTypes.flatMap((sourceType) => [
+          [sourceType.key, sourceType.value],
+          [sourceType.value, sourceType.value],
+        ]),
+      ),
+    [sourceTypes],
+  );
 
   // Transform data — one row per stock movement
   const stockMovements = useMemo(() => {
@@ -220,42 +244,12 @@ const StockMovementTable: React.FC = () => {
     dateRange,
   ]);
 
-  const ACTION_TYPE_MAP: Record<string, { label: string; className: string }> =
-    {
-      Import: {
-        label: "Nhập kho",
-        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
-      },
-      Export: {
-        label: "Xuất kho",
-        className: "bg-red-100 text-red-700 border-red-200",
-      },
-      Adjust: {
-        label: "Điều chỉnh",
-        className: "bg-orange-100 text-orange-700 border-orange-200",
-      },
-      Return: {
-        label: "Hoàn trả",
-        className: "bg-blue-100 text-blue-700 border-blue-200",
-      },
-      TransferIn: {
-        label: "Chuyển nhập",
-        className: "bg-teal-100 text-teal-700 border-teal-200",
-      },
-      TransferOut: {
-        label: "Chuyển xuất",
-        className: "bg-purple-100 text-purple-700 border-purple-200",
-      },
-    };
+  const getActionTypeLabel = (actionType: string) =>
+    actionTypeLabelMap.get(actionType) ?? getInventoryActionFallback(actionType).label;
 
-  const SOURCE_TYPE_MAP: Record<string, string> = {
-    Donation: "Quyên góp",
-    Mission: "Nhiệm vụ",
-    Purchase: "Mua sắm",
-    Adjustment: "Điều chỉnh",
-    Transfer: "Chuyển kho",
-    Manual: "Thủ công",
-  };
+  const getSourceTypeLabel = (sourceType: string) =>
+    sourceTypeLabelMap.get(sourceType) ??
+    getInventorySourceLabelFallback(sourceType);
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -264,15 +258,12 @@ const StockMovementTable: React.FC = () => {
 
   // Get action type badge with Vietnamese label + proper color
   const getActionTypeBadge = (actionType: string) => {
-    const config = ACTION_TYPE_MAP[actionType];
-    if (config) {
-      return (
-        <Badge variant="outline" className={config.className}>
-          {config.label}
-        </Badge>
-      );
-    }
-    return <Badge variant="outline">{actionType}</Badge>;
+    const config = getInventoryActionFallback(actionType);
+    return (
+      <Badge variant="outline" className={config.className}>
+        {getActionTypeLabel(actionType)}
+      </Badge>
+    );
   };
 
   const displayStockMovements = filteredStockMovements || stockMovements;
@@ -366,8 +357,7 @@ const StockMovementTable: React.FC = () => {
                             htmlFor={`action-${actionType.key}`}
                             className="text-sm tracking-tighter"
                           >
-                            {ACTION_TYPE_MAP[actionType.key]?.label ??
-                              actionType.value}
+                            {getActionTypeLabel(actionType.key)}
                           </Label>
                         </div>
                       ))}
@@ -420,8 +410,7 @@ const StockMovementTable: React.FC = () => {
                             htmlFor={`source-${sourceType.key}`}
                             className="text-sm tracking-tighter"
                           >
-                            {SOURCE_TYPE_MAP[sourceType.key] ??
-                              sourceType.value}
+                            {getSourceTypeLabel(sourceType.key)}
                           </Label>
                         </div>
                       ))}
@@ -655,7 +644,27 @@ const StockMovementTable: React.FC = () => {
                           <TableCell>
                             {getActionTypeBadge(movement.actionType)}
                           </TableCell>
-                          <TableCell>{movement.sourceName || "—"}</TableCell>
+                          <TableCell>
+                            {(movement.rawMovement as StockMovementEntity)
+                              .vatInvoiceId != null ? (
+                              <div>
+                                <p className="font-medium text-sm tracking-tighter truncate max-w-48">
+                                  {(movement.rawMovement as StockMovementEntity)
+                                    .supplierName || movement.sourceName || "—"}
+                                </p>
+                                <p className="text-xs text-muted-foreground tracking-tighter mt-0.5 flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  HĐ {(movement.rawMovement as StockMovementEntity).invoiceSerial}
+                                  {" - "}
+                                  {(movement.rawMovement as StockMovementEntity).invoiceNumber}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-sm tracking-tighter">
+                                {movement.sourceName || "—"}
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {movement.items.length === 1 ? (
                               <div>

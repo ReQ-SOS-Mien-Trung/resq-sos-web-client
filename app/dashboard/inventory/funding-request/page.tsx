@@ -2142,10 +2142,10 @@ export default function FundingRequestPage() {
                                 Đơn giá *
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
-                                Thể tích / đơn vị
+                                Thể tích / dm³
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
-                                Cân nặng / đơn vị
+                                Cân nặng / kg
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
                                 Thành tiền

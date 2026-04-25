@@ -49,6 +49,7 @@ import {
   PencilSimple,
   CaretDown,
   Eye,
+  CalendarBlank,
 } from "@phosphor-icons/react";
 import {
   useInventoryCategories,
@@ -56,6 +57,7 @@ import {
   useInventoryTargetGroups,
   useImportRegularInventory,
   useDownloadPurchaseImportTemplate,
+  useMyDepotFundsMetadata,
 } from "@/services/inventory/hooks";
 import type {
   ImportPurchaseItem,
@@ -65,7 +67,8 @@ import type {
 import { updateItemModel } from "@/services/inventory/api";
 import {
   uploadImageToCloudinary,
-  uploadRawToCloudinary,
+  uploadRawToCloudinaryWithId,
+  deleteCloudinaryRawFiles,
 } from "@/utils/uploadFile";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { DateTimePickerInput } from "@/components/ui/date-time-picker-input";
@@ -79,6 +82,7 @@ import {
   fetchInventorySnapshotByCategoryCodes,
 } from "@/components/inventory/import-post-submit-image-helpers";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
+import { AxiosError } from "axios";
 
 const SYSTEM_CATEGORIES = [
   { label: "Thực phẩm", value: "Food" },
@@ -90,8 +94,24 @@ const SYSTEM_CATEGORIES = [
   { label: "Công cụ sửa chữa", value: "RepairTools" },
   { label: "Thiết bị cứu hộ", value: "RescueEquipment" },
   { label: "Sưởi ấm", value: "Heating" },
+  { label: "Phương tiện", value: "Vehicle" },
   { label: "Khác", value: "Others" },
 ] as const;
+
+type ImportOption = {
+  label: string;
+  value: string;
+};
+
+function normalizeImportOption(value: string): string {
+  return value
+    .replace(/[Đđ]/g, "d")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 
 const CATEGORY_VI_MAP: Record<string, string> = {
   "thực phẩm": "Food",
@@ -103,6 +123,7 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   "công cụ sửa chữa": "RepairTools",
   "thiết bị cứu hộ": "RescueEquipment",
   "sưởi ấm": "Heating",
+  "phương tiện": "Vehicle",
   khác: "Others",
   food: "Food",
   water: "Water",
@@ -113,16 +134,42 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   repairtools: "RepairTools",
   rescueequipment: "RescueEquipment",
   heating: "Heating",
+  vehicle: "Vehicle",
   other: "Others",
   others: "Others",
 };
 
 /** Match category from bilingual format like "Thực phẩm - Food" */
-function matchCategoryCode(rawCategory: string): string {
+function matchCategoryCode(
+  rawCategory: string,
+  categoryOptions: ImportOption[],
+): string {
+  const rawValue = rawCategory.trim();
+  if (!rawValue) return "";
+
+  const rawParts = rawValue
+    .split(/\s*-\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const candidates = new Set(
+    [rawValue, ...rawParts].map((part) => normalizeImportOption(part)),
+  );
+  const metadataMatch = categoryOptions.find((category) => {
+    const optionValues = [
+      category.value,
+      category.label,
+      `${category.label} - ${category.value}`,
+      `${category.value} - ${category.label}`,
+    ];
+    return optionValues.some((value) =>
+      candidates.has(normalizeImportOption(value)),
+    );
+  });
+  if (metadataMatch) return metadataMatch.value;
+
   const lower = rawCategory.toLowerCase().trim();
   if (CATEGORY_VI_MAP[lower]) return CATEGORY_VI_MAP[lower];
-  const parts = rawCategory.split(/\s*-\s*/);
-  for (const part of parts) {
+  for (const part of rawParts) {
     const match = CATEGORY_VI_MAP[part.trim().toLowerCase()];
     if (match) return match;
   }
@@ -171,10 +218,10 @@ const LEGACY_COLS = [
   COL.LOAI,
   COL.DONVI,
   COL.MOTA,
-  COL.DONGIA,
   COL.SOLUONG,
   COL.THETICH,
   COL.CANNANG,
+  COL.DONGIA,
   COL.HETHAN,
   COL.NHAN,
 ] as const;
@@ -188,10 +235,10 @@ const SHEET_COLS = [
   COL.DONVI,
   COL.MOTA,
   COL.ANH,
-  COL.DONGIA,
   COL.SOLUONG,
   COL.THETICH,
   COL.CANNANG,
+  COL.DONGIA,
   COL.HETHAN,
   COL.NHAN,
 ] as const;
@@ -350,7 +397,7 @@ function formatMoney(value: string | number): string {
       : String(Math.round(value));
   const n = parseInt(raw, 10);
   if (!raw || isNaN(n)) return "";
-  return n.toLocaleString("vi-VN");
+  return n.toLocaleString("en-US");
 }
 
 interface PdfLine {
@@ -583,8 +630,8 @@ async function parseVatPdf(file: File): Promise<Partial<VatFormState>> {
             typeof item.width === "number" && item.width > 0
               ? item.width
               : Math.abs(item.transform[0]) *
-                (item.str as string).length *
-                0.55,
+              (item.str as string).length *
+              0.55,
           h:
             typeof item.height === "number" && item.height > 0
               ? item.height
@@ -683,6 +730,39 @@ function createEmptyGroup(): PurchaseGroup {
   };
 }
 
+function getApiError(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    const data = err.response?.data as
+      | {
+        message?: unknown;
+        title?: unknown;
+        error?: unknown;
+        errors?: unknown;
+      }
+      | undefined;
+    const directMessage = data?.message ?? data?.title ?? data?.error;
+    if (typeof directMessage === "string" && directMessage.trim()) {
+      return directMessage.trim();
+    }
+    if (data?.errors && typeof data.errors === "object") {
+      const messages = Object.values(data.errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (messages.length > 0) return messages.join("\n");
+    }
+  }
+  return fallback;
+}
+
+function getImportPurchaseError(err: unknown): string {
+  const apiMessage = getApiError(err, "");
+  if (apiMessage) return apiMessage;
+  if (err instanceof Error && err.message.trim()) return err.message.trim();
+  return "Lỗi không xác định";
+}
+
 export default function ExcelImportRegular() {
   const router = useRouter();
   const { selectedDepotId } = useManagerDepot();
@@ -698,6 +778,8 @@ export default function ExcelImportRegular() {
     url: string;
     name: string;
   } | null>(null);
+  const [selectedDepotFundId, setSelectedDepotFundId] = useState("");
+  const [showFundError, setShowFundError] = useState(false);
   const pdfPreviewUrlRef = useRef<string | null>(null);
 
   const openPdfPreview = useCallback((file: File) => {
@@ -768,6 +850,13 @@ export default function ExcelImportRegular() {
   const { data: itemTypesData } = useInventoryItemTypes();
   const { data: targetGroupsData } = useInventoryTargetGroups();
   const { data: inventoryCategoriesData } = useInventoryCategories();
+  const {
+    data: depotFundOptions = [],
+    isLoading: isLoadingDepotFunds,
+    isError: isDepotFundsError,
+  } = useMyDepotFundsMetadata(selectedDepotId ?? 0, {
+    enabled: Number.isFinite(selectedDepotId) && (selectedDepotId ?? 0) > 0,
+  });
   const importMutation = useImportRegularInventory();
   const { mutateAsync: downloadTemplate } = useDownloadPurchaseImportTemplate();
 
@@ -808,6 +897,28 @@ export default function ExcelImportRegular() {
     () => targetGroups.map((t) => ({ label: t.value, value: t.key })),
     [targetGroups],
   );
+  const validDepotFundOptions = useMemo(
+    () =>
+      depotFundOptions.filter((fund) => {
+        const parsed = Number(fund.key);
+        return Number.isInteger(parsed) && parsed > 0;
+      }),
+    [depotFundOptions],
+  );
+  const effectiveDepotFundId = useMemo(() => {
+    if (validDepotFundOptions.length === 1) {
+      return Number(validDepotFundOptions[0].key);
+    }
+    if (
+      validDepotFundOptions.length > 1 &&
+      validDepotFundOptions.some(
+        (fund) => `${selectedDepotId ?? 0}:${fund.key}` === selectedDepotFundId,
+      )
+    ) {
+      return Number(selectedDepotFundId.split(":")[1]);
+    }
+    return null;
+  }, [selectedDepotFundId, selectedDepotId, validDepotFundOptions]);
 
   useEffect(() => {
     const nextPreviewUrls: Record<string, string> = {};
@@ -865,8 +976,10 @@ export default function ExcelImportRegular() {
       if (!row.categoryCode) errors.categoryCode = "Danh mục không hợp lệ";
       if (!row.quantity || row.quantity <= 0)
         errors.quantity = "Số lượng phải > 0";
-      if (row.unitPrice < 0) errors.unitPrice = "Đơn giá không hợp lệ";
+      if (!row.unitPrice || row.unitPrice <= 0)
+        errors.unitPrice = "Đơn giá phải > 0";
       if (!row.unit) errors.unit = "Đơn vị không được trống";
+      if (!row.description) errors.description = "Mô tả không được trống";
       if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
       if (!row.targetGroups?.length)
         errors.targetGroups = "Đối tượng không được trống";
@@ -968,7 +1081,7 @@ export default function ExcelImportRegular() {
       );
       return dataRows.map((raw, idx) => {
         const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
-        const categoryCode = matchCategoryCode(rawCategory);
+        const categoryCode = matchCategoryCode(rawCategory, categoryOptions);
 
         const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
         const targetGroupsValue = rawTargetGroup
@@ -1035,7 +1148,7 @@ export default function ExcelImportRegular() {
         return applyRowValidation(rowData);
       });
     },
-    [applyRowValidation, targetGroups, itemTypes],
+    [applyRowValidation, categoryOptions, targetGroups, itemTypes],
   );
 
   const parseExcelForGroup = useCallback(
@@ -1207,6 +1320,7 @@ export default function ExcelImportRegular() {
   const handleReset = useCallback(() => {
     setStep("upload");
     setGroups([createEmptyGroup()]);
+    setSelectedDepotFundId("");
   }, []);
 
   const handleDownloadTemplate = useCallback(async () => {
@@ -1244,6 +1358,24 @@ export default function ExcelImportRegular() {
   const handleSubmit = useCallback(async () => {
     if (totalRows === 0) {
       toast.error("Không có dữ liệu để nhập kho");
+      return;
+    }
+
+    if (isLoadingDepotFunds) {
+      toast.error("Đang tải danh sách quỹ thanh toán. Vui lòng thử lại sau.");
+      return;
+    }
+
+    if (isDepotFundsError || validDepotFundOptions.length === 0) {
+      toast.error("Kho hiện chưa có quỹ hợp lệ để thanh toán nhập mua.");
+      return;
+    }
+
+    if (validDepotFundOptions.length > 1 && effectiveDepotFundId == null) {
+      setShowFundError(true);
+      toast.error(
+        "Vui lòng chọn quỹ cần thanh toán trước khi nhập kho.",
+      );
       return;
     }
 
@@ -1339,10 +1471,13 @@ export default function ExcelImportRegular() {
       `Đang tải ${groups.length} hóa đơn PDF lên...`,
     );
     let fileUrls: string[];
+    let uploadedPublicIds: string[] = [];
     try {
-      fileUrls = await Promise.all(
-        groups.map((g) => uploadRawToCloudinary(g.vatFile!)),
+      const uploadResults = await Promise.all(
+        groups.map((g) => uploadRawToCloudinaryWithId(g.vatFile!)),
       );
+      fileUrls = uploadResults.map((r) => r.secureUrl);
+      uploadedPublicIds = uploadResults.map((r) => r.publicId);
     } catch {
       setIsUploading(false);
       toast.dismiss(uploadToastId);
@@ -1354,6 +1489,9 @@ export default function ExcelImportRegular() {
 
     const payload = {
       depotId: selectedDepotId ?? 0,
+      ...(effectiveDepotFundId != null
+        ? { depotFundId: effectiveDepotFundId }
+        : {}),
       invoices: groups.map((g, i) => ({
         batchNote: g.batchNote.trim() || undefined,
         vatInvoice: {
@@ -1420,8 +1558,7 @@ export default function ExcelImportRegular() {
             })),
             beforeImportItems,
             afterImportItems,
-            (categoryCode) =>
-              categoryNameByCode[categoryCode] ?? categoryCode,
+            (categoryCode) => categoryNameByCode[categoryCode] ?? categoryCode,
           );
 
           const uploadedImages = await Promise.all(
@@ -1499,19 +1636,25 @@ export default function ExcelImportRegular() {
         toast.success(`Nhập kho thành công ${totalRows} vật phẩm!`);
       }
       router.push("/dashboard/inventory");
-    } catch (err: any) {
-      toast.error(
-        `Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`,
-      );
+    } catch (err: unknown) {
+      // Cleanup uploaded PDFs since the import failed
+      if (uploadedPublicIds.length > 0) {
+        deleteCloudinaryRawFiles(uploadedPublicIds);
+      }
+      toast.error(`Nhập kho thất bại: ${getImportPurchaseError(err)}`);
     }
   }, [
     applyRowValidation,
+    effectiveDepotFundId,
     groups,
+    isDepotFundsError,
+    isLoadingDepotFunds,
     totalRows,
     selectedDepotId,
     importMutation,
     categoryNameByCode,
     router,
+    validDepotFundOptions.length,
   ]);
 
   const renderInputCell = (
@@ -1613,8 +1756,8 @@ export default function ExcelImportRegular() {
       selected.length === 0
         ? placeholder
         : selected
-            .map((v) => options.find((o) => o.value === v)?.label ?? v)
-            .join(", ");
+          .map((v) => options.find((o) => o.value === v)?.label ?? v)
+          .join(", ");
     return (
       <div className="space-y-1">
         <Popover>
@@ -1692,7 +1835,7 @@ export default function ExcelImportRegular() {
             value={rawValue > 0 ? formatMoney(rawValue) : ""}
             onChange={(e) => {
               const stripped = e.target.value
-                .replace(/\./g, "")
+                .replace(/,/g, "")
                 .replace(/[^\d]/g, "");
               updateRow(
                 groupId,
@@ -1864,52 +2007,77 @@ export default function ExcelImportRegular() {
     type: "text" | "date" | "number" = "text",
     required = false,
     currency = false,
-  ) => (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
-      <Input
-        type={currency ? "text" : type}
-        value={currency ? formatMoney(vatForm[key]) : vatForm[key]}
-        onChange={(e) => {
-          const val = currency
-            ? e.target.value.replace(/\./g, "").replace(/[^\d]/g, "")
-            : e.target.value;
-          updateVatForm(groupId, key, val);
-        }}
-        placeholder={placeholder}
-        className={cn(
-          "h-8 text-sm",
-          type === "date" &&
-            "pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
-          hasFile &&
+  ) => {
+    const isDateInvalid =
+      hasFile &&
+      type === "date" &&
+      vatForm[key] &&
+      (vatForm[key] as string) > new Date().toISOString().slice(0, 10);
+    const isEmptyRequired =
+      hasFile && required && !(vatForm[key] as string).trim();
+    const hasErr = !!(isEmptyRequired || isDateInvalid);
+
+    if (type === "date") {
+      return (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+            {label}
+            {required && <span className="text-red-500">*</span>}
+          </label>
+          <DatePickerInput
+            value={vatForm[key] as string}
+            onChange={(v) => updateVatForm(groupId, key, v)}
+            placeholder="Chọn ngày..."
+            hasError={hasErr}
+            maxDate={new Date().toISOString().slice(0, 10)}
+          />
+          {isEmptyRequired && (
+            <p className="text-[11px] tracking-tighter text-red-500">
+              Không được phép để trống
+            </p>
+          )}
+          {isDateInvalid && (
+            <p className="text-[11px] tracking-tighter text-red-500">
+              Ngày không được là ngày trong tương lai
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          {label}
+          {required && <span className="text-red-500">*</span>}
+        </label>
+        <Input
+          type={currency ? "text" : type}
+          value={currency ? formatMoney(vatForm[key]) : vatForm[key]}
+          onChange={(e) => {
+            const val = currency
+              ? e.target.value.replace(/,/g, "").replace(/[^\d]/g, "")
+              : e.target.value;
+            updateVatForm(groupId, key, val);
+          }}
+          placeholder={placeholder}
+          className={cn(
+            "h-8 text-sm",
+            hasFile &&
             required &&
-            !vatForm[key].trim() &&
+            !(vatForm[key] as string).trim() &&
             "border-red-400 focus-visible:ring-red-400",
-          hasFile &&
-            type === "date" &&
-            vatForm[key] &&
-            vatForm[key] > new Date().toISOString().slice(0, 10) &&
-            "border-red-400 focus-visible:ring-red-400",
-        )}
-      />
-      {hasFile && required && !vatForm[key].trim() && (
-        <p className="text-[11px] tracking-tighter text-red-500">
-          Không được phép để trống
-        </p>
-      )}
-      {hasFile &&
-        type === "date" &&
-        vatForm[key] &&
-        vatForm[key] > new Date().toISOString().slice(0, 10) && (
+          )}
+        />
+        {hasFile && required && !(vatForm[key] as string).trim() && (
           <p className="text-[11px] tracking-tighter text-red-500">
-            Ngày không được là ngày trong tương lai
+            Không được phép để trống
           </p>
         )}
-    </div>
-  );
+      </div>
+    );
+  };
+
 
   return (
     <div className="flex flex-col h-full">
@@ -2428,6 +2596,85 @@ export default function ExcelImportRegular() {
                 </div>
               </div>
 
+              <div
+                className={cn(
+                  "rounded-xl border bg-card px-4 py-3",
+                  (isDepotFundsError || validDepotFundOptions.length === 0) &&
+                  "border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20",
+                  validDepotFundOptions.length > 1 &&
+                  effectiveDepotFundId == null &&
+                  "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20",
+                )}
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold tracking-tighter">
+                      Quỹ thanh toán nhập mua
+                    </p>
+                    <p className="mt-0.5 text-sm tracking-tighter text-muted-foreground">
+                      Hệ thống sẽ trừ tiền đúng quỹ đã chọn khi ghi nhận hóa
+                      đơn.
+                    </p>
+                  </div>
+                  <div className="w-full md:w-120">
+                    {isLoadingDepotFunds ? (
+                      <div className="flex h-10 items-center gap-2 rounded-lg border bg-background px-3 text-sm tracking-tighter text-muted-foreground">
+                        <SpinnerGap className="h-4 w-4 animate-spin" />
+                        Đang tải danh sách quỹ...
+                      </div>
+                    ) : isDepotFundsError ||
+                      validDepotFundOptions.length === 0 ? (
+                      <div className="flex min-h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium tracking-tighter text-red-700 dark:border-red-900 dark:bg-background dark:text-red-400">
+                        <WarningCircle
+                          className="h-4 w-4 shrink-0"
+                          weight="fill"
+                        />
+                        Kho hiện chưa có quỹ hợp lệ để thanh toán nhập mua.
+                      </div>
+                    ) : validDepotFundOptions.length === 1 ? (
+                      <div className="flex min-h-10 items-center rounded-lg border bg-background px-3 text-sm font-medium tracking-tighter">
+                        {validDepotFundOptions[0].value}
+                      </div>
+                    ) : (
+                      <>
+                        <Select
+                          value={selectedDepotFundId}
+                          onValueChange={(v) => {
+                            setSelectedDepotFundId(v);
+                            setShowFundError(false);
+                          }}
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              "h-10 w-full rounded-lg bg-background tracking-tighter",
+                              (effectiveDepotFundId == null || showFundError) &&
+                              "border-amber-300 focus-visible:ring-amber-400",
+                            )}
+                          >
+                            <SelectValue placeholder="Chọn quỹ thanh toán" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {validDepotFundOptions.map((fund) => (
+                              <SelectItem
+                                key={fund.key}
+                                value={`${selectedDepotId ?? 0}:${fund.key}`}
+                              >
+                                {fund.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {showFundError && effectiveDepotFundId == null && (
+                          <p className="text-xs text-amber-600 mt-1 font-medium tracking-tighter">
+                            Vui lòng chọn quỹ thanh toán trước khi xác nhận nhập kho
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {groups.map((group, idx) => {
                 const color = GROUP_COLORS[idx % GROUP_COLORS.length];
                 const groupErrors = group.rows.filter(
@@ -2649,18 +2896,34 @@ export default function ExcelImportRegular() {
                           true,
                         )}
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium tracking-tighter mb-1 text-muted-foreground">
-                          Ghi chú lần nhập
-                        </label>
-                        <Input
-                          value={group.batchNote}
-                          onChange={(e) =>
-                            patchGroup(group.id, { batchNote: e.target.value })
-                          }
-                          placeholder="Ghi chú cho lần nhập này..."
-                          className="h-8 text-sm"
-                        />
+                      <div className="flex gap-4 items-start">
+                        <div className="space-y-1 flex-1">
+                          <label className="text-xs font-medium tracking-tighter mb-1 text-muted-foreground">
+                            Ghi chú lần nhập
+                          </label>
+                          <Input
+                            value={group.batchNote}
+                            onChange={(e) =>
+                              patchGroup(group.id, { batchNote: e.target.value })
+                            }
+                            placeholder="Ghi chú cho lần nhập này..."
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1 min-w-52">
+                          <label className="text-xs font-medium tracking-tighter mb-1 text-muted-foreground">
+                            Tổng tiền hàng
+                          </label>
+                          <div className="h-8 flex items-center rounded-md border bg-muted/50 px-3 text-sm font-semibold text-emerald-700 tracking-tighter">
+                            {formatMoney(
+                              group.rows.reduce(
+                                (sum, r) => sum + (r.unitPrice ?? 0) * (r.quantity ?? 0),
+                                0,
+                              ),
+                            )}
+                            <span className="ml-1 text-sm font-normal text-muted-foreground">VNĐ</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -2681,7 +2944,7 @@ export default function ExcelImportRegular() {
                             <TableHead className="min-w-36">
                               Đối tượng
                             </TableHead>
-                            <TableHead className="min-w-36">
+                            <TableHead className="min-w-28">
                               Loại vật phẩm
                             </TableHead>
                             <TableHead className="min-w-24">Đơn vị</TableHead>
@@ -2689,19 +2952,41 @@ export default function ExcelImportRegular() {
                               Mô tả vật phẩm
                             </TableHead>
                             <TableHead className="min-w-32 w-32">Ảnh</TableHead>
-                            <TableHead className="min-w-28">Đơn giá</TableHead>
                             <TableHead className="min-w-24">Số lượng</TableHead>
                             <TableHead className="min-w-28">
-                              Thể tích / đơn vị
+                              Thể tích / dm³
                             </TableHead>
                             <TableHead className="min-w-28">
-                              Cân nặng / đơn vị
+                              Cân nặng / kg
                             </TableHead>
+                            <TableHead className="min-w-36">Đơn giá</TableHead>
                             <TableHead className="min-w-36">
                               Ngày hết hạn
                             </TableHead>
                             <TableHead className="min-w-36">
-                              Ngày nhận
+                              <div className="flex items-center gap-1.5">
+                                Ngày nhận
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-xs font-medium gap-0.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                                  onClick={() => {
+                                    const now = new Date();
+                                    const p2 = (n: number) => String(n).padStart(2, "0");
+                                    const nowStr = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}T${p2(now.getHours())}:${p2(now.getMinutes())}`;
+                                    patchGroup(group.id, (g) => ({
+                                      ...g,
+                                      rows: g.rows.map((r) =>
+                                        applyRowValidation({ ...r, receivedDate: nowStr }),
+                                      ),
+                                    }));
+                                    toast.success("Đã điền ngày nhận hôm nay cho tất cả");
+                                  }}
+                                >
+                                  <CalendarBlank className="h-3 w-3" />
+                                  Hôm nay
+                                </Button>
+                              </div>
                             </TableHead>
                             <TableHead className="w-10" />
                           </TableRow>
@@ -2715,7 +3000,7 @@ export default function ExcelImportRegular() {
                                 key={row.id}
                                 className={cn(
                                   hasErrors &&
-                                    "bg-red-50/50 dark:bg-red-950/10",
+                                  "bg-red-50/50 dark:bg-red-950/10",
                                 )}
                               >
                                 <TableCell className="text-center text-xs text-muted-foreground font-mono">
@@ -2745,7 +3030,7 @@ export default function ExcelImportRegular() {
                                       )
                                     }
                                     placeholder="X"
-                                    disabled={!row.itemModelId}
+                                    disabled={!!row.itemModelId}
                                     className="h-8 text-sm w-20 disabled:cursor-not-allowed disabled:opacity-60"
                                   />
                                 </TableCell>
@@ -2759,35 +3044,47 @@ export default function ExcelImportRegular() {
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  {renderMultiSelectCell(
-                                    group.id,
-                                    row,
-                                    targetGroupOptions,
-                                    "Chọn đối tượng",
-                                  )}
-                                  {row.itemType === "Reusable" &&
-                                    row.targetGroups?.includes("Rescuer") &&
-                                    !row.errors.targetGroups && (
+                                  {row.itemType === "Reusable" ? (
+                                    <div className="space-y-1">
+                                      <div
+                                        className={cn(
+                                          "h-8 w-full flex items-center text-sm px-3 rounded-md border bg-muted/50 cursor-not-allowed opacity-70",
+                                        )}
+                                      >
+                                        <span className="truncate text-left">
+                                          {targetGroupOptions.find((o) => o.value === "Rescuer")?.label ?? "Lực lượng cứu hộ"}
+                                        </span>
+                                      </div>
                                       <p className="text-[11px] text-blue-500 mt-0.5">
                                         Mặc định chọn với loại Tái sử dụng
                                       </p>
-                                    )}
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {renderMultiSelectCell(
+                                        group.id,
+                                        row,
+                                        targetGroupOptions,
+                                        "Chọn đối tượng",
+                                      )}
+                                    </>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   {itemTypeOptions.length > 0
                                     ? renderSelectCell(
-                                        group.id,
-                                        row,
-                                        "itemType",
-                                        itemTypeOptions,
-                                        "Chọn loại",
-                                      )
+                                      group.id,
+                                      row,
+                                      "itemType",
+                                      itemTypeOptions,
+                                      "Chọn loại",
+                                    )
                                     : renderInputCell(
-                                        group.id,
-                                        row,
-                                        "itemType",
-                                        "Loại vật phẩm",
-                                      )}
+                                      group.id,
+                                      row,
+                                      "itemType",
+                                      "Loại vật phẩm",
+                                    )}
                                 </TableCell>
                                 <TableCell>
                                   {renderInputCell(
@@ -2798,29 +3095,15 @@ export default function ExcelImportRegular() {
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  <Input
-                                    value={row.description}
-                                    onChange={(e) =>
-                                      updateRow(
-                                        group.id,
-                                        row.id,
-                                        "description",
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Mô tả vật phẩm..."
-                                    className="h-8 text-sm"
-                                  />
+                                  {renderInputCell(
+                                    group.id,
+                                    row,
+                                    "description",
+                                    "Mô tả vật phẩm...",
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   {renderImageCell(group.id, row)}
-                                </TableCell>
-                                <TableCell>
-                                  {renderCurrencyCell(
-                                    group.id,
-                                    row,
-                                    "unitPrice",
-                                  )}
                                 </TableCell>
                                 <TableCell>
                                   {renderInputCell(
@@ -2845,6 +3128,13 @@ export default function ExcelImportRegular() {
                                     row,
                                     "weightPerUnit",
                                     "kg",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {renderCurrencyCell(
+                                    group.id,
+                                    row,
+                                    "unitPrice",
                                   )}
                                 </TableCell>
                                 <TableCell>

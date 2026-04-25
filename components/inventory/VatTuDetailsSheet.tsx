@@ -83,6 +83,7 @@ import {
   getInventoryTotal,
   getInventoryTotalReserved,
 } from "@/services/inventory/utils";
+import { getInventorySourceLabelFallback } from "@/lib/inventory-movement-taxonomy";
 
 interface VatTuDetailsSheetProps {
   item: InventoryItemEntity | null;
@@ -205,7 +206,8 @@ export function VatTuDetailsSheet({
   const reusableStatusLabel = (key: string) =>
     reusableStatusesData.find((status) => status.key === key)?.value ?? key;
   const sourceTypeLabel = (key: string) =>
-    sourceTypesData.find((s) => s.key === key)?.value ?? key;
+    sourceTypesData.find((s) => s.key === key)?.value ??
+    getInventorySourceLabelFallback(key);
   const conditionLabel = (key: string) =>
     (reusableConditions ?? []).find((c) => c.key === key)?.value ?? key;
 

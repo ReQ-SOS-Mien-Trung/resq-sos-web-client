@@ -65,10 +65,48 @@ import {
 
 function getApiError(err: unknown, fallback: string): string {
   if (err instanceof AxiosError) {
-    const msg = err.response?.data?.message;
-    if (typeof msg === "string" && msg.trim()) return msg.trim();
+    const data = err.response?.data as
+      | {
+          message?: unknown;
+          title?: unknown;
+          error?: unknown;
+          errors?: unknown;
+        }
+      | undefined;
+    const directMessage = data?.message ?? data?.title ?? data?.error;
+    if (typeof directMessage === "string" && directMessage.trim()) {
+      return directMessage.trim();
+    }
+    if (data?.errors && typeof data.errors === "object") {
+      const messages = Object.values(data.errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (messages.length > 0) return messages.join("\n");
+    }
   }
   return fallback;
+}
+
+function getExternalResolutionSubmitError(err: unknown): string {
+  const apiMessage = getApiError(err, "");
+  if (err instanceof AxiosError) {
+    if (err.response?.status === 400) {
+      return [
+        "File Excel không khớp tồn kho hiện hành.",
+        apiMessage ||
+          "Vui lòng tải lại template mới nhất và kiểm tra Lot ID, Serial Number.",
+      ].join(" ");
+    }
+    if (err.response?.status === 409) {
+      return [
+        "Không thể xử lý vì tồn kho đã thay đổi hoặc vật phẩm tái sử dụng không ở trạng thái Available.",
+        apiMessage || "Vui lòng tải lại template rồi kiểm tra serial trước khi gửi.",
+      ].join(" ");
+    }
+  }
+  return apiMessage || "Gửi kết quả xử lý thất bại.";
 }
 
 function normalizeNotificationType(type: unknown): string {
@@ -107,6 +145,7 @@ type ExternalResolutionColumnKey =
   | "TARGET_GROUP"
   | "ITEM_TYPE"
   | "UNIT"
+  | "SERIAL_NUMBER"
   | "RECEIVED_DATE"
   | "EXPIRED_DATE"
   | "QUANTITY"
@@ -115,6 +154,9 @@ type ExternalResolutionColumnKey =
   | "HANDLING_METHOD"
   | "RECIPIENT"
   | "NOTE"
+  | "ITEM_MODEL_ID"
+  | "LOT_ID"
+  | "REUSABLE_ITEM_ID"
   | "IMAGE_URL";
 
 const EXTERNAL_RESOLUTION_COLUMN_ALIASES: Record<
@@ -127,6 +169,7 @@ const EXTERNAL_RESOLUTION_COLUMN_ALIASES: Record<
   TARGET_GROUP: ["doi tuong", "targetgroup", "target group"],
   ITEM_TYPE: ["loai vat pham", "itemtype", "item type"],
   UNIT: ["don vi", "unit"],
+  SERIAL_NUMBER: ["so serial", "serial", "serialnumber", "serial number"],
   RECEIVED_DATE: [
     "ngay nhan",
     "ngay nhap",
@@ -157,8 +200,42 @@ const EXTERNAL_RESOLUTION_COLUMN_ALIASES: Record<
   ],
   RECIPIENT: ["nguoi nhan", "don vi nhan", "noi nhan", "recipient"],
   NOTE: ["ghi chu", "note"],
+  ITEM_MODEL_ID: ["itemmodelid", "item model id", "ma mau vat pham"],
+  LOT_ID: ["lotid", "lot id", "ma lo"],
+  REUSABLE_ITEM_ID: [
+    "reusableitemid",
+    "reusable item id",
+    "ma vat pham tai su dung",
+  ],
   IMAGE_URL: ["anh", "hinh anh", "imageurl", "image url"],
 };
+
+const EXTERNAL_RESOLUTION_FIXED_COLUMN_INDEXES: Record<
+  ExternalResolutionColumnKey,
+  number
+> = {
+  ROW_NUMBER: 0,
+  ITEM_NAME: 1,
+  CATEGORY_NAME: 2,
+  TARGET_GROUP: 3,
+  ITEM_TYPE: 4,
+  UNIT: 5,
+  SERIAL_NUMBER: 6,
+  RECEIVED_DATE: 7,
+  EXPIRED_DATE: 8,
+  QUANTITY: 9,
+  UNIT_PRICE: 10,
+  TOTAL_PRICE: 11,
+  HANDLING_METHOD: 12,
+  RECIPIENT: 13,
+  NOTE: 14,
+  ITEM_MODEL_ID: 15,
+  LOT_ID: 16,
+  REUSABLE_ITEM_ID: 17,
+  IMAGE_URL: 18,
+};
+
+const EXTERNAL_RESOLUTION_FALLBACK_DATA_ROW_INDEX = 3;
 
 function normalizeExcelText(value: unknown): string {
   return String(value ?? "")
@@ -183,6 +260,11 @@ function parseExcelNumber(value: unknown): number {
     .replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseNullableExcelNumber(value: unknown): number | null {
+  const parsed = parseExcelNumber(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function parseExcelDateTime(value: unknown): string | null {
@@ -295,6 +377,31 @@ function findExternalResolutionHeaderLayout(rows: unknown[][]): {
   return null;
 }
 
+function resolveExternalResolutionLayout(rows: unknown[][]): {
+  dataRowIndex: number;
+  columnIndexes: Partial<Record<ExternalResolutionColumnKey, number>>;
+} | null {
+  const headerLayout = findExternalResolutionHeaderLayout(rows);
+  if (headerLayout) {
+    return {
+      dataRowIndex: headerLayout.headerRowIndex + 1,
+      columnIndexes: {
+        ...EXTERNAL_RESOLUTION_FIXED_COLUMN_INDEXES,
+        ...headerLayout.columnIndexes,
+      },
+    };
+  }
+
+  if (rows.length <= EXTERNAL_RESOLUTION_FALLBACK_DATA_ROW_INDEX) {
+    return null;
+  }
+
+  return {
+    dataRowIndex: EXTERNAL_RESOLUTION_FALLBACK_DATA_ROW_INDEX,
+    columnIndexes: EXTERNAL_RESOLUTION_FIXED_COLUMN_INDEXES,
+  };
+}
+
 function getExternalResolutionRows(
   workbook: XLSX.WorkBook,
 ): DepotExternalResolutionItem[] {
@@ -308,11 +415,11 @@ function getExternalResolutionRows(
     raw: true,
     defval: "",
   });
-  const layout = findExternalResolutionHeaderLayout(rows);
+  const layout = resolveExternalResolutionLayout(rows);
   if (!layout) return [];
 
-  const { headerRowIndex, columnIndexes } = layout;
-  const dataRows = rows.slice(headerRowIndex + 1);
+  const { dataRowIndex, columnIndexes } = layout;
+  const dataRows = rows.slice(dataRowIndex);
 
   return dataRows
     .map((row, index) => {
@@ -327,12 +434,16 @@ function getExternalResolutionRows(
 
       return {
         rowNumber:
-          parseExcelNumber(getCell("ROW_NUMBER")) || headerRowIndex + index + 2,
+          parseExcelNumber(getCell("ROW_NUMBER")) || dataRowIndex + index + 1,
+        itemModelId: parseNullableExcelNumber(getCell("ITEM_MODEL_ID")) ?? 0,
         itemName: String(getCell("ITEM_NAME") ?? "").trim(),
         categoryName: String(getCell("CATEGORY_NAME") ?? "").trim(),
         targetGroup: String(getCell("TARGET_GROUP") ?? "").trim(),
         itemType: String(getCell("ITEM_TYPE") ?? "").trim(),
         unit: String(getCell("UNIT") ?? "").trim(),
+        lotId: parseNullableExcelNumber(getCell("LOT_ID")),
+        reusableItemId: parseNullableExcelNumber(getCell("REUSABLE_ITEM_ID")),
+        serialNumber: String(getCell("SERIAL_NUMBER") ?? "").trim() || null,
         receivedDate: parseExcelDateTime(getCell("RECEIVED_DATE")),
         expiredDate: parseExcelDateTime(getCell("EXPIRED_DATE")),
         quantity,
@@ -760,7 +871,7 @@ function TransferDetailPanel({
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-border/40 bg-background">
-            <table className="w-full min-w-[520px]">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-border/30 bg-muted/10">
                   <th className="px-4 py-2 text-left text-xs font-semibold tracking-tighter text-foreground">
@@ -768,6 +879,9 @@ function TransferDetailPanel({
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold tracking-tighter text-foreground">
                     Loại
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold tracking-tighter text-foreground">
+                    Số Serial
                   </th>
                   <th className="px-4 py-2 text-right text-xs font-semibold tracking-tighter text-foreground">
                     Số lượng
@@ -777,7 +891,7 @@ function TransferDetailPanel({
               <tbody>
                 {transfer.items.map((item) => (
                   <tr
-                    key={`${transfer.id}-${item.itemModelId}-${item.itemType}`}
+                    key={`${transfer.id}-${item.itemModelId}-${item.reusableItemId ?? item.serialNumber ?? item.itemType}`}
                     className="border-b border-border/20 last:border-0"
                   >
                     <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
@@ -788,6 +902,9 @@ function TransferDetailPanel({
                         item.itemType,
                         itemTypeValueMap,
                       )}
+                    </td>
+                    <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
+                      {item.serialNumber || "—"}
                     </td>
                     <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
                       {item.quantity.toLocaleString("vi-VN")} {item.unit || ""}
@@ -1114,7 +1231,7 @@ export function DepotClosureTransferTable({
           void Promise.all([refetch(), refetchExternalResolutionState()]);
         },
         onError: (err) => {
-          toast.error(getApiError(err, "Gửi kết quả xử lý thất bại."));
+          toast.error(getExternalResolutionSubmitError(err));
         },
       },
     );
@@ -1302,6 +1419,7 @@ export function DepotClosureTransferTable({
                             "Đối tượng",
                             "Loại vật phẩm",
                             "Đơn vị",
+                            "Số Serial",
                             "Ngày nhập",
                             "Hạn sử dụng",
                             "Số lượng",
@@ -1323,7 +1441,7 @@ export function DepotClosureTransferTable({
                       <tbody>
                         {externalResolutionItems.map((item) => (
                           <tr
-                            key={`${item.rowNumber}-${item.itemName}`}
+                            key={`${item.rowNumber}-${item.itemModelId}-${item.lotId ?? item.reusableItemId ?? item.itemName}`}
                             className="border-b border-blue-200/70 dark:border-blue-800/60 align-top"
                           >
                             <td className="px-4 py-3 font-medium text-foreground tracking-tighter whitespace-nowrap">
@@ -1346,6 +1464,9 @@ export function DepotClosureTransferTable({
                             </td>
                             <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {item.unit || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
+                              {item.serialNumber || "—"}
                             </td>
                             <td className="px-4 py-3 text-foreground tracking-tighter whitespace-nowrap">
                               {formatExcelPreviewDate(item.receivedDate)}

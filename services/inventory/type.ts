@@ -201,6 +201,7 @@ export interface ImportPurchaseItem {
 
 export type ImportRegularRequest = {
   depotId: number;
+  depotFundId?: number;
   invoices: Array<{
     batchNote?: string;
     vatInvoice: VatInvoice;
@@ -208,6 +209,11 @@ export type ImportRegularRequest = {
     campaignDisbursementId?: number;
   }>;
 };
+
+export interface DepotFundMetadataItem {
+  key: string;
+  value: string;
+}
 
 export interface UpdateItemModelPayload {
   categoryId: number;
@@ -250,6 +256,15 @@ export interface StockMovementEntity {
   note: string;
   createdAt: string;
   items: StockMovementItem[];
+  /** VAT Invoice fields – only present for Purchase imports */
+  vatInvoiceId?: number | null;
+  invoiceSerial?: string | null;
+  invoiceNumber?: string | null;
+  supplierName?: string | null;
+  supplierTaxCode?: string | null;
+  invoiceDate?: string | null;
+  invoiceTotalAmount?: number | null;
+  invoiceFileUrl?: string | null;
 }
 
 export interface GetDepotStockMovementsParams {
