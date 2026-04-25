@@ -4,6 +4,7 @@ export { default as DashboardLayout } from "./DashboardLayout";
 export { default as SummaryCards } from "./SummaryCards";
 export { default as RevenueChart } from "./RevenueChart";
 export { default as CalendarWidget } from "./CalendarWidget";
+export { default as DepotFundMovementChart } from "./DepotFundMovementChart";
 export { default as LeadsManagement } from "./LeadsManagement";
 export { default as TopCountries } from "./TopCountries";
 export { default as RetentionRate } from "./RetentionRate";

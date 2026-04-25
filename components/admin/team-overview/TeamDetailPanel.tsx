@@ -138,7 +138,7 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
               <CardContent className="">
                 {data.completionRate.totalMissions === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">
-                    Chưa có nhiệm vụ
+                    Chưa có thống kê
                   </p>
                 ) : (
                   <div className="flex flex-row items-center justify-center gap-4">
@@ -251,16 +251,12 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium truncate">
                             {m.lastName} {m.firstName}
                           </span>
                           {m.isLeader && (
-                            <Crown
-                              size={14}
-                              weight="fill"
-                              className="text-amber-500 shrink-0"
-                            />
+                            <Icon icon="iconoir:bright-crown" width="20" height="20" className="text-amber-500 shrink-0" />
                           )}
                         </div>
                       </div>
@@ -306,15 +302,15 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
             <div className="overflow-hidden rounded-2xl border border-border/50 bg-background">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-muted/50">
-                <TableRow>
+                  <TableRow>
                     <TableHead className="w-11" />
                     <TableHead className="w-[110px]">Mã NV</TableHead>
-                  <TableHead>Loại</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Báo cáo</TableHead>
-                  <TableHead>Ngày giao</TableHead>
-                  <TableHead>Ngày hoàn thành</TableHead>
-                </TableRow>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead>Báo cáo</TableHead>
+                    <TableHead>Ngày giao</TableHead>
+                    <TableHead>Ngày hoàn thành</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.missions.map((mission: TeamMission) => {
@@ -329,9 +325,8 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                 : mission.missionTeamId,
                             )
                           }
-                          className={`cursor-pointer transition-colors hover:bg-muted/30 ${
-                            isExpanded ? "bg-muted/40" : ""
-                          }`}
+                          className={`cursor-pointer transition-colors hover:bg-muted/30 ${isExpanded ? "bg-muted/40" : ""
+                            }`}
                         >
                           <TableCell className="text-muted-foreground">
                             {isExpanded ? (
@@ -353,13 +348,12 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                           </TableCell>
                           <TableCell>
                             <Badge
-                              className={`whitespace-nowrap text-xs ${
-                                mission.missionStatus === "Completed"
-                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                  : mission.missionStatus === "InProgress"
-                                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                                    : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                              }`}
+                              className={`whitespace-nowrap text-xs ${mission.missionStatus === "Completed"
+                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                : mission.missionStatus === "InProgress"
+                                  ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                                }`}
                             >
                               {mission.missionStatus}
                             </Badge>
@@ -381,8 +375,8 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                           <TableCell className="whitespace-nowrap text-sm text-foreground/80">
                             {mission.missionCompletedAt
                               ? new Date(
-                                  mission.missionCompletedAt,
-                                ).toLocaleString("vi-VN")
+                                mission.missionCompletedAt,
+                              ).toLocaleString("vi-VN")
                               : "-"}
                           </TableCell>
                         </TableRow>
@@ -416,8 +410,8 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                         Hoàn thành:{" "}
                                         {mission.missionCompletedAt
                                           ? new Date(
-                                              mission.missionCompletedAt,
-                                            ).toLocaleString("vi-VN")
+                                            mission.missionCompletedAt,
+                                          ).toLocaleString("vi-VN")
                                           : "Chưa hoàn thành"}
                                       </span>
                                     </div>
@@ -439,11 +433,10 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                                     {act.activityType}
                                                   </span>
                                                   <Badge
-                                                    className={`text-xs ${
-                                                      act.status === "Completed"
-                                                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                                        : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                                                    }`}
+                                                    className={`text-xs ${act.status === "Completed"
+                                                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                                      }`}
                                                   >
                                                     {act.status}
                                                   </Badge>

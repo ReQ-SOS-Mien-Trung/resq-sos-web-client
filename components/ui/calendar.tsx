@@ -43,7 +43,7 @@ function Calendar({
           "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem] text-center",
         week: "flex w-full mt-2",
         day: cn(
-          "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+          "relative p-0 py-0.5 text-center text-sm focus-within:relative focus-within:z-20",
           "[&:has([aria-selected])]:bg-accent",
           "[&:has([aria-selected].day-outside)]:bg-accent/50",
           "first:[&:has([aria-selected])]:rounded-l-md",
@@ -63,7 +63,7 @@ function Calendar({
         outside: "day-outside opacity-50 aria-selected:bg-accent/50",
         disabled: "opacity-50",
         range_middle:
-          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          "aria-selected:bg-accent aria-selected:text-accent-foreground [&>button]:!bg-transparent [&>button]:!text-foreground [&>button]:hover:!bg-transparent [&>button]:hover:!text-foreground",
         hidden: "invisible",
         ...classNames,
       }}

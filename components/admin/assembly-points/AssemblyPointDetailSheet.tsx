@@ -39,6 +39,7 @@ import {
   buildAssemblyPointStatusConfig,
   getAssemblyPointStatusConfig,
 } from "@/components/admin/assembly-points/status-config";
+import { Icon } from "@iconify/react";
 
 function formatLastUpdated(date: string | null) {
   if (!date) return "Chưa cập nhật";
@@ -202,11 +203,7 @@ function MemberFloatingTooltip({
                 {m.lastName} {m.firstName}
               </span>
               {m.isLeader && (
-                <Crown
-                  size={13}
-                  weight="fill"
-                  className="text-amber-500 shrink-0"
-                />
+                <Icon icon="iconoir:bright-crown" width="20" height="20" className="text-amber-500 shrink-0" />
               )}
               {m.status === "Pending" && (
                 <span className="text-xs text-amber-600 font-medium tracking-tight">
@@ -342,11 +339,12 @@ function TeamCard({
                 compact ? "mt-1.5 text-[13px]" : "mt-2 text-sm",
               )}
             >
-              <Crown
+              {/* <Crown
                 size={12}
                 weight="fill"
                 className="text-amber-500 shrink-0"
-              />
+              /> */}
+              <Icon icon="iconoir:bright-crown" width="24" height="24" className="text-amber-500 shrink-0" />
               <span className="text-foreground font-medium truncate">
                 {leader.lastName} {leader.firstName}
               </span>
@@ -580,7 +578,7 @@ export function AssemblyPointDetailSheet({
                         layout
                         className={cn(
                           "mt-3 grid gap-2",
-                          isFullscreen 
+                          isFullscreen
                             ? (data.statusChangedAt ? "grid-cols-4" : "grid-cols-3")
                             : "grid-cols-2",
                         )}

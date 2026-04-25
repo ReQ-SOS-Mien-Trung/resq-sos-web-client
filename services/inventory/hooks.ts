@@ -54,6 +54,7 @@ import {
   decommissionReusable,
   getReusableItemStatuses,
   getInventoryItemModels,
+  getDepotInventoryItemModels,
   searchDepotReusableUnits,
   setReusableMaintenance,
   setReusableAvailable,
@@ -72,6 +73,7 @@ import {
   InventoryOrganization,
   InventoryTargetGroup,
   InventoryActionType,
+  InventoryItemModelMetadata,
   InventorySourceType,
   InventoryReliefItem,
   ReusableItemCondition,
@@ -177,6 +179,8 @@ export const INVENTORY_KEYS = {
   reusableItemStatuses: () =>
     [...INVENTORY_KEYS.all, "reusableItemStatuses"] as const,
   itemModels: () => [...INVENTORY_KEYS.all, "itemModels"] as const,
+  depotItemModels: (depotId: number) =>
+    [...INVENTORY_KEYS.all, "depotItemModels", depotId] as const,
   myDepotFundsMetadata: (depotId: number) =>
     [...INVENTORY_KEYS.all, "myDepotFundsMetadata", depotId] as const,
   reusableUnitSearch: (params: SearchDepotReusableUnitsParams) =>
@@ -840,6 +844,23 @@ export function useInventoryItemModels(
     queryKey: INVENTORY_KEYS.itemModels(),
     queryFn: getInventoryItemModels,
     staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useDepotInventoryItemModels(
+  depotId: number,
+  options?: Omit<
+    UseQueryOptions<InventoryItemModelMetadata[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.depotItemModels(depotId),
+    queryFn: () => getDepotInventoryItemModels(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
+    staleTime: 60_000,
     ...options,
   });
 }

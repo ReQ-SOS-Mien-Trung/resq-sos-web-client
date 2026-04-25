@@ -71,13 +71,13 @@ const CircularProgress = ({
   const remaining = Math.max(0, max - value);
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <div className="relative w-24 h-24">
+      <div className="relative w-[84px] h-[84px]">
         <Doughnut
           data={{
             datasets: [
               {
                 data: [value, remaining],
-                backgroundColor: [hex, "rgba(128,128,128,0.12)"],
+                backgroundColor: [hex, "transparent"],
                 borderWidth: 0,
                 hoverOffset: 0,
               },
@@ -93,10 +93,10 @@ const CircularProgress = ({
           }}
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-base font-bold">{value.toFixed(1)}</span>
+          <span className="text-base font-bold tracking-tighter">{value.toFixed(1)}</span>
         </div>
       </div>
-      <span className="text-sm text-muted-foreground text-center leading-tight max-w-24">
+      <span className="text-xs font-medium text-center tracking-tighter leading-tight max-w-[84px]">
         {label}
       </span>
     </div>
@@ -182,8 +182,8 @@ const RescuerScoreSheet = ({
                 </Avatar>
               )}
               <div>
-                <SheetTitle className="text-base">{fullName}</SheetTitle>
-                <p className="text-sm text-muted-foreground">
+                <SheetTitle className="text-lg tracking-tighter">{fullName}</SheetTitle>
+                <p className="text-sm text-muted-foreground tracking-tighter">
                   Điểm đánh giá cứu hộ viên
                 </p>
               </div>
@@ -201,34 +201,34 @@ const RescuerScoreSheet = ({
           <div className="space-y-6 mt-6 pb-6">
             {/* ── Overall Score ──────────────────────────────────────────── */}
             <Card className="border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Trophy size={16} className="text-amber-500" />
+              <CardHeader className="">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Trophy size={24} className="text-amber-500" />
                   Điểm tổng quan
                   <Badge variant="secondary" className="ml-auto text-sm">
-                    {data.overallScore.evaluationCount} lần đánh giá
+                    {data.overallScore?.evaluationCount || 0} lần đánh giá
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center mb-4">
-                  <div className="flex flex-col items-center">
-                    <span className="text-3xl font-bold text-foreground">
-                      {data.overallScore.overallAverageScore.toFixed(2)}
+                <div className="flex items-center justify-center mb-5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-4xl font-bold text-foreground tracking-tighter">
+                      {data.overallScore?.overallAverageScore?.toFixed(2) || "0.00"}
                     </span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-base font-medium tracking-tighter text-muted-foreground">
                       / 10.0
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="flex justify-between w-full">
                   {CRITERIA.map(({ key, label, color }) => (
                     <div
                       key={key}
                       className="relative flex flex-col items-center"
                     >
                       <CircularProgress
-                        value={data.overallScore[key]}
+                        value={data.overallScore?.[key] || 0}
                         label={label}
                         color={color}
                       />
@@ -241,14 +241,14 @@ const RescuerScoreSheet = ({
             {/* ── Mission Evaluations ────────────────────────────────────── */}
             <Card className="border-border/50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Star size={16} className="text-amber-500" />
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Star size={24} className="text-amber-500" />
                   Điểm theo từng nhiệm vụ
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {data.missionEvaluations.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
+                  <p className="text-sm text-muted-foreground tracking-tighter text-center py-4">
                     Chưa có đánh giá nào
                   </p>
                 ) : (
@@ -289,7 +289,7 @@ const RescuerScoreSheet = ({
                         </button>
                         {expandedEval === ev.evaluationId && (
                           <div className="px-3 pb-3 border-t border-border/30">
-                            <div className="grid grid-cols-5 gap-2 mt-3">
+                            <div className="flex justify-between w-full mt-3">
                               {CRITERIA.map(({ key, label, color }) => (
                                 <div
                                   key={key}
@@ -315,14 +315,14 @@ const RescuerScoreSheet = ({
             {/* ── Team History ────────────────────────────────────────────── */}
             <Card className="border-border/50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <CalendarBlank size={16} className="text-blue-500" />
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <CalendarBlank size={24} className="text-blue-500" />
                   Lịch sử tham gia đội
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {data.teamHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
+                  <p className="text-sm text-muted-foreground tracking-tighter text-center py-4">
                     Chưa tham gia đội nào
                   </p>
                 ) : (
@@ -331,7 +331,7 @@ const RescuerScoreSheet = ({
                       (th: TeamHistoryItem, idx: number) => (
                         <div
                           key={`${th.teamId}-${idx}`}
-                          className="flex items-center gap-3 p-3 rounded-lg border border-border/40 hover:bg-muted/20 transition-colors"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/20 transition-colors"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -346,11 +346,10 @@ const RescuerScoreSheet = ({
                               </Badge>
                               {th.roleInTeam && (
                                 <Badge
-                                  className={`text-sm shrink-0 ${
-                                    th.roleInTeam === "Leader"
-                                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                                      : "bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                                  }`}
+                                  className={`text-sm shrink-0 ${th.roleInTeam === "Leader"
+                                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                    : "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                                    }`}
                                 >
                                   {th.roleInTeam}
                                 </Badge>
@@ -367,20 +366,19 @@ const RescuerScoreSheet = ({
                                 <SignOutIcon size={12} />
                                 {th.leftAt
                                   ? new Date(th.leftAt).toLocaleDateString(
-                                      "vi-VN",
-                                    )
+                                    "vi-VN",
+                                  )
                                   : "Đang hoạt động"}
                               </span>
                             </div>
                           </div>
                           <Badge
-                            className={`text-sm shrink-0 ${
-                              th.status === "Accepted"
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                : th.status === "Removed"
-                                  ? "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                                  : "bg-gray-500/10 text-gray-700 dark:text-gray-400"
-                            }`}
+                            className={`text-sm shrink-0 ${th.status === "Accepted"
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                              : th.status === "Removed"
+                                ? "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                                : "bg-gray-500/10 text-gray-700 dark:text-gray-400"
+                              }`}
                           >
                             {th.status}
                           </Badge>

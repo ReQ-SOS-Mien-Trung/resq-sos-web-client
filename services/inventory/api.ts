@@ -16,6 +16,7 @@ import {
   InventoryOrganization,
   InventoryTargetGroup,
   InventoryActionType,
+  InventoryItemModelMetadata,
   InventorySourceType,
   InventoryReliefItem,
   ReusableItemCondition,
@@ -366,6 +367,19 @@ export async function getInventoryItemModels(): Promise<
 > {
   const { data } = await api.get("/logistics/inventory/metadata/item-models");
   return data;
+}
+
+/**
+ * Get item models available in a depot
+ * GET /logistics/inventory/metadata/item-models/depot/{depotId}
+ */
+export async function getDepotInventoryItemModels(
+  depotId: number,
+): Promise<InventoryItemModelMetadata[]> {
+  const { data } = await api.get(
+    `/logistics/inventory/metadata/item-models/depot/${depotId}`,
+  );
+  return Array.isArray(data) ? data : [];
 }
 
 /**
