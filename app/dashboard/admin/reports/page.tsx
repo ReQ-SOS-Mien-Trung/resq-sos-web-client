@@ -2187,7 +2187,7 @@ export default function FundingRequestsPage() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="text-sm font-bold uppercase tracking-tighter text-muted-foreground mb-2 block">
+              <label className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground mb-2 block">
                 Chọn quỹ để rút tiền
               </label>
               <Select
@@ -2198,9 +2198,8 @@ export default function FundingRequestsPage() {
                   <SelectValue placeholder="Chọn chiến dịch quỹ..." />
                 </SelectTrigger>
                 <SelectContent
-                  disablePortal
                   position="popper"
-                  className="w-[--radix-select-trigger-width]"
+                  className="w-[--radix-select-trigger-width] z-9999"
                 >
                   {activeCampaigns.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
@@ -2287,7 +2286,7 @@ export default function FundingRequestsPage() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="text-sm font-bold uppercase tracking-tighter text-muted-foreground mb-2 block">
+              <label className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground mb-2 block">
                 Lý do từ chối
               </label>
               <Textarea

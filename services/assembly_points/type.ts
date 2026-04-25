@@ -248,3 +248,38 @@ export interface GetAssemblyPointCheckedInRescuersResponse {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 }
+
+// Check-in radius config for a specific assembly point
+export interface AssemblyPointCheckInRadiusConfig {
+  assemblyPointId: number;
+  maxRadiusMeters: number;
+  isGlobalFallback: boolean;
+  updatedAt: string | null;
+}
+
+// Check-in radius item in the global list (has updatedBy)
+export interface AssemblyPointCheckInRadiusItem {
+  assemblyPointId: number;
+  maxRadiusMeters: number;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+// Response for GET /personnel/assembly-point/check-in-radius
+export interface GetAllCheckInRadiusConfigsResponse {
+  items: AssemblyPointCheckInRadiusItem[];
+  totalCount: number;
+}
+
+// Request body for PUT /personnel/assembly-point/{id}/check-in-radius
+export interface SetCheckInRadiusRequest {
+  id: number;
+  maxRadiusMeters: number;
+}
+
+// Response for PUT /personnel/assembly-point/{id}/check-in-radius
+export interface SetCheckInRadiusResponse {
+  assemblyPointId: number;
+  maxRadiusMeters: number;
+  updatedAt: string;
+}

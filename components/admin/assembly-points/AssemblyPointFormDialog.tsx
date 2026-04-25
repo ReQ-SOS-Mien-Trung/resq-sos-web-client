@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AxiosError } from "axios";
 import dynamic from "next/dynamic";
 import {
@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin,
+  MagnifyingGlass,
   Spinner,
   NavigationArrow,
   UsersThree,
@@ -66,10 +67,24 @@ export function AssemblyPointFormDialog({
   const [capacity, setCapacity] = useState(
     editItem ? String(editItem.maxCapacity) : "",
   );
+  const [addressQuery, setAddressQuery] = useState("");
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
   const { mutate: create, isPending: isCreating } = useCreateAssemblyPoint();
   const { mutate: update, isPending: isUpdating } = useUpdateAssemblyPoint();
   const isPending = isCreating || isUpdating;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setName(editItem?.name ?? "");
+    setLat(editItem ? String(editItem.latitude) : "");
+    setLng(editItem ? String(editItem.longitude) : "");
+    setCapacity(editItem ? String(editItem.maxCapacity) : "");
+    setAddressQuery("");
+  }, [editItem, open]);
 
   const isFormValid = (() => {
     if (!name.trim()) return false;
@@ -90,13 +105,83 @@ export function AssemblyPointFormDialog({
       setLat("");
       setLng("");
       setCapacity("");
+      setAddressQuery("");
     }
     onOpenChange(val);
+  };
+
+  const resolveAddressFromPickedPoint = async (
+    pickedLat: number,
+    pickedLng: number,
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/geocode?lat=${encodeURIComponent(String(pickedLat))}&lng=${encodeURIComponent(String(pickedLng))}`,
+      );
+      if (!response.ok) {
+        throw new Error("reverse geocode failed");
+      }
+
+      const json = (await response.json()) as {
+        result?: { display_name?: string };
+      };
+
+      setAddressQuery(
+        json.result?.display_name?.trim() ||
+          `${pickedLat.toFixed(6)}, ${pickedLng.toFixed(6)}`,
+      );
+    } catch {
+      setAddressQuery(`${pickedLat.toFixed(6)}, ${pickedLng.toFixed(6)}`);
+    }
   };
 
   const handleMapPick = (pickedLat: number, pickedLng: number) => {
     setLat(pickedLat.toFixed(6));
     setLng(pickedLng.toFixed(6));
+    void resolveAddressFromPickedPoint(pickedLat, pickedLng);
+  };
+
+  const handleAddressGeocode = async () => {
+    const query = addressQuery.trim();
+    if (!query) {
+      toast.error("Vui lòng nhập địa chỉ cần xác định.");
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const response = await fetch(
+        `/api/geocode?q=${encodeURIComponent(query)}`,
+      );
+      if (!response.ok) {
+        throw new Error("geocode failed");
+      }
+
+      const json = (await response.json()) as {
+        results?: Array<{ lat: string; lon: string; display_name?: string }>;
+      };
+      const firstResult = json.results?.[0];
+
+      if (!firstResult) {
+        toast.error("Không tìm thấy địa chỉ phù hợp.");
+        return;
+      }
+
+      const nextLat = Number(firstResult.lat);
+      const nextLng = Number(firstResult.lon);
+      if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) {
+        throw new Error("invalid geocode result");
+      }
+
+      setLat(nextLat.toFixed(6));
+      setLng(nextLng.toFixed(6));
+      setAddressQuery(firstResult.display_name?.trim() || query);
+      toast.success("Đã xác định địa chỉ và cập nhật tọa độ.");
+    } catch {
+      toast.error("Không thể xác định địa chỉ, vui lòng thử lại.");
+    } finally {
+      setIsGeocoding(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -183,10 +268,10 @@ export function AssemblyPointFormDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="tracking-tighter">
+          <DialogTitle className="tracking-tighter text-lg">
             {isEdit ? "Chỉnh sửa điểm tập kết" : "Tạo điểm tập kết mới"}
           </DialogTitle>
-          <DialogDescription className="tracking-tight">
+          <DialogDescription className="tracking-tighter">
             {isEdit
               ? "Cập nhật thông tin điểm tập kết"
               : "Nhấn vào bản đồ để chọn vị trí, sau đó điền thông tin bên dưới"}
@@ -197,10 +282,40 @@ export function AssemblyPointFormDialog({
           {/* ── Left Column: Map ── */}
           <div className="space-y-4 lg:col-span-2">
             <div className="space-y-2">
-              <Label className="text-base font-medium tracking-tight flex items-center gap-1.5">
+              <Label className="text-sm font-medium tracking-tight flex items-center gap-1.5">
                 <MapPin size={14} className="text-red-500" />
                 Chọn vị trí trên bản đồ <span className="text-red-500">*</span>
               </Label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <Input
+                  value={addressQuery}
+                  onChange={(e) => setAddressQuery(e.target.value)}
+                  placeholder="Tìm theo địa chỉ để tự động lấy tọa độ..."
+                  className="tracking-tight"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleAddressGeocode();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void handleAddressGeocode();
+                  }}
+                  disabled={isGeocoding}
+                  className="gap-2 h-11 tracking-tighter"
+                >
+                  {isGeocoding ? (
+                    <Spinner size={16} className="animate-spin" />
+                  ) : (
+                    <MagnifyingGlass size={16} />
+                  )}
+                  {isGeocoding ? "Đang tìm..." : "Tìm địa chỉ"}
+                </Button>
+              </div>
               <LocationPickerMap
                 lat={lat ? Number(lat) : undefined}
                 lng={lng ? Number(lng) : undefined}
@@ -208,49 +323,9 @@ export function AssemblyPointFormDialog({
                 height={400}
               />
             </div>
-
-            {/* Lat / Lng manual input */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="ap-lat"
-                  className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1"
-                >
-                  <NavigationArrow size={12} />
-                  Vĩ độ (Latitude)
-                </Label>
-                <Input
-                  id="ap-lat"
-                  type="number"
-                  step="any"
-                  placeholder="16.047079"
-                  value={lat}
-                  onChange={(e) => setLat(e.target.value)}
-                  className="font-mono text-base tracking-tight"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="ap-lng"
-                  className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1"
-                >
-                  <NavigationArrow size={12} className="rotate-90" />
-                  Kinh độ (Longitude)
-                </Label>
-                <Input
-                  id="ap-lng"
-                  type="number"
-                  step="any"
-                  placeholder="108.20623"
-                  value={lng}
-                  onChange={(e) => setLng(e.target.value)}
-                  className="font-mono text-base tracking-tight"
-                />
-              </div>
-            </div>
           </div>
 
-          {/* ── Right Column: Name + Capacity ── */}
+          {/* ── Right Column: Name + Capacity + Coordinates ── */}
           <div className="flex flex-col space-y-5 h-full">
             {/* Name */}
             <div className="space-y-2">
@@ -318,7 +393,47 @@ export function AssemblyPointFormDialog({
               />
             </div>
 
-            <div className="flex justify-end gap-2 mt-auto pt-6">
+            {/* Coordinates */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="ap-lat"
+                  className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1"
+                >
+                  <NavigationArrow size={12} />
+                  Vĩ độ (Latitude)
+                </Label>
+                <Input
+                  id="ap-lat"
+                  type="number"
+                  step="any"
+                  placeholder="16.047079"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                  className="font-mono text-base tracking-tight"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="ap-lng"
+                  className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1"
+                >
+                  <NavigationArrow size={12} className="rotate-90" />
+                  Kinh độ (Longitude)
+                </Label>
+                <Input
+                  id="ap-lng"
+                  type="number"
+                  step="any"
+                  placeholder="108.20623"
+                  value={lng}
+                  onChange={(e) => setLng(e.target.value)}
+                  className="font-mono text-base tracking-tight"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
               <Button
                 variant="outline"
                 onClick={() => handleClose(false)}

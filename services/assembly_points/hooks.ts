@@ -20,6 +20,10 @@ import {
   updateRescuerAssemblyPointAssignment,
   scheduleAssemblyPointGathering,
   startAssemblyPointGathering,
+  getAssemblyPointCheckInRadius,
+  getAllCheckInRadiusConfigs,
+  setAssemblyPointCheckInRadius,
+  deleteAssemblyPointCheckInRadius,
 } from "./api";
 import {
   GetAssemblyPointsResponse,
@@ -42,6 +46,10 @@ import {
   GetAssemblyPointEventsResponse,
   GetAssemblyPointCheckedInRescuersParams,
   GetAssemblyPointCheckedInRescuersResponse,
+  AssemblyPointCheckInRadiusConfig,
+  GetAllCheckInRadiusConfigsResponse,
+  SetCheckInRadiusRequest,
+  SetCheckInRadiusResponse,
 } from "./type";
 import { AxiosError } from "axios";
 import { RESCUERS_QUERY_KEY } from "../rescuers/hooks";
@@ -58,6 +66,12 @@ export const ASSEMBLY_POINT_EVENTS_QUERY_KEY = [
 ] as const;
 export const ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY = [
   "assembly-point-checked-in-rescuers",
+] as const;
+export const ASSEMBLY_POINT_CHECK_IN_RADIUS_QUERY_KEY = [
+  "assembly-point-check-in-radius",
+] as const;
+export const ALL_CHECK_IN_RADIUS_CONFIGS_QUERY_KEY = [
+  "all-check-in-radius-configs",
 ] as const;
 
 export interface UseAssemblyPointsOptions {
@@ -377,6 +391,76 @@ export function useStartAssemblyPointGathering() {
           ],
         });
       }
+    },
+  });
+}
+
+/**
+ * Hook to fetch check-in radius config for a specific assembly point
+ * GET /personnel/assembly-point/{id}/check-in-radius
+ */
+export function useAssemblyPointCheckInRadius(
+  id: number,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<AssemblyPointCheckInRadiusConfig>({
+    queryKey: [...ASSEMBLY_POINT_CHECK_IN_RADIUS_QUERY_KEY, id],
+    queryFn: () => getAssemblyPointCheckInRadius(id),
+    enabled: (options?.enabled ?? true) && Number.isFinite(id),
+  });
+}
+
+/**
+ * Hook to fetch all assembly points with custom check-in radius (excludes global fallback)
+ * GET /personnel/assembly-point/check-in-radius
+ */
+export function useAllCheckInRadiusConfigs(options?: { enabled?: boolean }) {
+  return useQuery<GetAllCheckInRadiusConfigsResponse>({
+    queryKey: ALL_CHECK_IN_RADIUS_CONFIGS_QUERY_KEY,
+    queryFn: getAllCheckInRadiusConfigs,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to set or update check-in radius for a specific assembly point
+ * PUT /personnel/assembly-point/{id}/check-in-radius
+ */
+export function useSetAssemblyPointCheckInRadius() {
+  const queryClient = useQueryClient();
+
+  return useMutation<SetCheckInRadiusResponse, Error, SetCheckInRadiusRequest>({
+    mutationFn: setAssemblyPointCheckInRadius,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...ASSEMBLY_POINT_CHECK_IN_RADIUS_QUERY_KEY,
+          data.assemblyPointId,
+        ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ALL_CHECK_IN_RADIUS_CONFIGS_QUERY_KEY,
+      });
+    },
+  });
+}
+
+/**
+ * Hook to delete custom check-in radius for a specific assembly point (reverts to global fallback)
+ * DELETE /personnel/assembly-point/{id}/check-in-radius
+ */
+export function useDeleteAssemblyPointCheckInRadius() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, number>({
+    mutationFn: deleteAssemblyPointCheckInRadius,
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({
+        queryKey: [...ASSEMBLY_POINT_CHECK_IN_RADIUS_QUERY_KEY, id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ALL_CHECK_IN_RADIUS_CONFIGS_QUERY_KEY,
+      });
     },
   });
 }

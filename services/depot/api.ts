@@ -333,6 +333,16 @@ function normalizeDepotClosureDetailTransferItems(
     return {
       itemModelId:
         typeof candidate.itemModelId === "number" ? candidate.itemModelId : 0,
+      reusableItemId:
+        typeof candidate.reusableItemId === "number"
+          ? candidate.reusableItemId
+          : null,
+      serialNumber:
+        typeof source.serialNumber === "string"
+          ? source.serialNumber
+          : source.serialNumber == null
+            ? null
+            : String(source.serialNumber),
       itemName: typeof candidate.itemName === "string" ? candidate.itemName : "",
       itemType: typeof candidate.itemType === "string" ? candidate.itemType : "",
       unit: typeof candidate.unit === "string" ? candidate.unit : null,
@@ -437,6 +447,19 @@ function normalizeExternalResolvedItems(
     const candidate = (item ?? {}) as Partial<DepotExternalResolvedItem>;
     return {
       id: typeof candidate.id === "number" ? candidate.id : 0,
+      itemModelId:
+        typeof candidate.itemModelId === "number" ? candidate.itemModelId : null,
+      lotId: typeof candidate.lotId === "number" ? candidate.lotId : null,
+      reusableItemId:
+        typeof candidate.reusableItemId === "number"
+          ? candidate.reusableItemId
+          : null,
+      serialNumber:
+        typeof candidate.serialNumber === "string"
+          ? candidate.serialNumber
+          : (item as Record<string, unknown>).serialNumber == null
+            ? null
+            : String((item as Record<string, unknown>).serialNumber),
       itemName: typeof candidate.itemName === "string" ? candidate.itemName : "",
       categoryName:
         typeof candidate.categoryName === "string" ? candidate.categoryName : "",

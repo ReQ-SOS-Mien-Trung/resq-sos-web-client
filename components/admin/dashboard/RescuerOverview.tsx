@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useAdminRescuers } from "@/services/user/hooks";
 import type { UserEntity } from "@/services/user/type";
@@ -17,14 +17,25 @@ import {
   Minus,
 } from "@phosphor-icons/react";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip as ChartTooltipPlugin,
+  type ChartOptions,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  ChartTooltipPlugin,
+);
 
 // ─── Helpers ───
 
@@ -98,52 +109,212 @@ function buildMonthlyStats(rescuers: UserEntity[]): MonthlyData[] {
   return months;
 }
 
-// ─── Custom Tooltip ───
+// ─── External Tooltip for Chart.js ───
 
-function ChartTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{
-    value: number;
-    dataKey: string;
-    color: string;
-    payload?: MonthlyData;
-  }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
+// ─── Area Chart Component ───
 
-  const data = payload[0]?.payload as MonthlyData;
-  return (
-    <div className="bg-card border border-border/60 p-3 shadow-xl min-w-45">
-      <p className="text-sm tracking-tighter font-bold uppercase text-muted-foreground mb-2">
-        {label} / {data?.year}
-      </p>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-sm tracking-tighter">
-          <span className="text-muted-foreground">Tổng tích lũy</span>
-          <span className="font-bold">{data?.total}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm tracking-tighter">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 bg-[#FF5722]" />
-            <span className="text-muted-foreground">Mới gia nhập</span>
+function RescuerAreaChart({ monthlyData }: { monthlyData: MonthlyData[] }) {
+  const chartRef = useRef<ChartJS<"line"> | null>(null);
+
+  // ── tooltip handler closed over monthlyData ──
+  const tooltipHandler = useMemo(() => {
+    function getOrCreate(chart: ChartJS) {
+      let el = chart.canvas.parentNode?.querySelector(
+        "div.cjs-tt",
+      ) as HTMLDivElement | null;
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "cjs-tt";
+        Object.assign(el.style, {
+          background: "var(--card,white)",
+          border: "1px solid rgba(0,0,0,0.08)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          borderRadius: "8px",
+          padding: "10px 12px",
+          pointerEvents: "none",
+          position: "absolute",
+          opacity: "0",
+          transform: "translateY(4px) scale(0.97)",
+          transition:
+            "opacity 0.18s cubic-bezier(0.4,0,0.2,1), transform 0.18s cubic-bezier(0.4,0,0.2,1), left 0.12s cubic-bezier(0.4,0,0.2,1), top 0.12s cubic-bezier(0.4,0,0.2,1)",
+          minWidth: "170px",
+          zIndex: "999",
+          fontSize: "12px",
+          fontFamily: "inherit",
+          color: "var(--foreground)",
+        });
+        chart.canvas.parentNode?.appendChild(el);
+      }
+      return el;
+    }
+
+    return (
+      context: Parameters<
+        NonNullable<
+          NonNullable<ChartOptions<"line">["plugins"]>["tooltip"]
+        >["external"]
+      >[0],
+    ) => {
+      const { chart, tooltip } = context;
+      const el = getOrCreate(chart);
+
+      if (tooltip.opacity === 0) {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(4px) scale(0.97)";
+        return;
+      }
+
+      const idx = tooltip.dataPoints?.[0]?.dataIndex ?? -1;
+      const d = monthlyData[idx];
+      if (!d) return;
+
+      el.innerHTML = `
+        <p style="font-size:11px;font-weight:700;letter-spacing:-0.02em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:6px">
+          ${d.month} / ${d.year}
+        </p>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;letter-spacing:-0.02em">
+            <span style="color:var(--muted-foreground)">Tổng số</span>
+            <strong>${d.total}</strong>
           </div>
-          <span className="font-bold text-[#FF5722]">+{data?.newCount}</span>
+          <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;letter-spacing:-0.02em">
+            <span style="display:flex;align-items:center;gap:4px;color:var(--muted-foreground)">
+              <span style="width:8px;height:8px;background:#FF5722;display:inline-block"></span>Mới gia nhập
+            </span>
+            <strong style="color:#FF5722">+${d.newCount}</strong>
+          </div>
+          <hr style="border:none;border-top:1px solid rgba(0,0,0,0.08);margin:2px 0" />
+          <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;letter-spacing:-0.02em">
+            <span style="color:var(--muted-foreground)">Hệ thống</span>
+            <span style="font-weight:600">+${d.core}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;letter-spacing:-0.02em">
+            <span style="color:var(--muted-foreground)">Tình nguyện</span>
+            <span style="font-weight:600">+${d.volunteer}</span>
+          </div>
         </div>
-        <div className="h-px bg-border/50 my-1" />
-        <div className="flex items-center justify-between text-sm tracking-tighter">
-          <span className="text-muted-foreground">Hệ thống</span>
-          <span className="font-semibold">+{data?.core}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm tracking-tighter">
-          <span className="text-muted-foreground">Tình nguyện</span>
-          <span className="font-semibold">+{data?.volunteer}</span>
-        </div>
-      </div>
+      `;
+
+      const { offsetLeft, offsetTop } = chart.canvas;
+      let left = offsetLeft + tooltip.caretX;
+      if (tooltip.caretX > chart.width / 2) {
+        left = left - el.offsetWidth - 12;
+      } else {
+        left = left + 12;
+      }
+      const top = offsetTop + tooltip.caretY - el.offsetHeight / 2;
+
+      // If tooltip was hidden, snap to position first (no transition), then fade in
+      const isHidden = el.style.opacity === "0" || el.style.opacity === "";
+      if (isHidden) {
+        el.style.transition = "none";
+        el.style.left = left + "px";
+        el.style.top = top + "px";
+        // Force reflow to apply position instantly
+        void el.offsetHeight;
+        el.style.transition =
+          "opacity 0.18s cubic-bezier(0.4,0,0.2,1), transform 0.18s cubic-bezier(0.4,0,0.2,1), left 0.12s cubic-bezier(0.4,0,0.2,1), top 0.12s cubic-bezier(0.4,0,0.2,1)";
+      } else {
+        el.style.left = left + "px";
+        el.style.top = top + "px";
+      }
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0) scale(1)";
+    };
+  }, [monthlyData]);
+
+  const data = useMemo(() => {
+    const makeGradient = (
+      ctx: CanvasRenderingContext2D,
+      opacity0: number,
+      opacity1: number,
+    ) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, 240);
+      grad.addColorStop(0, `rgba(255,87,34,${opacity0})`);
+      grad.addColorStop(1, `rgba(255,87,34,${opacity1})`);
+      return grad;
+    };
+
+    return {
+      labels: monthlyData.map((d) => d.month),
+      datasets: [
+        {
+          label: "Tổng số",
+          data: monthlyData.map((d) => d.total),
+          borderColor: "rgba(255,87,34,0.25)",
+          borderWidth: 1,
+          fill: true,
+          backgroundColor: (ctx: { chart: ChartJS }) => {
+            const c = ctx.chart.ctx;
+            return makeGradient(c, 0.12, 0.01);
+          },
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+        },
+        {
+          label: "Mới gia nhập",
+          data: monthlyData.map((d) => d.newCount),
+          borderColor: "#FF5722",
+          borderWidth: 2.5,
+          fill: true,
+          backgroundColor: (ctx: { chart: ChartJS }) => {
+            const c = ctx.chart.ctx;
+            return makeGradient(c, 0.45, 0.03);
+          },
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: "#FF5722",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: "#FF5722",
+          pointHoverBorderColor: "#fff",
+          pointHoverBorderWidth: 2,
+        },
+      ],
+    };
+  }, [monthlyData]);
+
+  const options = useMemo<ChartOptions<"line">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600, easing: "easeInOutQuart" },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external: tooltipHandler,
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: {
+            color: "rgba(100,116,139,0.8)",
+            font: { size: 11 },
+          },
+        },
+        y: {
+          grid: { color: "rgba(100,116,139,0.1)" },
+          border: { display: false, dash: [4, 4] },
+          ticks: {
+            color: "rgba(100,116,139,0.8)",
+            font: { size: 11 },
+            precision: 0,
+          },
+        },
+      },
+    }),
+    [tooltipHandler],
+  );
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Line ref={chartRef} data={data} options={options} />
     </div>
   );
 }
@@ -308,114 +479,14 @@ export default function RescuerOverview() {
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-0.5 bg-[#FF5722]/25" />
-                <span>Tổng tích lũy</span>
+                <span>Tổng số</span>
               </div>
             </div>
           </div>
 
           {/* Chart */}
           <div className="flex-1 min-h-44 -ml-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={monthlyData}
-                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient
-                    id="rescuerGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="0%" stopColor="#FF5722" stopOpacity={0.25} />
-                    <stop
-                      offset="100%"
-                      stopColor="#FF5722"
-                      stopOpacity={0.02}
-                    />
-                  </linearGradient>
-                  <linearGradient
-                    id="rescuerNewGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="0%" stopColor="#FF5722" stopOpacity={0.5} />
-                    <stop
-                      offset="100%"
-                      stopColor="#FF5722"
-                      stopOpacity={0.05}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  className="text-border/30"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 11, fill: "currentColor" }}
-                  className="text-muted-foreground"
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "currentColor" }}
-                  className="text-muted-foreground"
-                  tickLine={false}
-                  axisLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  content={<ChartTooltip />}
-                  cursor={{
-                    stroke: "#FF5722",
-                    strokeWidth: 1,
-                    strokeDasharray: "4 4",
-                  }}
-                />
-                {/* Cumulative area (background) */}
-                <Area
-                  type="monotone"
-                  dataKey="total"
-                  stroke="#FF5722"
-                  strokeWidth={1}
-                  strokeOpacity={0.3}
-                  fill="url(#rescuerGradient)"
-                  dot={false}
-                  activeDot={false}
-                />
-                {/* New rescuers per month (foreground) */}
-                <Area
-                  type="monotone"
-                  dataKey="newCount"
-                  stroke="#FF5722"
-                  strokeWidth={2.5}
-                  fill="url(#rescuerNewGradient)"
-                  dot={({ cx, cy, index }) => (
-                    <circle
-                      key={index}
-                      cx={cx}
-                      cy={cy}
-                      r={3}
-                      fill="#FF5722"
-                      stroke="#fff"
-                      strokeWidth={2}
-                    />
-                  )}
-                  activeDot={{
-                    r: 5,
-                    fill: "#FF5722",
-                    stroke: "#fff",
-                    strokeWidth: 2,
-                  }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <RescuerAreaChart monthlyData={monthlyData} />
           </div>
         </div>
 

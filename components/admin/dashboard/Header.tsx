@@ -12,14 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   SidebarSimple,
   User,
   Gear,
   SignOut,
-  SquaresFour,
-  ShareNetwork,
   Warning,
   UsersThree,
   Buildings,
@@ -29,26 +27,43 @@ import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { useSystemFund } from "@/services/system_fund";
-import { Icon } from "@iconify/react";
+import { useUserMe } from "@/services/user/hooks";
 import Image from "next/image";
 
 function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
 }
 
-const Header = ({
-  onSidebarToggle,
-  sidebarOpen = true,
-}: HeaderProps) => {
+const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
+  const { data: userMe } = useUserMe();
   const { data: systemFund, isLoading: loadingSystemFund } = useSystemFund();
 
-  const userDisplayName = getUserDisplayName(user);
-  const userInitials = getUserAvatarInitials(user);
+  const userDisplayName = userMe
+    ? getUserDisplayName(
+        {
+          firstName: userMe.firstName,
+          lastName: userMe.lastName,
+          username: userMe.username,
+        },
+        getUserDisplayName(user),
+      )
+    : getUserDisplayName(user);
+  const userInitials = userMe
+    ? getUserAvatarInitials(
+        {
+          firstName: userMe.firstName,
+          lastName: userMe.lastName,
+          username: userMe.username,
+        },
+        getUserAvatarInitials(user),
+      )
+    : getUserAvatarInitials(user);
   const isSystemFundPage = pathname === "/dashboard/admin/system-fund";
+  const isTeamOverviewPage = pathname === "/dashboard/admin/team-overview";
 
   // Get role name based on roleId
   const getRoleName = (roleId?: number) => {
@@ -84,7 +99,7 @@ const Header = ({
         </Button>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted-foreground/2">
             <Image
               src="/icons/logo.svg"
               alt="ResQ SOS"
@@ -109,11 +124,14 @@ const Header = ({
           className={cn(
             "hidden md:flex gap-1.5 h-9 rounded-lg transition-all duration-200 shadow-sm",
             isSystemFundPage
-              ? "bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-              : "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600",
+              ? "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60 dark:hover:bg-emerald-950/60",
           )}
         >
-          <Buildings size={16} className="text-white" />
+          <Buildings
+            size={16}
+            className={cn(isSystemFundPage ? "text-white" : "text-emerald-500")}
+          />
           {loadingSystemFund
             ? "Số dư quỹ hệ thống: —"
             : `Số dư quỹ hệ thống: ${formatMoney(systemFund?.balance ?? 0)}`}
@@ -121,12 +139,20 @@ const Header = ({
 
         {/* Customize Widget Button */}
         <Button
-          variant="outline"
+          variant="default"
           size="sm"
           onClick={() => router.push("/dashboard/admin/team-overview")}
-          className="hidden md:flex gap-1.5 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
+          className={cn(
+            "hidden md:flex gap-1.5 h-9 rounded-lg transition-all duration-200 shadow-sm",
+            isTeamOverviewPage
+              ? "bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-500"
+              : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60 dark:hover:bg-rose-950/60",
+          )}
         >
-          <UsersThree size={16} className="text-red-500" />
+          <UsersThree
+            size={16}
+            className={cn(isTeamOverviewPage ? "text-white" : "text-rose-500")}
+          />
           Tổng quan đội
         </Button>
 
@@ -218,13 +244,13 @@ const Header = ({
         />
 
         {/* Share Button */}
-        <Button
+        {/* <Button
           variant="ghost"
           size="icon"
           className="h-9 w-9 rounded-lg hover:bg-muted/80 transition-colors"
         >
           <ShareNetwork size={20} />
-        </Button>
+        </Button> */}
 
         {/* User Profile */}
         <DropdownMenu>
@@ -235,6 +261,13 @@ const Header = ({
               className="rounded-full h-9 w-9 p-0 hover:ring-2 hover:ring-red-500/20 transition-all"
             >
               <Avatar className="h-9 w-9 ring-2 ring-border">
+                {userMe?.avatarUrl ? (
+                  <AvatarImage
+                    src={userMe.avatarUrl}
+                    alt={userDisplayName}
+                    className="object-cover"
+                  />
+                ) : null}
                 <AvatarFallback className="bg-linear-to-br from-red-400 to-orange-500 text-white font-semibold">
                   {userInitials}
                 </AvatarFallback>

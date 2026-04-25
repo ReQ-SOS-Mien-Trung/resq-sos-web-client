@@ -48,6 +48,7 @@ import {
   PencilSimple,
   CaretDown,
   Eye,
+  CalendarBlank,
 } from "@phosphor-icons/react";
 import {
   useInventoryCategories,
@@ -88,6 +89,7 @@ const SYSTEM_CATEGORIES = [
   { label: "Công cụ sửa chữa", value: "RepairTools" },
   { label: "Thiết bị cứu hộ", value: "RescueEquipment" },
   { label: "Sưởi ấm", value: "Heating" },
+  { label: "Phương tiện", value: "Vehicle" },
   { label: "Khác", value: "Others" },
 ] as const;
 
@@ -102,6 +104,7 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   "công cụ sửa chữa": "RepairTools",
   "thiết bị cứu hộ": "RescueEquipment",
   "sưởi ấm": "Heating",
+  "phương tiện": "Vehicle",
   khác: "Others",
   food: "Food",
   water: "Water",
@@ -112,6 +115,7 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   repairtools: "RepairTools",
   rescueequipment: "RescueEquipment",
   heating: "Heating",
+  vehicle: "Vehicle",
   other: "Others",
   others: "Others",
 };
@@ -157,7 +161,7 @@ const COL = {
   MOTA: "Mô tả vật phẩm",
   ANH: "Ảnh",
   SOLUONG: "Số lượng",
-  THETICH: "Thể tích (dm3)",
+  THETICH: "Thể tích (dm³)",
   CANNANG: "Cân nặng (kg)",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",
@@ -459,6 +463,7 @@ export default function ExcelImportFromOrg() {
       if (!row.quantity || row.quantity <= 0)
         errors.quantity = "Số lượng phải > 0";
       if (!row.unit) errors.unit = "Đơn vị không được trống";
+      if (!row.description) errors.description = "Mô tả không được trống";
       if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
       if (!row.targetGroups?.length)
         errors.targetGroups = "Đối tượng không được trống";
@@ -1028,9 +1033,9 @@ export default function ExcelImportFromOrg() {
               prev.map((row) =>
                 imageUrlByRowId.get(row.id)
                   ? {
-                      ...row,
-                      imageUrl: imageUrlByRowId.get(row.id) ?? row.imageUrl,
-                    }
+                    ...row,
+                    imageUrl: imageUrlByRowId.get(row.id) ?? row.imageUrl,
+                  }
                   : row,
               ),
             );
@@ -1328,8 +1333,8 @@ export default function ExcelImportFromOrg() {
       selected.length === 0
         ? placeholder
         : selected
-            .map((v) => options.find((o) => o.value === v)?.label ?? v)
-            .join(", ");
+          .map((v) => options.find((o) => o.value === v)?.label ?? v)
+          .join(", ");
     return (
       <div className="space-y-1">
         <Popover>
@@ -1487,7 +1492,7 @@ export default function ExcelImportFromOrg() {
                             className={cn(
                               "pl-9 pr-9 tracking-tighter",
                               orgError &&
-                                "border-red-400 focus-visible:ring-red-400",
+                              "border-red-400 focus-visible:ring-red-400",
                             )}
                           />
                           <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
@@ -1526,7 +1531,7 @@ export default function ExcelImportFromOrg() {
                                 className={cn(
                                   "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-muted transition-colors",
                                   selectedOrgId === org.key &&
-                                    "bg-muted font-medium",
+                                  "bg-muted font-medium",
                                 )}
                               >
                                 <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1778,7 +1783,7 @@ export default function ExcelImportFromOrg() {
                           className={cn(
                             "h-8 text-sm pl-3 pr-8 tracking-tighter",
                             !orgSearchValue.trim() &&
-                              "border-red-400 focus-visible:ring-red-400",
+                            "border-red-400 focus-visible:ring-red-400",
                           )}
                         />
                         {orgSearchValue ? (
@@ -1817,7 +1822,7 @@ export default function ExcelImportFromOrg() {
                               className={cn(
                                 "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-muted transition-colors",
                                 selectedOrgId === org.key &&
-                                  "bg-muted font-medium",
+                                "bg-muted font-medium",
                               )}
                             >
                               <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1871,19 +1876,38 @@ export default function ExcelImportFromOrg() {
                       </TableHead>
                       <TableHead className="min-w-40">Danh mục</TableHead>
                       <TableHead className="min-w-36">Đối tượng</TableHead>
-                      <TableHead className="min-w-36">Loại vật phẩm</TableHead>
+                      <TableHead className="min-w-28">Loại vật phẩm</TableHead>
                       <TableHead className="min-w-24">Đơn vị</TableHead>
                       <TableHead className="min-w-48">Mô tả vật phẩm</TableHead>
                       <TableHead className="min-w-32 w-32">Ảnh</TableHead>
                       <TableHead className="min-w-24">Số lượng</TableHead>
-                      <TableHead className="min-w-28">
-                        Thể tích / đơn vị
-                      </TableHead>
-                      <TableHead className="min-w-28">
-                        Cân nặng / đơn vị
-                      </TableHead>
+                      <TableHead className="min-w-28">Thể tích / dm³</TableHead>
+                      <TableHead className="min-w-28">Cân nặng / kg</TableHead>
                       <TableHead className="min-w-36">Ngày hết hạn</TableHead>
-                      <TableHead className="min-w-36">Ngày nhận</TableHead>
+                      <TableHead className="min-w-36">
+                        <div className="flex items-center gap-1.5">
+                          Ngày nhận
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-5 px-1.5 text-xs font-medium gap-0.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                            onClick={() => {
+                              const now = new Date();
+                              const p2 = (n: number) => String(n).padStart(2, "0");
+                              const nowStr = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}T${p2(now.getHours())}:${p2(now.getMinutes())}`;
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  applyRowValidation({ ...r, receivedDate: nowStr }),
+                                ),
+                              );
+                              toast.success("Đã điền ngày nhận hôm nay cho tất cả");
+                            }}
+                          >
+                            <CalendarBlank className="h-3 w-3" />
+                            Hôm nay
+                          </Button>
+                        </div>
+                      </TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
@@ -1923,7 +1947,7 @@ export default function ExcelImportFromOrg() {
                                 )
                               }
                               placeholder="X"
-                              disabled={!row.itemModelId}
+                              disabled={!!row.itemModelId}
                               className="h-8 text-sm w-20 disabled:cursor-not-allowed disabled:opacity-60"
                             />
                           </TableCell>
@@ -1940,34 +1964,46 @@ export default function ExcelImportFromOrg() {
 
                           {/* Đối tượng */}
                           <TableCell>
-                            {renderMultiSelectCell(
-                              row,
-                              targetGroupOptions,
-                              "Chọn đối tượng",
-                            )}
-                            {row.itemType === "Reusable" &&
-                              row.targetGroups?.includes("Rescuer") &&
-                              !row.errors.targetGroups && (
+                            {row.itemType === "Reusable" ? (
+                              <div className="space-y-1">
+                                <div
+                                  className={cn(
+                                    "h-8 w-full flex items-center text-sm px-3 rounded-md border bg-muted/50 cursor-not-allowed opacity-70",
+                                  )}
+                                >
+                                  <span className="truncate text-left">
+                                    {targetGroupOptions.find((o) => o.value === "Rescuer")?.label ?? "Lực lượng cứu hộ"}
+                                  </span>
+                                </div>
                                 <p className="text-[11px] text-blue-500 mt-0.5">
                                   Mặc định chọn với loại Tái sử dụng
                                 </p>
-                              )}
+                              </div>
+                            ) : (
+                              <>
+                                {renderMultiSelectCell(
+                                  row,
+                                  targetGroupOptions,
+                                  "Chọn đối tượng",
+                                )}
+                              </>
+                            )}
                           </TableCell>
 
                           {/* Loại vật phẩm */}
                           <TableCell>
                             {itemTypeOptions.length > 0
                               ? renderSelectCell(
-                                  row,
-                                  "itemType",
-                                  itemTypeOptions,
-                                  "Chọn loại",
-                                )
+                                row,
+                                "itemType",
+                                itemTypeOptions,
+                                "Chọn loại",
+                              )
                               : renderInputCell(
-                                  row,
-                                  "itemType",
-                                  "Loại vật phẩm",
-                                )}
+                                row,
+                                "itemType",
+                                "Loại vật phẩm",
+                              )}
                           </TableCell>
 
                           {/* Đơn vị */}
@@ -1977,14 +2013,7 @@ export default function ExcelImportFromOrg() {
 
                           {/* Mô tả vật phẩm */}
                           <TableCell>
-                            <Input
-                              value={row.description}
-                              onChange={(e) =>
-                                updateRow(row.id, "description", e.target.value)
-                              }
-                              placeholder="Mô tả vật phẩm..."
-                              className="h-8 text-sm"
-                            />
+                            {renderInputCell(row, "description", "Mô tả vật phẩm...")}
                           </TableCell>
 
                           {/* Ảnh */}

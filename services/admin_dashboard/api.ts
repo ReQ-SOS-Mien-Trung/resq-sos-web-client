@@ -6,6 +6,7 @@ import {
   RescuersDailyStatisticsResponse,
   MissionSuccessRateSummaryResponse,
   SosRequestsSummaryResponse,
+  MissionTeamReportsSummaryResponse,
 } from "./type";
 
 /**
@@ -59,5 +60,15 @@ export async function getMissionSuccessRateSummary(): Promise<MissionSuccessRate
  */
 export async function getSosRequestsSummary(): Promise<SosRequestsSummaryResponse> {
   const { data } = await api.get("/personnel/dashboard/sos-requests/summary");
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/mission-team-reports/summary
+ */
+export async function getMissionTeamReportsSummary(): Promise<MissionTeamReportsSummaryResponse> {
+  const { data } = await api.get(
+    "/personnel/dashboard/mission-team-reports/summary",
+  );
   return data;
 }
