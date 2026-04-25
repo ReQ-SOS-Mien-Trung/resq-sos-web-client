@@ -54,6 +54,7 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -996,10 +997,7 @@ const CoordinatorMap = ({
         className="w-full h-full z-0 coordinator-map"
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
 
         {/* Fly to location handler */}
         <FlyToHandler

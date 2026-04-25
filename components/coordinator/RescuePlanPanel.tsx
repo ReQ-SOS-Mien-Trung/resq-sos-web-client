@@ -13,6 +13,7 @@ import {
   Tooltip,
   useMap,
 } from "react-leaflet";
+import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 import { divIcon, tileLayer } from "leaflet";
 import {
   activityTypeConfig,
