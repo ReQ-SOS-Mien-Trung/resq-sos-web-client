@@ -845,7 +845,16 @@ const SOSDetailsPanel = ({
 
   const evaluationSnapshot = embeddedEvaluation ?? analysisResponse ?? null;
   const ruleEvaluation = evaluationSnapshot?.ruleEvaluation ?? null;
-  const aiAnalyses = evaluationSnapshot?.aiAnalyses ?? [];
+  // Backend may return either `aiAnalysis` (singular object) or `aiAnalyses` (array).
+  // Normalize both shapes into a single array.
+  const rawAiAnalyses = evaluationSnapshot?.aiAnalyses ?? [];
+  const singularAiAnalysis = evaluationSnapshot?.aiAnalysis ?? null;
+  const aiAnalyses =
+    rawAiAnalyses.length > 0
+      ? rawAiAnalyses
+      : singularAiAnalysis
+        ? [singularAiAnalysis]
+        : [];
   const hasAiAnalysis =
     evaluationSnapshot?.hasAiAnalysis ?? aiAnalyses.length > 0;
   const isLoadingEvaluation =

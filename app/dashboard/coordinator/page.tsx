@@ -56,6 +56,7 @@ import type {
 } from "@/services/rescue_teams/type";
 import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
+import { SOS_CLUSTER_MAX_SIZE_BY_PRIORITY } from "@/lib/sos-cluster-capacity";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -174,14 +175,14 @@ function normalizeSOSRequestTypeFilterValue(
   return null;
 }
 
-/** Số lượng SOS tối đa trong mỗi cụm tự động, theo mức độ ưu tiên của seed */
-const AUTO_CLUSTER_MAX_SIZE_BY_PRIORITY: Record<SOSRequest["priority"], number> = {
-  P1: 1, // Rất nghiêm trọng → chỉ 1 mình, không gom thêm
-  P2: 2, // Nghiêm trọng → gom tối đa 2
-  P3: 3, // Trung bình → gom tối đa 3
-  P4: 5, // Thấp → gom tối đa 5
-};
 const AUTO_CLUSTER_RADIUS_STEP_KM = 1;
+const COORDINATOR_SOS_REFETCH_INTERVAL_MS = 10_000;
+const DEFAULT_COORDINATOR_SOS_STATUSES: SOSRequestStatus[] = [
+  "Pending",
+  "Assigned",
+  "InProgress",
+  "Incident",
+];
 const SOS_PRIORITY_ORDER: Record<SOSRequest["priority"], number> = {
   P1: 0,
   P2: 1,
@@ -318,7 +319,7 @@ function buildAutoClusters(
     }
 
     const maxClusterSize =
-      AUTO_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
+      SOS_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
 
     // P1: không gom thêm, chỉ tạo cụm 1 mình
     if (maxClusterSize <= 1) {
@@ -635,7 +636,10 @@ const CoordinatorDashboardContent = () => {
   );
 
   const statusQueryFilter = useMemo(
-    () => (selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined),
+    () =>
+      selectedSOSStatuses.length > 0
+        ? selectedSOSStatuses
+        : DEFAULT_COORDINATOR_SOS_STATUSES,
     [selectedSOSStatuses],
   );
   const priorityQueryFilter = useMemo(
@@ -694,6 +698,7 @@ const CoordinatorDashboardContent = () => {
         Priorities: priorityQueryFilter,
         SosTypes: sosTypeQueryFilter,
       },
+      refetchInterval: COORDINATOR_SOS_REFETCH_INTERVAL_MS,
     });
   const { data: mapSosData } = useSOSRequestsInBounds({
     params: mapFetchBounds
@@ -708,6 +713,7 @@ const CoordinatorDashboardContent = () => {
         }
       : undefined,
     enabled: !isWeatherMode && !!mapFetchBounds,
+    refetchInterval: COORDINATOR_SOS_REFETCH_INTERVAL_MS,
   });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
@@ -1913,7 +1919,7 @@ const CoordinatorDashboardContent = () => {
             sidebarOpen ? "w-88" : "w-0",
           )}
         >
-          {sidebarOpen && (
+          <div className={cn("h-full w-88", !sidebarOpen && "invisible")}>
             <SOSSidebar
               sosRequests={sosRequests}
               incomingRequests={sidebarSOSRequests}
@@ -1960,8 +1966,9 @@ const CoordinatorDashboardContent = () => {
               selectedClusterSosTypes={selectedClusterSosTypes}
               onSelectedClusterSosTypesChange={setSelectedClusterSosTypes}
             />
-          )}
+          </div>
         </aside>
+
 
         {/* Map Container */}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">

@@ -15,6 +15,7 @@ import {
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
   StartAssemblyPointGatheringRequest,
+  CancelAssemblyPointEventRequest,
   GetAssemblyPointEventsParams,
   GetAssemblyPointEventsResponse,
   GetAssemblyPointCheckedInRescuersParams,
@@ -198,6 +199,17 @@ export async function startAssemblyPointGathering(
 ): Promise<void> {
   const { eventId } = payload;
   await api.post(`/personnel/assembly-point/events/${eventId}/start-gathering`);
+}
+
+/**
+ * Cancel an assembly point event
+ * POST /personnel/assembly-point/events/{eventId}/cancel
+ */
+export async function cancelAssemblyPointEvent(
+  payload: CancelAssemblyPointEventRequest,
+): Promise<void> {
+  const { eventId } = payload;
+  await api.post(`/personnel/assembly-point/events/${eventId}/cancel`);
 }
 
 /**

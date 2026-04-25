@@ -179,6 +179,12 @@ export interface StartAssemblyPointGatheringRequest {
   assemblyPointId?: number;
 }
 
+// Cancel gathering by assembly event id request
+export interface CancelAssemblyPointEventRequest {
+  eventId: number;
+  assemblyPointId?: number;
+}
+
 // Assembly point event status
 export type AssemblyPointEventStatus = string;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, memo } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { ServiceZoneEntity } from "@/services/map/type";
@@ -122,13 +122,34 @@ const MapInvalidator = () => {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
-    const observer = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        map.invalidateSize();
-      });
-    });
+
+    let rafId: number | null = null;
+    let loopEnd = 0;
+
+    const runLoop = () => {
+      map.invalidateSize({ animate: false });
+      if (Date.now() < loopEnd) {
+        rafId = requestAnimationFrame(runLoop);
+      } else {
+        rafId = null;
+      }
+    };
+
+    const startLoop = () => {
+      // Keep invalidating for slightly longer than the sidebar CSS transition (300ms)
+      loopEnd = Date.now() + 400;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(runLoop);
+      }
+    };
+
+    const observer = new ResizeObserver(startLoop);
     observer.observe(map.getContainer());
-    return () => observer.disconnect();
+
+    return () => {
+      observer.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
   }, [map]);
   return null;
 };
@@ -1229,7 +1250,7 @@ const CoordinatorMap = ({
   );
 };
 
-export default CoordinatorMap;
+export default memo(CoordinatorMap);
 
 function ServiceZoneOverlay({
   zone,
