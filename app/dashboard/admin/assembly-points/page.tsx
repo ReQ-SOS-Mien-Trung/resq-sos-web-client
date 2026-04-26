@@ -350,6 +350,11 @@ export default function AssemblyPointsPage() {
   };
 
   const openDetail = (id: number) => {
+    if (detailOpen && detailId === id) {
+      setDetailOpen(false);
+      setDetailId(null);
+      return;
+    }
     setDetailId(id);
     setDetailOpen(true);
   };

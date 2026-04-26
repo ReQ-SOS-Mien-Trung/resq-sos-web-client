@@ -100,6 +100,8 @@ import {
   useDepotFundTransactionTypes,
   useDepotFundReferenceTypes,
 } from "@/services/transaction";
+import { useFundingRequestRealtime } from "@/hooks/useFundingRequestRealtime";
+import type { FundingRequestRealtimeUpdate } from "@/services/admin_finance_realtime/type";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { vi as viLocale } from "date-fns/locale";
@@ -641,6 +643,27 @@ export default function FundingRequestsPage() {
     () => selectedItemsData?.items ?? selectedItem?.items ?? [],
     [selectedItemsData, selectedItem],
   );
+  const handleFundingRequestRealtimeUpdate = useCallback(
+    (payload: FundingRequestRealtimeUpdate) => {
+      setSelectedItem((current) => {
+        if (!current || current.id !== payload.requestId) return current;
+        if (!(payload.status in statusConfig)) return current;
+
+        return {
+          ...current,
+          status: payload.status as FundingRequestStatus,
+        };
+      });
+    },
+    [],
+  );
+
+  useFundingRequestRealtime({
+    requestId: selectedItem?.id,
+    subscribeDetail: panelOpen,
+    subscribeList: true,
+    onUpdate: handleFundingRequestRealtimeUpdate,
+  });
 
   // Push content when panel opens
   const handlePanelChange = useCallback((open: boolean) => {
@@ -742,6 +765,12 @@ export default function FundingRequestsPage() {
 
   // Open detail panel
   const openDetail = (item: FundingRequestEntity) => {
+    if (panelOpen && selectedItem?.id === item.id) {
+      setPanelOpen(false);
+      setSelectedItem(null);
+      handlePanelChange(false);
+      return;
+    }
     setSelectedItem(item);
     setPanelOpen(true);
     if (depotTxPanelOpen) {
@@ -752,6 +781,11 @@ export default function FundingRequestsPage() {
 
   // Open depot fund transaction panel
   const openDepotFundPanel = (fund: DepotFund) => {
+    if (depotTxPanelOpen && selectedDepotFund?.depotId === fund.depotId) {
+      setDepotTxPanelOpen(false);
+      setSelectedDepotFund(null);
+      return;
+    }
     setSelectedDepotFund(fund);
     setSelectedFundSourceId(null);
     resetDepotTxFilters();
@@ -783,7 +817,12 @@ export default function FundingRequestsPage() {
           handlePanelChange(false);
           setSelectedItem(null);
         },
-        onError: () => toast.error("Duyệt thất bại. Vui lòng thử lại."),
+        onError: (error: unknown) => {
+          const msg =
+            (error as { response?: { data?: { message?: string } } })?.response
+              ?.data?.message ?? "Duyệt thất bại. Vui lòng thử lại.";
+          toast.error(msg);
+        },
       },
     );
   };
@@ -997,12 +1036,11 @@ export default function FundingRequestsPage() {
                         <div
                           key={`${fund.depotId}-${fund.depotName}-${fund.funds.length}-${index}`}
                           onClick={() => openDepotFundPanel(fund)}
-                          className={`flex h-full flex-col rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${
-                            selectedDepotFund?.depotId === fund.depotId &&
+                          className={`flex h-full flex-col rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${selectedDepotFund?.depotId === fund.depotId &&
                             depotTxPanelOpen
-                              ? "border-primary ring-1 ring-primary/25 shadow-sm"
-                              : "border-border/60"
-                          }`}
+                            ? "border-primary ring-1 ring-primary/25 shadow-sm"
+                            : "border-border/60"
+                            }`}
                         >
                           <div className="mb-2 flex w-full items-start">
                             <div className="min-w-0 w-full pr-2">
@@ -1016,11 +1054,10 @@ export default function FundingRequestsPage() {
                           </div>
 
                           <p
-                            className={`text-3xl font-bold tracking-tighter ${
-                              getDepotFundTotalBalance(fund) < 0
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-emerald-600 dark:text-emerald-400"
-                            }`}
+                            className={`text-3xl font-bold tracking-tighter ${getDepotFundTotalBalance(fund) < 0
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                              }`}
                           >
                             {formatMoney(getDepotFundTotalBalance(fund))}
                           </p>
@@ -1068,8 +1105,8 @@ export default function FundingRequestsPage() {
                             Cập nhật gần nhất:{" "}
                             {getDepotFundLatestUpdatedAt(fund)
                               ? new Date(
-                                  getDepotFundLatestUpdatedAt(fund) as string,
-                                ).toLocaleString("vi-VN")
+                                getDepotFundLatestUpdatedAt(fund) as string,
+                              ).toLocaleString("vi-VN")
                               : "—"}
                           </p>
                         </div>
@@ -1201,9 +1238,8 @@ export default function FundingRequestsPage() {
 
               <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
                 {hasFilters
-                  ? `${filtered.length} / ${
-                      data?.totalCount ?? items.length
-                    } yêu cầu`
+                  ? `${filtered.length} / ${data?.totalCount ?? items.length
+                  } yêu cầu`
                   : `${data?.totalCount ?? items.length} yêu cầu`}
               </div>
             </div>
@@ -1469,8 +1505,8 @@ export default function FundingRequestsPage() {
                           Duyệt bởi: {selectedItem.reviewedByUserName} ·{" "}
                           {selectedItem.reviewedAt
                             ? new Date(selectedItem.reviewedAt).toLocaleString(
-                                "vi-VN",
-                              )
+                              "vi-VN",
+                            )
                             : ""}
                         </p>
                       )}
@@ -1487,11 +1523,7 @@ export default function FundingRequestsPage() {
                       <p className="text-sm tracking-tighter text-rose-700 dark:text-rose-400">
                         {selectedItem.rejectionReason}
                       </p>
-                      {selectedItem.reviewedByUserName && (
-                        <p className="text-sm text-rose-600/70 tracking-tighter mt-1">
-                          Từ chối bởi: {selectedItem.reviewedByUserName}
-                        </p>
-                      )}
+
                     </div>
                   )}
               </div>
@@ -1542,13 +1574,13 @@ export default function FundingRequestsPage() {
                           <span>Đơn giá: {formatMoney(item.unitPrice)}</span>
                           {hasMeasurementValue(item.volumePerUnit) && (
                             <span>
-                              Thể tích/đv:{" "}
+                              Thể tích/dm³:{" "}
                               {formatMeasurementNumber(item.volumePerUnit)} dm3
                             </span>
                           )}
                           {hasMeasurementValue(item.weightPerUnit) && (
                             <span>
-                              Khối luọngw/đv:{" "}
+                              Khối lượng/kg:{" "}
                               {formatMeasurementNumber(item.weightPerUnit)} kg
                             </span>
                           )}
@@ -1612,9 +1644,8 @@ export default function FundingRequestsPage() {
         <SheetContent
           side="bottom"
           showClose={false}
-          className={`overflow-y-auto p-6 transition-all ${
-            depotTxFullscreen ? "h-dvh rounded-none" : "h-[85vh] rounded-t-2xl"
-          }`}
+          className={`overflow-y-auto p-6 transition-all ${depotTxFullscreen ? "h-dvh rounded-none" : "h-[85vh] rounded-t-2xl"
+            }`}
         >
           <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
             <Button
@@ -1669,11 +1700,10 @@ export default function FundingRequestsPage() {
                     Tổng số dư
                   </p>
                   <p
-                    className={`text-xl font-bold tracking-tighter ${
-                      getDepotFundTotalBalance(selectedDepotFund) < 0
-                        ? "text-red-600"
-                        : "text-emerald-600"
-                    }`}
+                    className={`text-xl font-bold tracking-tighter ${getDepotFundTotalBalance(selectedDepotFund) < 0
+                      ? "text-red-600"
+                      : "text-emerald-600"
+                      }`}
                   >
                     {formatMoney(getDepotFundTotalBalance(selectedDepotFund))}
                   </p>
@@ -1740,11 +1770,10 @@ export default function FundingRequestsPage() {
                           setSelectedFundSourceId(fundSource.id);
                           setDepotTxPage(1);
                         }}
-                        className={`rounded-xl border p-3 text-left transition-all ${
-                          selectedFundSourceId === fundSource.id
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
-                            : "border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20"
-                        }`}
+                        className={`rounded-xl border p-3 text-left transition-all ${selectedFundSourceId === fundSource.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
+                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20"
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -2051,9 +2080,8 @@ export default function FundingRequestsPage() {
                               </TableCell>
                               <TableCell className="text-sm font-medium">
                                 <span
-                                  className={`inline-flex items-center gap-1 ${
-                                    isIn ? "text-emerald-600" : "text-rose-600"
-                                  }`}
+                                  className={`inline-flex items-center gap-1 ${isIn ? "text-emerald-600" : "text-rose-600"
+                                    }`}
                                 >
                                   {isIn ? (
                                     <ArrowUp size={12} weight="bold" />
@@ -2087,9 +2115,8 @@ export default function FundingRequestsPage() {
                                 {tx.note || "—"}
                               </TableCell>
                               <TableCell
-                                className={`text-sm font-bold text-right ${
-                                  isIn ? "text-emerald-600" : "text-rose-600"
-                                }`}
+                                className={`text-sm font-bold text-right ${isIn ? "text-emerald-600" : "text-rose-600"
+                                  }`}
                               >
                                 {isIn ? "+" : ""}
                                 {formatMoney(tx.amount)}

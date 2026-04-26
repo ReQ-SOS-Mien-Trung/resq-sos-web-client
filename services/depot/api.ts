@@ -40,6 +40,7 @@ import {
   InitiateDepotClosureTransferRequest,
   InitiateDepotClosureTransferResponse,
   DepotClosureTransferSuggestionsResponse,
+  DepotTransferListItem,
   GetMyDepotTransfersResponse,
   GetMyDepotClosuresResponse,
   GetDepotClosuresListByDepotIdResponse,
@@ -272,10 +273,26 @@ function normalizeRemainingInventoryItems(
   }
 
   return payload.map((item) => {
+    const source = (item ?? {}) as Record<string, unknown>;
     const candidate = (item ?? {}) as Partial<DepotClosureRemainingInventoryItem>;
     return {
       itemModelId:
         typeof candidate.itemModelId === "number" ? candidate.itemModelId : 0,
+      lotId: typeof candidate.lotId === "number" ? candidate.lotId : null,
+      supplyInventoryLotId:
+        typeof candidate.supplyInventoryLotId === "number"
+          ? candidate.supplyInventoryLotId
+          : null,
+      reusableItemId:
+        typeof candidate.reusableItemId === "number"
+          ? candidate.reusableItemId
+          : null,
+      serialNumber:
+        typeof candidate.serialNumber === "string"
+          ? candidate.serialNumber
+          : source.serialNumber == null
+            ? null
+            : String(source.serialNumber),
       itemName: typeof candidate.itemName === "string" ? candidate.itemName : "",
       categoryName:
         typeof candidate.categoryName === "string" ? candidate.categoryName : null,
@@ -329,6 +346,7 @@ function normalizeDepotClosureDetailTransferItems(
   }
 
   return payload.map((item) => {
+    const source = (item ?? {}) as Record<string, unknown>;
     const candidate = (item ?? {}) as Partial<DepotClosureDetailTransferItem>;
     return {
       itemModelId:
@@ -434,6 +452,73 @@ function normalizeDepotClosureTransferResponse(
     throw new Error("Invalid depot closure transfer response");
   }
   return normalized;
+}
+
+function normalizeDepotTransferListItems(
+  payload: unknown,
+): DepotTransferListItem[] {
+  const rawItems = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object"
+      ? Array.isArray((payload as Record<string, unknown>).items)
+        ? ((payload as Record<string, unknown>).items as unknown[])
+        : Array.isArray((payload as Record<string, unknown>).data)
+          ? ((payload as Record<string, unknown>).data as unknown[])
+          : []
+      : [];
+
+  return rawItems.map((item) => {
+    const source = (item ?? {}) as Record<string, unknown>;
+    const transferId =
+      typeof source.transferId === "number"
+        ? source.transferId
+        : typeof source.id === "number"
+          ? source.id
+          : 0;
+
+    return {
+      transferId,
+      id: typeof source.id === "number" ? source.id : transferId,
+      closureId: typeof source.closureId === "number" ? source.closureId : 0,
+      sourceDepotId:
+        typeof source.sourceDepotId === "number" ? source.sourceDepotId : 0,
+      sourceDepotName:
+        typeof source.sourceDepotName === "string" ? source.sourceDepotName : "",
+      targetDepotId:
+        typeof source.targetDepotId === "number" ? source.targetDepotId : 0,
+      targetDepotName:
+        typeof source.targetDepotName === "string" ? source.targetDepotName : "",
+      status: typeof source.status === "string" ? source.status : "",
+      userRole: typeof source.userRole === "string" ? source.userRole : "",
+      relatedDepotId:
+        typeof source.relatedDepotId === "number" ? source.relatedDepotId : 0,
+      relatedDepotName:
+        typeof source.relatedDepotName === "string" ? source.relatedDepotName : "",
+      counterpartyDepotId:
+        typeof source.counterpartyDepotId === "number"
+          ? source.counterpartyDepotId
+          : 0,
+      counterpartyDepotName:
+        typeof source.counterpartyDepotName === "string"
+          ? source.counterpartyDepotName
+          : "",
+      createdAt: typeof source.createdAt === "string" ? source.createdAt : "",
+      snapshotConsumableUnits:
+        typeof source.snapshotConsumableUnits === "number"
+          ? source.snapshotConsumableUnits
+          : 0,
+      snapshotReusableUnits:
+        typeof source.snapshotReusableUnits === "number"
+          ? source.snapshotReusableUnits
+          : 0,
+      shippedAt: typeof source.shippedAt === "string" ? source.shippedAt : null,
+      receivedAt:
+        typeof source.receivedAt === "string" ? source.receivedAt : null,
+      cancelledAt:
+        typeof source.cancelledAt === "string" ? source.cancelledAt : null,
+      items: normalizeDepotClosureDetailTransferItems(source.items),
+    };
+  });
 }
 
 function normalizeExternalResolvedItems(
@@ -943,7 +1028,7 @@ export async function getMyDepotTransfers(
   const { data } = await api.get("/logistics/depot/transfer", {
     params: { depotId },
   });
-  return data;
+  return normalizeDepotTransferListItems(data);
 }
 
 /**
@@ -957,7 +1042,7 @@ export async function getMyIncomingClosureTransfer(
     "/logistics/depot/my-incoming-closure-transfer",
     { params: { depotId } },
   );
-  return Array.isArray(data) ? data : [];
+  return normalizeDepotTransferListItems(data);
 }
 
 /**
@@ -1158,6 +1243,17 @@ export async function getDepotFundMovementChart(
 ): Promise<import("./type").DepotFundMovementChartResponse> {
   const { data } = await api.get(
     `/finance/depot-funds/${depotId}/chart/fund-movement`,
+    { params },
+  );
+  return data;
+}
+
+export async function getDepotFundMovementMultiLineChart(
+  depotId: number,
+  params?: import("./type").GetDepotFundMovementParams,
+): Promise<import("./type").DepotFundMovementMultiLineChartResponse> {
+  const { data } = await api.get(
+    `/finance/depot-funds/${depotId}/chart/fund-movement/multi-line`,
     { params },
   );
   return data;

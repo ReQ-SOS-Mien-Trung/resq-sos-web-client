@@ -94,6 +94,13 @@ export interface CampaignStatusMetadata {
   value: string;
 }
 
+/* ── GET /finance/campaigns/metadata ── */
+
+export interface CampaignMetadata {
+  key: number;
+  value: string;
+}
+
 /* ── POST /finance/campaigns ── */
 
 export interface CreateCampaignRequest {

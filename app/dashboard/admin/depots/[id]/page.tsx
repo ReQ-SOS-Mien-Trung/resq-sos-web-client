@@ -135,7 +135,6 @@ function getDepotClosureTransferCapacityError(err: unknown): string {
   const apiMessage = getApiError(err, "");
   if (err instanceof AxiosError && err.response?.status === 409) {
     return [
-      "Không thể tạo chuyển kho vì kho đích không còn đủ dung tích hoặc tải trọng sau khi tính cả hàng đang chuyển đến nhưng chưa nhận.",
       apiMessage || "Vui lòng giảm số lượng hoặc chọn kho đích khác.",
     ].join(" ");
   }
@@ -202,10 +201,6 @@ function toFiniteNumberOrNull(value: unknown): number | null {
   const parsed =
     typeof value === "number" ? value : Number(value ?? Number.NaN);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function isConsumableItemType(value: string | null | undefined): boolean {
-  return value?.trim().toLocaleLowerCase("en-US") === "consumable";
 }
 
 function getInventoryItemTypeLabel(
@@ -398,7 +393,7 @@ function ClosureTransferRecordCard({
                     tone.tableHeadStickyBg,
                   )}
                 >
-                  Số Serial
+                  Reusable / Serial
                 </th>
                 <th
                   className={cn(
@@ -422,8 +417,8 @@ function ClosureTransferRecordCard({
                   <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
                     {getInventoryItemTypeLabel(item.itemType, itemTypeValueMap)}
                   </td>
-                  <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
-                    {item.serialNumber || "—"}
+                  <td className="px-4 py-2 align-top">
+                    <ReusableIdentityCell item={item} />
                   </td>
                   <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
                     {item.quantity.toLocaleString("vi-VN")} {item.unit || ""}
@@ -533,11 +528,11 @@ function getTransferCapacityValidationMessage(
     : "Kho đích";
 
   if (!status.requiresCapacityCheck) {
-    return `${depotLabel} không có tải Consumable nên không bị ràng buộc sức chứa.`;
+    return `${depotLabel} không có tải cần kiểm tra sức chứa.`;
   }
 
   if (!status.hasMetric) {
-    return `${depotLabel} chưa có dữ liệu sức chứa khả dụng cho phần hàng tiêu hao.`;
+    return `${depotLabel} chưa có dữ liệu sức chứa khả dụng cho phần hàng được phân bổ.`;
   }
 
   const issueParts: string[] = [];
@@ -553,8 +548,8 @@ function getTransferCapacityValidationMessage(
   }
 
   return issueParts.length
-    ? `${depotLabel} ${issueParts.join(" và ")} cho phần hàng tiêu hao. Sức chứa thực tế còn có thể thấp hơn nếu kho đang có hàng chờ nhập từ transfer khác.`
-    : `${depotLabel} không còn đủ sức chứa cho phần hàng tiêu hao. Sức chứa thực tế còn có thể thấp hơn nếu kho đang có hàng chờ nhập từ transfer khác.`;
+    ? `${depotLabel} ${issueParts.join(" và ")} cho phần hàng được phân bổ. Sức chứa thực tế còn có thể thấp hơn nếu kho đang có hàng chờ nhập từ transfer khác.`
+    : `${depotLabel} không còn đủ sức chứa cho phần hàng được phân bổ. Sức chứa thực tế còn có thể thấp hơn nếu kho đang có hàng chờ nhập từ transfer khác.`;
 }
 
 interface TransferAssignmentItemDraft {
@@ -650,6 +645,59 @@ function createTransferAssignmentDraft(
 
 function normalizeDepotName(value: string | null | undefined): string {
   return value?.trim().toLocaleLowerCase("vi") ?? "";
+}
+
+function getRemainingInventoryRowKey(
+  item: DepotClosureRemainingInventoryItem,
+  index: number,
+): string {
+  const lotKey = item.lotId ?? item.supplyInventoryLotId;
+  const reusableKey = item.reusableItemId ?? item.serialNumber;
+  const identityKey =
+    lotKey != null
+      ? `lot-${lotKey}`
+      : reusableKey != null
+        ? `reusable-${reusableKey}`
+        : `row-${index}`;
+
+  return `remaining-${item.itemModelId}-${item.itemType}-${identityKey}-${index}`;
+}
+
+function ReusableIdentityCell({
+  item,
+  align = "left",
+}: {
+  item: {
+    reusableItemId?: number | null;
+    serialNumber?: string | null;
+  };
+  align?: "left" | "right";
+}) {
+  const serialNumber = item.serialNumber?.trim();
+
+  if (item.reusableItemId == null && !serialNumber) {
+    return (
+      <span className="text-sm tracking-tighter text-muted-foreground">—</span>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "space-y-0.5 text-xs tracking-tighter",
+        align === "right" ? "text-right" : "text-left",
+      )}
+    >
+      {item.reusableItemId != null && (
+        <p className="font-semibold text-foreground">
+          ID: #{item.reusableItemId}
+        </p>
+      )}
+      {serialNumber && (
+        <p className="font-medium text-muted-foreground">{serialNumber}</p>
+      )}
+    </div>
+  );
 }
 
 function normalizeClosureInventoryItems(
@@ -1305,6 +1353,9 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                                     <th className="text-left px-3 py-2 text-sm font-semibold tracking-tighter text-foreground">
                                                       Loại
                                                     </th>
+                                                    <th className="text-left px-3 py-2 text-sm font-semibold tracking-tighter text-foreground">
+                                                      Reusable / Serial
+                                                    </th>
                                                     <th className="text-right px-3 py-2 text-sm font-semibold tracking-tighter text-foreground">
                                                       Tổng
                                                     </th>
@@ -1319,11 +1370,11 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                                     </th>
                                                   </tr>
                                                 </thead>
-                                                <tbody>
+                                                  <tbody>
                                                   {detail.remainingInventoryItems.map(
-                                                    (item) => (
+                                                    (item, index) => (
                                                       <tr
-                                                        key={`history-remaining-${closure.id}-${item.itemModelId}-${item.itemType}`}
+                                                        key={`history-${closure.id}-${getRemainingInventoryRowKey(item, index)}`}
                                                         className="border-b border-border/20 last:border-0"
                                                       >
                                                         <td className="px-3 py-2">
@@ -1340,6 +1391,11 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                                             item.itemType,
                                                             itemTypeValueMap,
                                                           )}
+                                                        </td>
+                                                        <td className="px-3 py-2 align-top">
+                                                          <ReusableIdentityCell
+                                                            item={item}
+                                                          />
                                                         </td>
                                                         <td className="px-3 py-2 text-right text-sm tracking-tighter text-foreground">
                                                           {(
@@ -1811,8 +1867,6 @@ export default function DepotDetailPage() {
             value: "Tự xử lý bên ngoài (quản trị viên ghi chú cách xử lý)",
           },
         ];
-  const resolveActionPending =
-    markExternalMutation.isPending || initiateTransferMutation.isPending;
 
   const closureInventoryItems = useMemo(
     () =>
@@ -1863,6 +1917,10 @@ export default function DepotDetailPage() {
   } = useDepotClosureTransferSuggestions(depotId, {
     enabled: shouldLoadTransferSuggestions,
   });
+  const resolveActionPending =
+    markExternalMutation.isPending ||
+    initiateTransferMutation.isPending ||
+    transferSuggestionsFetching;
 
   const mergedTargetDepotChoices = useMemo(() => {
     const map = new Map<number, { key: number; value: string }>();
@@ -1943,7 +2001,7 @@ export default function DepotDetailPage() {
         if (!Number.isFinite(quantity) || quantity <= 0) continue;
 
         const selectedItem = closureInventoryMap.get(item.itemKey);
-        if (!selectedItem || !isConsumableItemType(selectedItem.itemType)) {
+        if (!selectedItem) {
           continue;
         }
 
@@ -2206,108 +2264,113 @@ export default function DepotDetailPage() {
     unallocatedSuggestedTransfers.length > 0,
   );
 
-  const buildTransferAssignmentsPayload = useCallback(() => {
-    if (!closureInventoryItems.length) {
-      toast.error("Chưa có danh sách vật phẩm tồn để phân bổ chuyển kho.");
-      return null;
-    }
-
-    const usedQuantityByItemKey = new Map<string, number>();
-    const assignmentsByTargetDepotId = new Map<
-      number,
-      {
-        targetDepotId: number;
-        items: Array<{
-          itemModelId: number;
-          itemType: string;
-          quantity: number;
-        }>;
-        load: TransferCapacityLoad;
+  const buildTransferAssignmentsPayload = useCallback(
+    (
+      freshMetricMap?: Map<
+        string,
+        DepotClosureTransferSuggestionTargetMetric
+      > | null,
+    ) => {
+      if (!closureInventoryItems.length) {
+        toast.error("Chưa có danh sách vật phẩm tồn để phân bổ chuyển kho.");
+        return null;
       }
-    >();
 
-    for (const assignment of transferAssignments) {
-      const nonEmptyItems = assignment.items.filter((item) =>
-        item.quantity.trim(),
-      );
-      const hasAnyData = assignment.targetDepotId || nonEmptyItems.length > 0;
-      if (!hasAnyData) continue;
+      const usedQuantityByItemKey = new Map<string, number>();
+      const assignmentsByTargetDepotId = new Map<
+        number,
+        {
+          targetDepotId: number;
+          items: Array<{
+            itemModelId: number;
+            itemType: string;
+            quantity: number;
+          }>;
+          load: TransferCapacityLoad;
+        }
+      >();
 
-      const targetDepotId = Number(assignment.targetDepotId);
-      if (!Number.isFinite(targetDepotId) || targetDepotId <= 0) {
-        toast.error(
-          "Mỗi kho đích cần được chọn trước khi xác nhận chuyển kho.",
+      for (const assignment of transferAssignments) {
+        const nonEmptyItems = assignment.items.filter((item) =>
+          item.quantity.trim(),
         );
-        return null;
-      }
+        const hasAnyData = assignment.targetDepotId || nonEmptyItems.length > 0;
+        if (!hasAnyData) continue;
 
-      if (targetDepotId === depotId) {
-        toast.error("Kho đích không thể trùng với kho đang đóng.");
-        return null;
-      }
-
-      if (nonEmptyItems.length === 0) {
-        toast.error("Mỗi kho đích cần có ít nhất một vật phẩm để chuyển.");
-        return null;
-      }
-
-      const targetAssignment =
-        assignmentsByTargetDepotId.get(targetDepotId) ??
-        (() => {
-          const created = {
-            targetDepotId,
-            items: [] as Array<{
-              itemModelId: number;
-              itemType: string;
-              quantity: number;
-            }>,
-            load: createEmptyTransferCapacityLoad(),
-          };
-          assignmentsByTargetDepotId.set(targetDepotId, created);
-          return created;
-        })();
-
-      for (const item of nonEmptyItems) {
-        const selectedItem = closureInventoryMap.get(item.itemKey);
-        if (!selectedItem) {
+        const targetDepotId = Number(assignment.targetDepotId);
+        if (!Number.isFinite(targetDepotId) || targetDepotId <= 0) {
           toast.error(
-            "Có vật phẩm chưa được chọn đúng trong danh sách chuyển kho.",
+            "Mỗi kho đích cần được chọn trước khi xác nhận chuyển kho.",
           );
           return null;
         }
 
-        const quantity = Number(item.quantity);
-        if (!Number.isFinite(quantity) || quantity <= 0) {
-          toast.error("Số lượng chuyển phải lớn hơn 0.");
+        if (targetDepotId === depotId) {
+          toast.error("Kho đích không thể trùng với kho đang đóng.");
           return null;
         }
 
-        const nextUsed =
-          (usedQuantityByItemKey.get(item.itemKey) ?? 0) + quantity;
-        if (nextUsed > selectedItem.quantity) {
-          toast.error(
-            `Số lượng "${selectedItem.itemName}" đang vượt tồn còn lại của kho.`,
+        if (nonEmptyItems.length === 0) {
+          toast.error("Mỗi kho đích cần có ít nhất một vật phẩm để chuyển.");
+          return null;
+        }
+
+        const targetAssignment =
+          assignmentsByTargetDepotId.get(targetDepotId) ??
+          (() => {
+            const created = {
+              targetDepotId,
+              items: [] as Array<{
+                itemModelId: number;
+                itemType: string;
+                quantity: number;
+              }>,
+              load: createEmptyTransferCapacityLoad(),
+            };
+            assignmentsByTargetDepotId.set(targetDepotId, created);
+            return created;
+          })();
+
+        for (const item of nonEmptyItems) {
+          const selectedItem = closureInventoryMap.get(item.itemKey);
+          if (!selectedItem) {
+            toast.error(
+              "Có vật phẩm chưa được chọn đúng trong danh sách chuyển kho.",
+            );
+            return null;
+          }
+
+          const quantity = Number(item.quantity);
+          if (!Number.isFinite(quantity) || quantity <= 0) {
+            toast.error("Số lượng chuyển phải lớn hơn 0.");
+            return null;
+          }
+
+          const nextUsed =
+            (usedQuantityByItemKey.get(item.itemKey) ?? 0) + quantity;
+          if (nextUsed > selectedItem.quantity) {
+            toast.error(
+              `Số lượng "${selectedItem.itemName}" đang vượt tồn còn lại của kho.`,
+            );
+            return null;
+          }
+          usedQuantityByItemKey.set(item.itemKey, nextUsed);
+
+          const existingTargetItem = targetAssignment.items.find(
+            (entry) =>
+              entry.itemModelId === selectedItem.itemModelId &&
+              entry.itemType === selectedItem.itemType,
           );
-          return null;
-        }
-        usedQuantityByItemKey.set(item.itemKey, nextUsed);
+          if (existingTargetItem) {
+            existingTargetItem.quantity += quantity;
+          } else {
+            targetAssignment.items.push({
+              itemModelId: selectedItem.itemModelId,
+              itemType: selectedItem.itemType,
+              quantity,
+            });
+          }
 
-        const existingTargetItem = targetAssignment.items.find(
-          (entry) =>
-            entry.itemModelId === selectedItem.itemModelId &&
-            entry.itemType === selectedItem.itemType,
-        );
-        if (existingTargetItem) {
-          existingTargetItem.quantity += quantity;
-        } else {
-          targetAssignment.items.push({
-            itemModelId: selectedItem.itemModelId,
-            itemType: selectedItem.itemType,
-            quantity,
-          });
-        }
-
-        if (isConsumableItemType(selectedItem.itemType)) {
           targetAssignment.load.consumableUnits += quantity;
           targetAssignment.load.consumableLineCount += 1;
           if (selectedItem.volumePerUnit != null) {
@@ -2320,39 +2383,62 @@ export default function DepotDetailPage() {
           }
         }
       }
-    }
 
-    const payload = Array.from(assignmentsByTargetDepotId.values()).filter(
-      (assignment) => assignment.items.length > 0,
-    );
-
-    if (!payload.length) {
-      toast.error("Hãy chọn ít nhất một kho đích và một vật phẩm để chuyển.");
-      return null;
-    }
-
-    for (const assignment of payload) {
-      const capacityStatus = getTransferCapacityStatusForTarget(
-        assignment.targetDepotId,
-        assignment.load,
+      const payload = Array.from(assignmentsByTargetDepotId.values()).filter(
+        (assignment) => assignment.items.length > 0,
       );
-      if (!capacityStatus.fitsBoth) {
-        toast.error(getTransferCapacityValidationMessage(capacityStatus));
+
+      if (!payload.length) {
+        toast.error("Hãy chọn ít nhất một kho đích và một vật phẩm để chuyển.");
         return null;
       }
-    }
 
-    return payload.map(({ targetDepotId, items }) => ({
-      targetDepotId,
-      items,
-    }));
-  }, [
-    closureInventoryItems.length,
-    closureInventoryMap,
-    depotId,
-    getTransferCapacityStatusForTarget,
-    transferAssignments,
-  ]);
+      // Use fresh metrics if provided, otherwise fall back to cached
+      const resolveCapacityStatus = (
+        targetDepotId: number,
+        load: TransferCapacityLoad,
+      ): TransferCapacityStatus => {
+        if (freshMetricMap) {
+          const metric = freshMetricMap.get(String(targetDepotId)) ?? null;
+          const targetDepotName =
+            mergedTargetDepotChoiceMap.get(String(targetDepotId)) ??
+            metric?.depotName ??
+            null;
+          return buildTransferCapacityStatus({
+            load,
+            targetDepotId,
+            targetDepotName,
+            metric,
+          });
+        }
+        return getTransferCapacityStatusForTarget(targetDepotId, load);
+      };
+
+      for (const assignment of payload) {
+        const capacityStatus = resolveCapacityStatus(
+          assignment.targetDepotId,
+          assignment.load,
+        );
+        if (!capacityStatus.fitsBoth) {
+          toast.error(getTransferCapacityValidationMessage(capacityStatus));
+          return null;
+        }
+      }
+
+      return payload.map(({ targetDepotId, items }) => ({
+        targetDepotId,
+        items,
+      }));
+    },
+    [
+      closureInventoryItems.length,
+      closureInventoryMap,
+      depotId,
+      getTransferCapacityStatusForTarget,
+      mergedTargetDepotChoiceMap,
+      transferAssignments,
+    ],
+  );
 
   const renderTransferAssignmentsEditor = useCallback(
     (context: "dialog" | "inline") => {
@@ -2442,8 +2528,8 @@ export default function DepotDetailPage() {
                   )}
                   {(transferSuggestions?.unallocatedItemLineCount ?? 0) > 0 && (
                     <Badge className="tracking-tighter bg-red-500/10 text-red-700 dark:text-red-400 border-0">
-                      {transferSuggestions!.unallocatedItemLineCount} dòng chưa
-                      phân được
+                      {transferSuggestions!.unallocatedItemLineCount} vật phẩm
+                      chưa phân được
                     </Badge>
                   )}
                 </div>
@@ -2709,20 +2795,20 @@ export default function DepotDetailPage() {
                                   className="border-border/30 hover:bg-muted/20"
                                 >
                                   <TableCell className="p-3 align-top">
-                                    <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2 min-w-0">
                                       <p className="min-w-55 text-sm font-semibold tracking-tighter text-foreground">
                                         {item.itemName}
                                       </p>
                                       {item.allocationMode ===
                                         "SplitByCapacity" && (
-                                        <span className="inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-medium tracking-tight text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                        <span className="inline-flex shrink-0 items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-medium tracking-tight text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                           Bị tách
                                         </span>
                                       )}
                                       {(item.allocationMode == null ||
                                         item.allocationMode ===
                                           "Unallocated") && (
-                                        <span className="inline-flex items-center rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-medium tracking-tight text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                        <span className="inline-flex shrink-0 items-center rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-medium tracking-tight text-red-700 dark:bg-red-900/30 dark:text-red-400">
                                           Chưa phân được
                                         </span>
                                       )}
@@ -2983,7 +3069,7 @@ export default function DepotDetailPage() {
                               </p>
                               {assignmentHasCapacityIssue && (
                                 <p className="mt-1 text-[11px] font-medium tracking-tighter text-rose-700">
-                                  Vượt sức chứa phần Consumable
+                                  Vượt sức chứa hàng phân bổ
                                 </p>
                               )}
                             </button>
@@ -3112,7 +3198,7 @@ export default function DepotDetailPage() {
                           </div>
                         </div>
 
-                        <div className="min-w-0 rounded-2xl border border-dashed bg-background">
+                        <div className="min-w-0 rounded-2xl border bg-background">
                           <div className="border-b border-border/60 bg-background/95 px-3 py-3">
                             <div className="flex flex-row items-center justify-between gap-3">
                               <div className="min-w-0">
@@ -3157,7 +3243,7 @@ export default function DepotDetailPage() {
 
                             <div
                               className={cn(
-                                "mt-3 grid gap-3 border-t border-border/60 pt-3 text-xs font-medium tracking-tighter text-muted-foreground",
+                                "mt-3 grid gap-3 border-t border-border/60 pt-3 text-[13px] font-medium tracking-tighter text-muted-foreground",
                                 sourceGridCols,
                               )}
                             >
@@ -3249,7 +3335,7 @@ export default function DepotDetailPage() {
                                             </span>
                                           )}
                                         </div>
-                                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 tracking-tighter text-muted-foreground xl:line-clamp-3">
+                                        <p className="mt-1 line-clamp-2 break-words text-xs leading-4 tracking-tighter text-muted-foreground xl:line-clamp-3">
                                           {itemTypeLabel}
                                           {inventoryItem.unit
                                             ? ` · Đơn vị: ${inventoryItem.unit}`
@@ -3258,10 +3344,10 @@ export default function DepotDetailPage() {
                                             ? ` · Danh mục: ${inventoryItem.categoryName}`
                                             : ""}
                                           {inventoryItem.volumePerUnit != null
-                                            ? ` · Thể tích: ${formatDepotMetric(inventoryItem.volumePerUnit, "dm3")}/đv`
+                                            ? ` · Thể tích: ${formatDepotMetric(inventoryItem.volumePerUnit, "dm3")}`
                                             : ""}
                                           {inventoryItem.weightPerUnit != null
-                                            ? ` · Khối lượng: ${formatDepotMetric(inventoryItem.weightPerUnit, "kg")}/đv`
+                                            ? ` · Khối lượng: ${formatDepotMetric(inventoryItem.weightPerUnit, "kg")}`
                                             : ""}
                                           {inventoryItem.blockedQuantity > 0
                                             ? ` · Khóa ${inventoryItem.blockedQuantity.toLocaleString("vi-VN")}`
@@ -3270,7 +3356,7 @@ export default function DepotDetailPage() {
                                       </div>
 
                                       <div className="min-w-0">
-                                        <p className="text-sm font-semibold tracking-tighter tabular-nums">
+                                        <p className="text-sm font-semibold tracking-tighter">
                                           {remainingQuantity.toLocaleString(
                                             "vi-VN",
                                           )}
@@ -3631,7 +3717,7 @@ export default function DepotDetailPage() {
     );
   }, [activeClosure?.closeReason, confirmCloseDialogOpen, initiateReason]);
 
-  function handleResolve() {
+  async function handleResolve() {
     if (!depot) return;
     const transferReason =
       initiateReason.trim() ||
@@ -3639,7 +3725,24 @@ export default function DepotDetailPage() {
       "Đóng kho và điều phối hàng tồn sang kho đích";
 
     if (resolutionType === "TransferToDepot") {
-      const assignments = buildTransferAssignmentsPayload();
+      // Refresh metrics to get real-time capacity before validating
+      let freshMetricMap:
+        | Map<string, DepotClosureTransferSuggestionTargetMetric>
+        | undefined;
+      try {
+        const freshSuggestions = await refetchTransferSuggestions();
+        if (freshSuggestions.data?.targetDepotMetrics) {
+          freshMetricMap = new Map(
+            freshSuggestions.data.targetDepotMetrics
+              .filter((m) => Number.isFinite(m.depotId) && m.depotId > 0)
+              .map((m) => [String(m.depotId), m]),
+          );
+        }
+      } catch {
+        // If refetch fails, proceed with cached metrics
+      }
+
+      const assignments = buildTransferAssignmentsPayload(freshMetricMap);
       if (!assignments) return;
 
       initiateTransferMutation.mutate(
@@ -3713,7 +3816,7 @@ export default function DepotDetailPage() {
     );
   }
 
-  function handleResolveInDialog() {
+  async function handleResolveInDialog() {
     if (!depot) return;
     const transferReason =
       initiateReason.trim() ||
@@ -3721,7 +3824,24 @@ export default function DepotDetailPage() {
       "Đóng kho và điều phối hàng tồn sang kho đích";
 
     if (resolutionType === "TransferToDepot") {
-      const assignments = buildTransferAssignmentsPayload();
+      // Refresh metrics to get real-time capacity before validating
+      let freshMetricMap:
+        | Map<string, DepotClosureTransferSuggestionTargetMetric>
+        | undefined;
+      try {
+        const freshSuggestions = await refetchTransferSuggestions();
+        if (freshSuggestions.data?.targetDepotMetrics) {
+          freshMetricMap = new Map(
+            freshSuggestions.data.targetDepotMetrics
+              .filter((m) => Number.isFinite(m.depotId) && m.depotId > 0)
+              .map((m) => [String(m.depotId), m]),
+          );
+        }
+      } catch {
+        // If refetch fails, proceed with cached metrics
+      }
+
+      const assignments = buildTransferAssignmentsPayload(freshMetricMap);
       if (!assignments) return;
 
       initiateTransferMutation.mutate(
@@ -3988,25 +4108,25 @@ export default function DepotDetailPage() {
                     activeClosureStatus === "InProgress") ? (
                     <div
                       className={cn(
-                        "flex max-w-xl flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border px-4 py-3 text-white",
+                        "flex flex-col max-w-sm rounded-xl border px-3 py-2 text-white",
                         closingBannerTheme.wrapper,
                       )}
                     >
                       <div className="flex items-center gap-2">
                         {activeClosureStatus === "Processing" ? (
                           <Spinner
-                            size={16}
+                            size={14}
                             className="shrink-0 animate-spin text-white"
                           />
                         ) : isTransferActive ? (
                           <ArrowsLeftRight
-                            size={16}
+                            size={14}
                             className="shrink-0 text-white"
                             weight="fill"
                           />
                         ) : (
                           <WarningCircle
-                            size={16}
+                            size={14}
                             className="shrink-0 text-white"
                             weight="fill"
                           />
@@ -4018,7 +4138,7 @@ export default function DepotDetailPage() {
                       {isTransferActive && (
                         <span
                           className={cn(
-                            "text-xs font-medium tracking-tighter",
+                            "text-xs font-medium tracking-tighter pl-5",
                             closingBannerTheme.muted,
                           )}
                         >
@@ -4028,7 +4148,7 @@ export default function DepotDetailPage() {
                       {isTransferDoneWithRemainingItems && (
                         <span
                           className={cn(
-                            "text-xs font-medium tracking-tighter",
+                            "text-xs font-medium tracking-tighter pl-5",
                             closingBannerTheme.muted,
                           )}
                         >
@@ -4580,8 +4700,9 @@ export default function DepotDetailPage() {
           </CardContent>
         </Card>
 
-        {/* ══ Transfer Panel ══ */}
-        {depot.status === "Closing" &&
+        {/* ══ Transfer Panel ══ HIDDEN */}
+        {false &&
+          depot.status === "Closing" &&
           !!activeTransfer &&
           !!activeClosureId && (
             <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 overflow-hidden">
@@ -4788,7 +4909,8 @@ export default function DepotDetailPage() {
             </div>
           )}
 
-        {depot.status === "Closing" &&
+        {false &&
+          depot.status === "Closing" &&
           activeClosureStatus === "Processing" &&
           !activeTransfer && (
             <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 p-5">
@@ -4930,6 +5052,9 @@ export default function DepotDetailPage() {
                               <TableHead className="p-3 text-sm font-semibold tracking-tighter text-foreground">
                                 Loại
                               </TableHead>
+                              <TableHead className="p-3 text-sm font-semibold tracking-tighter text-foreground">
+                                Reusable / Serial
+                              </TableHead>
                               <TableHead className="p-3 text-right text-sm font-semibold tracking-tighter text-foreground">
                                 Tổng số lượng
                               </TableHead>
@@ -4949,9 +5074,9 @@ export default function DepotDetailPage() {
                           </TableHeader>
                           <TableBody>
                             {activeClosure.remainingInventoryItems!.map(
-                              (item) => (
+                              (item, index) => (
                                 <TableRow
-                                  key={`remaining-${item.itemModelId}-${item.itemType}`}
+                                  key={getRemainingInventoryRowKey(item, index)}
                                   className="border-border/60 hover:bg-muted/20"
                                 >
                                   <TableCell className="p-3">
@@ -4976,6 +5101,9 @@ export default function DepotDetailPage() {
                                         itemTypeValueMap,
                                       )}
                                     </Badge>
+                                  </TableCell>
+                                  <TableCell className="p-3 align-top">
+                                    <ReusableIdentityCell item={item} />
                                   </TableCell>
                                   <TableCell className="p-3 text-right text-sm font-bold tracking-tighter tabular-nums">
                                     {(item.quantity ?? 0).toLocaleString(

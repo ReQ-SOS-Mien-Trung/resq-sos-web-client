@@ -1266,8 +1266,9 @@ export function DepotClosurePanel({
               {transferSteps.map((step, i) => {
                 const cur = transferStepOrder.indexOf(currentTransferStatus);
                 const me = transferStepOrder.indexOf(step.key);
-                const done = me < cur;
-                const active = me === cur;
+                const isReceived = currentTransferStatus === "Received";
+                const done = me < cur || (isReceived && me === cur);
+                const active = me === cur && !isReceived;
                 return (
                   <React.Fragment key={step.key}>
                     {i > 0 && (

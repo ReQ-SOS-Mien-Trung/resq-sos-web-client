@@ -181,10 +181,9 @@ const VictimsBarChart = () => {
   return (
     <Card className="border border-border/50 overflow-hidden group hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          {/* Title & total */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 xl:flex-nowrap">
+            <div className="flex shrink-0 items-center gap-2">
               <UsersThree
                 size={20}
                 weight="duotone"
@@ -200,69 +199,75 @@ const VictimsBarChart = () => {
                 />
               )}
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tighter text-foreground">
-                {totalVictims.toLocaleString("vi-VN")}
-              </span>
-              <span className="text-sm text-muted-foreground">nạn nhân</span>
+
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+              <div className="flex flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+                <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
+                  Từ
+                </span>
+                <DatePickerInput
+                  value={fromDate}
+                  onChange={setFromDate}
+                  placeholder="Ngày bắt đầu"
+                  className="w-[160px]"
+                />
+                <ArrowRight
+                  size={14}
+                  className="text-muted-foreground shrink-0"
+                />
+                <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
+                  Đến
+                </span>
+                <DatePickerInput
+                  value={toDate}
+                  onChange={setToDate}
+                  placeholder="Ngày kết thúc"
+                  className="w-[160px]"
+                />
+              </div>
+
+              {/* Granularity selector */}
+              <div className="flex items-center gap-1.5">
+                <CalendarBlank size={14} className="text-muted-foreground" />
+                <div className="flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5">
+                  {GRANULARITY_OPTIONS.map((opt) => (
+                    <Button
+                      key={opt.value}
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 px-2.5 text-sm tracking-tighter font-medium rounded transition-all duration-200",
+                        granularity === opt.value
+                          ? "bg-background text-foreground shadow-sm font-semibold"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setGranularity(opt.value)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Granularity selector */}
-          <div className="flex items-center gap-1.5">
-            <CalendarBlank size={14} className="text-muted-foreground" />
-            <div className="flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5">
-              {GRANULARITY_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-7 px-2.5 text-sm tracking-tighter font-medium rounded transition-all duration-200",
-                    granularity === opt.value
-                      ? "bg-background text-foreground shadow-sm font-semibold"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setGranularity(opt.value)}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold tracking-tighter text-foreground">
+              {totalVictims.toLocaleString("vi-VN")}
+            </span>
+            <span className="text-sm tracking-tighter text-muted-foreground">
+              nạn nhân
+            </span>
           </div>
-        </div>
-
-        {/* Date Range Filter */}
-        <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
-            Từ
-          </span>
-          <DatePickerInput
-            value={fromDate}
-            onChange={setFromDate}
-            placeholder="Ngày bắt đầu"
-            className="w-[160px]"
-          />
-          <ArrowRight size={14} className="text-muted-foreground shrink-0" />
-          <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
-            Đến
-          </span>
-          <DatePickerInput
-            value={toDate}
-            onChange={setToDate}
-            placeholder="Ngày kết thúc"
-            className="w-[160px]"
-          />
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4">
+      <CardContent className="">
         {chartLoading ? (
-          <div className="flex items-center justify-center h-[380px]">
+          <div className="flex items-center justify-center h-95">
             <Spinner size={32} className="animate-spin text-muted-foreground" />
           </div>
         ) : formattedData.length === 0 ? (
-          <div className="flex items-center justify-center h-[380px] text-muted-foreground text-sm">
+          <div className="flex items-center justify-center h-95 text-muted-foreground text-sm">
             Không có dữ liệu cho khoảng thời gian này
           </div>
         ) : (

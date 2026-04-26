@@ -32,6 +32,11 @@ export type InventorySourceType = InventoryCategory;
 
 export type InventoryReliefItem = InventoryCategory;
 
+export interface InventoryItemModelMetadata {
+  key: number;
+  value: string;
+}
+
 export type ReusableItemCondition = InventoryCategory;
 
 export interface ReusableBreakdown {
@@ -229,6 +234,19 @@ export interface UpdateItemModelPayload {
 
 // ─── Stock Movement History ───
 
+export interface StockMovementLotDetail {
+  lotId: number;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+  quantityChange: number;
+}
+
+export interface StockMovementReusableDetail {
+  reusableItemId: number;
+  serialNumber?: string | null;
+  quantityChange: number;
+}
+
 export interface StockMovementItem {
   itemId: number;
   itemName: string;
@@ -244,6 +262,13 @@ export interface StockMovementItem {
   expiredDate?: string | null;
   /** ID lô hàng gắn kết */
   supplyInventoryLotId?: number | null;
+  itemModelId: number;
+  remainingQuantity: number;
+  lotId?: number | null;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
+  lotDetails?: StockMovementLotDetail[];
+  reusableDetails?: StockMovementReusableDetail[];
 }
 
 export interface StockMovementEntity {
@@ -253,7 +278,7 @@ export interface StockMovementEntity {
   sourceId: number | null;
   sourceName: string;
   performedByName: string;
-  note: string;
+  note: string | null;
   createdAt: string;
   items: StockMovementItem[];
   /** VAT Invoice fields – only present for Purchase imports */
@@ -269,6 +294,7 @@ export interface StockMovementEntity {
 
 export interface GetDepotStockMovementsParams {
   depotId: number;
+  itemModelId?: number;
   actionTypes?: string[];
   sourceTypes?: string[];
   fromDate?: string;

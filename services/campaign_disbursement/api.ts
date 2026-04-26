@@ -1,6 +1,7 @@
 import api from "@/config/axios";
 import type {
   AllocateDisbursementRequest,
+  CampaignMetadata,
   CampaignStatusMetadata,
   GetCampaignSpendingParams,
   GetCampaignSpendingResponse,
@@ -67,6 +68,15 @@ export async function getCampaigns(
  */
 export async function getCampaignStatuses(): Promise<CampaignStatusMetadata[]> {
   const { data } = await api.get("/finance/campaigns/metadata/statuses");
+  return data;
+}
+
+/**
+ * Lấy danh sách chiến dịch dạng key/value cho dropdown
+ * GET /finance/campaigns/metadata
+ */
+export async function getCampaignMetadata(): Promise<CampaignMetadata[]> {
+  const { data } = await api.get("/finance/campaigns/metadata");
   return data;
 }
 

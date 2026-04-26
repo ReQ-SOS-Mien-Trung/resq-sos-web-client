@@ -543,7 +543,6 @@ const InventoryDashboardPage = () => {
   // ── Handlers ──
   const handleItemSelect = useCallback((item: InventoryItem) => {
     setSelectedItem(item);
-    setItemSheetOpen(true);
   }, []);
 
   const handleRequestSelect = useCallback((request: SupplyRequest) => {
@@ -1164,22 +1163,6 @@ const InventoryDashboardPage = () => {
           </motion.div>
         </main>
       </div>
-
-      {/* Item Details Sheet */}
-      <ItemDetailsSheet
-        item={selectedItem}
-        open={itemSheetOpen}
-        onOpenChange={setItemSheetOpen}
-        onRequestInbound={() => {
-          console.log("Request inbound for:", selectedItem?.name);
-        }}
-        onRequestOutbound={() => {
-          console.log("Request outbound for:", selectedItem?.name);
-        }}
-        onEdit={() => {
-          console.log("Edit item:", selectedItem?.name);
-        }}
-      />
 
       {/* Vat Tu Details Sheet - rendered at page level for full overlay */}
       <VatTuDetailsSheet

@@ -60,6 +60,7 @@ import {
   getDepotClosureTransferStatusToneClass,
   normalizeDepotClosureTransferStatus,
 } from "@/lib/depot-closure-transfer-status";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -618,6 +619,10 @@ function TransferDetailPanel({
     0;
   const snapshotReusable =
     transfer?.snapshotReusableUnits ?? transferItem.snapshotReusableUnits ?? 0;
+  const transferItems =
+    transfer?.items && transfer.items.length > 0
+      ? transfer.items
+      : (transferItem.items ?? []);
 
   const sourceCfgMap: Record<
     string,
@@ -652,8 +657,9 @@ function TransferDetailPanel({
         {transferSteps.map((step, i) => {
           const cur = stepOrder.indexOf(currentStatus);
           const me = stepOrder.indexOf(step.key);
-          const done = me < cur;
-          const active = me === cur;
+          const isReceived = currentStatus === "Received";
+          const done = me < cur || (isReceived && me === cur);
+          const active = me === cur && !isReceived;
           return (
             <React.Fragment key={step.key}>
               {i > 0 && (
@@ -854,7 +860,7 @@ function TransferDetailPanel({
           </motion.div>
         )}
 
-      {transfer && transfer.items.length > 0 && (
+      {transferItems.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -866,7 +872,7 @@ function TransferDetailPanel({
               Danh sách vật phẩm
             </p>
             <span className="text-xs tracking-tighter text-muted-foreground">
-              {transfer.items.length} dòng
+              {transferItems.length} dòng
             </span>
           </div>
 
@@ -889,9 +895,9 @@ function TransferDetailPanel({
                 </tr>
               </thead>
               <tbody>
-                {transfer.items.map((item) => (
+                {transferItems.map((item) => (
                   <tr
-                    key={`${transfer.id}-${item.itemModelId}-${item.reusableItemId ?? item.serialNumber ?? item.itemType}`}
+                    key={`${transfer?.id ?? transferItem.transferId}-${item.itemModelId}-${item.reusableItemId ?? item.serialNumber ?? item.itemType}`}
                     className="border-b border-border/20 last:border-0"
                   >
                     <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
@@ -1057,6 +1063,13 @@ export function DepotClosureTransferTable({
     isFetching,
     refetch,
   } = useMyDepotTransfers(resolvedDepotId, { enabled: resolvedDepotId > 0 });
+  useInventoryOperationalRealtime({
+    depotClosures: {
+      depotId: resolvedDepotId,
+      transferId: expandedId,
+    },
+    enabled: resolvedDepotId > 0,
+  });
   const {
     data: externalResolutionState,
     refetch: refetchExternalResolutionState,
