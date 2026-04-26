@@ -3,6 +3,7 @@ import {
   allocateDisbursement,
   getCampaignSpending,
   getCampaigns,
+  getCampaignMetadata,
   getCampaignStatuses,
   createCampaign,
   updateCampaignInfo,
@@ -13,6 +14,7 @@ import {
 } from "./api";
 import type {
   AllocateDisbursementRequest,
+  CampaignMetadata,
   CampaignStatusMetadata,
   GetCampaignSpendingParams,
   GetCampaignSpendingResponse,
@@ -29,6 +31,7 @@ import type {
 
 export const CAMPAIGN_SPENDING_QUERY_KEY = ["campaign-spending"] as const;
 export const CAMPAIGNS_QUERY_KEY = ["campaigns"] as const;
+export const CAMPAIGN_METADATA_QUERY_KEY = ["campaign-metadata"] as const;
 export const CAMPAIGN_STATUSES_QUERY_KEY = ["campaign-statuses"] as const;
 
 /* ── GET campaign spending ── */
@@ -92,6 +95,19 @@ export function useCampaignStatuses() {
   return useQuery<CampaignStatusMetadata[]>({
     queryKey: CAMPAIGN_STATUSES_QUERY_KEY,
     queryFn: getCampaignStatuses,
+    staleTime: Infinity,
+  });
+}
+
+/* ── GET campaign metadata ── */
+
+/**
+ * Hook to fetch campaign key/value options for dropdowns
+ */
+export function useCampaignMetadata() {
+  return useQuery<CampaignMetadata[]>({
+    queryKey: CAMPAIGN_METADATA_QUERY_KEY,
+    queryFn: getCampaignMetadata,
     staleTime: Infinity,
   });
 }

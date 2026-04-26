@@ -122,7 +122,7 @@ const MissionReportComplianceChart = () => {
             weight="duotone"
             className="text-violet-500"
           />
-          <CardTitle className="text-base font-semibold text-foreground">
+          <CardTitle className="text-sm font-semibold text-foreground xl:text-base">
             Tuân thủ báo cáo nhiệm vụ
           </CardTitle>
         </div>
@@ -134,10 +134,10 @@ const MissionReportComplianceChart = () => {
             <Spinner size={32} className="animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4">
             {/* Doughnut chart + center label */}
             <div className="flex flex-col items-center gap-1">
-              <div style={{ width: 180, height: 180, lineHeight: 0 }}>
+              <div style={{ width: 160, height: 160, lineHeight: 0 }}>
                 <Doughnut ref={chartRef} data={chartData} options={options} />
               </div>
               <div className="flex flex-col items-center">
@@ -182,9 +182,9 @@ const MissionReportComplianceChart = () => {
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               {/* Total Completed Teams */}
-              <div className="rounded-xl bg-muted/50 p-3 flex flex-col gap-1">
+              <div className="rounded-xl bg-muted/50 p-2.5 flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle
                     size={14}
@@ -201,7 +201,7 @@ const MissionReportComplianceChart = () => {
               </div>
 
               {/* Submission Rate */}
-              <div className="rounded-xl bg-muted/50 p-3 flex flex-col gap-1">
+              <div className="rounded-xl bg-muted/50 p-2.5 flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
                   <ClipboardText
                     size={14}

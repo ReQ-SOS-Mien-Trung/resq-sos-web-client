@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Table,
   TableBody,
@@ -89,6 +90,7 @@ import {
   useUpdateCampaignTarget,
   useUpdateCampaignStatus,
   useCampaignFundFlowChart,
+  useCampaignMetadata,
 } from "@/services/campaign_disbursement";
 import type {
   CampaignStatus,
@@ -141,6 +143,14 @@ function formatDateToYmd(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function toDateTimeStart(value: string) {
+  return value ? `${value}T00:00:00.000Z` : undefined;
+}
+
+function toDateTimeEnd(value: string) {
+  return value ? `${value}T23:59:59.999Z` : undefined;
+}
+
 function formatAmountWithDot(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -156,14 +166,37 @@ function normalizeText(value: string): string {
 /* ── Campaign Fund Flow Chart ─────────────────────────────── */
 
 function CampaignFundFlowChart() {
-  const { data: campaignsData, isLoading: loadingCampaigns } = useCampaigns({
-    params: { pageSize: 6, statuses: ["Active"] },
-  });
-  const firstCampaign = campaignsData?.items?.[0];
-  const { data, isLoading } = useCampaignFundFlowChart(
-    firstCampaign?.id,
-    undefined,
-    { enabled: !!firstCampaign },
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [granularity, setGranularity] = useState<"month" | "week">("month");
+
+  const { data: campaignOptions = [], isLoading: loadingCampaigns } =
+    useCampaignMetadata();
+  const effectiveCampaignId = selectedCampaignId
+    ? Number(selectedCampaignId)
+    : campaignOptions[0]?.key;
+  const selectedCampaignName = useMemo(() => {
+    if (effectiveCampaignId === undefined) return "";
+    return (
+      campaignOptions.find((item) => item.key === effectiveCampaignId)?.value ??
+      ""
+    );
+  }, [campaignOptions, effectiveCampaignId]);
+
+  const chartParams = useMemo(
+    () => ({
+      from: toDateTimeStart(fromDate),
+      to: toDateTimeEnd(toDate),
+      granularity,
+    }),
+    [fromDate, granularity, toDate],
+  );
+
+  const { data, isLoading, isError } = useCampaignFundFlowChart(
+    effectiveCampaignId,
+    chartParams,
+    { enabled: effectiveCampaignId !== undefined },
   );
 
   const chartData = useMemo(() => {
@@ -199,23 +232,96 @@ function CampaignFundFlowChart() {
     };
   }, [data]);
 
-  const title = firstCampaign
-    ? `Quỹ chiến dịch: ${firstCampaign.name}`
+  const title = selectedCampaignName
+    ? `Quỹ chiến dịch: ${selectedCampaignName}`
     : "Biến động quỹ chiến dịch";
 
   return (
     <Card className="border border-border/50 py-0">
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-1.5 rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
-            <ChartBarHorizontal className="h-4 w-4" weight="fill" />
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="p-1.5 rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+              <ChartBarHorizontal className="h-4 w-4" weight="fill" />
+            </div>
+            <p className="min-w-0 truncate text-base font-semibold tracking-tighter">
+              {title}
+            </p>
           </div>
-          <p className="text-base font-semibold tracking-tighter">{title}</p>
+          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(260px,340px)_150px_150px_130px_36px]">
+            <Select
+              value={
+                effectiveCampaignId !== undefined
+                  ? String(effectiveCampaignId)
+                  : undefined
+              }
+              onValueChange={setSelectedCampaignId}
+              disabled={loadingCampaigns || campaignOptions.length === 0}
+            >
+              <SelectTrigger className="h-9 w-full min-w-0 overflow-hidden bg-background text-sm [&_[data-slot=select-value]]:truncate">
+                <SelectValue placeholder="Chọn chiến dịch" />
+              </SelectTrigger>
+              <SelectContent className="w-[min(380px,calc(100vw-2rem))]">
+                {campaignOptions.map((campaign) => (
+                  <SelectItem key={campaign.key} value={String(campaign.key)}>
+                    {campaign.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <DatePickerInput
+              value={fromDate}
+              onChange={setFromDate}
+              placeholder="Từ ngày"
+              maxDate={toDate || undefined}
+              className="h-9"
+            />
+            <DatePickerInput
+              value={toDate}
+              onChange={setToDate}
+              placeholder="Đến ngày"
+              minDate={fromDate || undefined}
+              className="h-9"
+            />
+            <Select
+              value={granularity}
+              onValueChange={(value) =>
+                setGranularity(value as "month" | "week")
+              }
+            >
+              <SelectTrigger className="h-9 w-full bg-background text-sm">
+                <SelectValue placeholder="Chu kỳ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Tháng</SelectItem>
+                <SelectItem value="week">Tuần</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-full sm:w-9"
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+                setGranularity("month");
+              }}
+              disabled={!fromDate && !toDate && granularity === "month"}
+              title="Xóa bộ lọc"
+            >
+              <ArrowClockwise size={16} />
+            </Button>
+          </div>
         </div>
         {isLoading || loadingCampaigns ? (
           <div className="h-52 flex items-center justify-center">
             <div className="h-4 w-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
           </div>
+        ) : isError ? (
+          <p className="text-sm text-muted-foreground tracking-tighter">
+            Không tải được dữ liệu
+          </p>
         ) : chartData ? (
           <Bar
             data={chartData}
@@ -247,9 +353,9 @@ function CampaignFundFlowChart() {
               },
             }}
           />
-        ) : !loadingCampaigns && !firstCampaign ? (
+        ) : !loadingCampaigns && effectiveCampaignId === undefined ? (
           <p className="text-sm text-muted-foreground tracking-tighter">
-            Không có chiến dịch đang hoạt động
+            Không có chiến dịch để hiển thị
           </p>
         ) : (
           <p className="text-sm text-muted-foreground tracking-tighter">
