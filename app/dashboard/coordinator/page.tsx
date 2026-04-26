@@ -562,6 +562,8 @@ const CoordinatorDashboardContent = () => {
   const [selectedClusterSosTypes, setSelectedClusterSosTypes] = useState<
     ClusterSOSType[]
   >([]);
+  const [sosSort, setSosSort] = useState<string>("time:desc");
+  const [clusterSort, setClusterSort] = useState<string>("time:desc");
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -678,13 +680,15 @@ const CoordinatorDashboardContent = () => {
               selectedClusterSosTypes.length > 0
                 ? selectedClusterSosTypes
                 : undefined,
+            Sort: clusterSort,
           }
-        : undefined,
+        : { Sort: clusterSort },
     [
       hasSidebarClusterBackendFilters,
       selectedClusterPriorities,
       selectedClusterSosTypes,
       selectedClusterStatuses,
+      clusterSort,
     ],
   );
 
@@ -697,6 +701,7 @@ const CoordinatorDashboardContent = () => {
         Statuses: statusQueryFilter,
         Priorities: priorityQueryFilter,
         SosTypes: sosTypeQueryFilter,
+        Sort: sosSort,
       },
       refetchInterval: COORDINATOR_SOS_REFETCH_INTERVAL_MS,
     });
@@ -723,7 +728,9 @@ const CoordinatorDashboardContent = () => {
   const { data: rescueTeamsData } = useRescueTeams({
     params: { pageSize: 200 },
   });
-  const { data: clustersData } = useSOSClusters();
+  const { data: clustersData } = useSOSClusters({
+    params: { Sort: clusterSort },
+  });
   const { data: sidebarFilteredClustersData } = useSOSClusters({
     params: sidebarClusterQueryParams,
     enabled: hasSidebarClusterBackendFilters,
@@ -1923,12 +1930,21 @@ const CoordinatorDashboardContent = () => {
             <SOSSidebar
               sosRequests={sosRequests}
               incomingRequests={sidebarSOSRequests}
-              incomingPagination={{
-                page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
-                pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
-                totalCount: sidebarSosData?.totalCount ?? 0,
-                onPageChange: setSidebarSOSPage,
-              }}
+              incomingPagination={useMemo(
+                () => ({
+                  page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
+                  pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
+                  totalCount: sidebarSosData?.totalCount ?? 0,
+                  onPageChange: setSidebarSOSPage,
+                }),
+                [
+                  sidebarSosData?.pageNumber,
+                  sidebarSOSPage,
+                  sidebarSosData?.pageSize,
+                  sidebarSosData?.totalCount,
+                  setSidebarSOSPage,
+                ],
+              )}
               isIncomingRequestsLoading={isSidebarSosLoading}
               rescuers={rescuers}
               teamIncidents={teamIncidents}
@@ -1965,6 +1981,10 @@ const CoordinatorDashboardContent = () => {
               onSelectedClusterPrioritiesChange={setSelectedClusterPriorities}
               selectedClusterSosTypes={selectedClusterSosTypes}
               onSelectedClusterSosTypesChange={setSelectedClusterSosTypes}
+              sosSort={sosSort}
+              onSosSortChange={setSosSort}
+              clusterSort={clusterSort}
+              onClusterSortChange={setClusterSort}
             />
           </div>
         </aside>
@@ -2035,7 +2055,12 @@ const CoordinatorDashboardContent = () => {
               {/* SOS Details Panel */}
               <SOSDetailsPanel
                 open={sosDetailOpen}
-                onOpenChange={setSOSDetailOpen}
+                onOpenChange={(open) => {
+                  setSOSDetailOpen(open);
+                  if (!open) {
+                    setSelectedSOS(null);
+                  }
+                }}
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
                 isProcessing={isProcessingSOS}
@@ -2141,7 +2166,12 @@ const CoordinatorDashboardContent = () => {
               {/* Location Details Panel */}
               <LocationDetailsPanel
                 open={locationPanelOpen}
-                onOpenChange={setLocationPanelOpen}
+                onOpenChange={(open) => {
+                  setLocationPanelOpen(open);
+                  if (!open) {
+                    setLocationPanelData(null);
+                  }
+                }}
                 location={locationPanelData}
               />
 

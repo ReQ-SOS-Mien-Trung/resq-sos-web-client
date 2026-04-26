@@ -25,6 +25,7 @@ export async function getSOSRequests(
       Statuses: params?.Statuses,
       Priorities: params?.Priorities,
       SosTypes: params?.SosTypes,
+      Sort: params?.Sort,
     },
     paramsSerializer: {
       indexes: null,
@@ -53,6 +54,7 @@ export async function getSOSRequestsInBounds(
       Statuses: params.Statuses,
       Priorities: params.Priorities,
       SosTypes: params.SosTypes,
+      Sort: params.Sort,
     },
     paramsSerializer: {
       indexes: null, // ?Statuses=Pending&Statuses=Assigned

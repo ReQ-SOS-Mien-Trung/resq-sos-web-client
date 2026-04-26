@@ -89,6 +89,7 @@ export function useSOSRequests(options?: UseSOSRequestsOptions) {
       normalizedStatuses.join(","),
       normalizedPriorityLevels.join(","),
       normalizedSosTypes.join(","),
+      params?.Sort ?? "time:desc",
     ],
     queryFn: () => getSOSRequests(params),
     refetchInterval: options?.refetchInterval,
@@ -139,6 +140,7 @@ export function useSOSRequestsInBounds(
       normalizedStatuses.join(","),
       normalizedPriorityLevels.join(","),
       normalizedSosTypes.join(","),
+      params?.Sort ?? "time:desc",
     ],
     queryFn: () => getSOSRequestsInBounds(params!),
     enabled:
