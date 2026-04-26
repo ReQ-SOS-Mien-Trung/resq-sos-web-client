@@ -1435,9 +1435,9 @@ function SOSRequestMarker({
   };
 
   const color = priorityColors[sos.priority];
-  const size = isSelected ? 48 : 28;
-  const badgeSize = isSelected ? 36 : 22;
-  const labelFontSize = isSelected ? 12 : 9;
+  const size = isSelected ? 48 : 36;
+  const badgeSize = isSelected ? 38 : 28;
+  const labelFontSize = isSelected ? 11 : 9.5;
 
   // Create custom icon using divIcon with useMemo
   const icon = useMemo(() => {
@@ -1446,6 +1446,29 @@ function SOSRequestMarker({
     const L = require("leaflet");
 
     const isPending = sos.status === "PENDING";
+    const sosType = (sos.sosType || "").toUpperCase();
+
+    // Determine shape based on type
+    // RELIEF (Cứu trợ) -> Circle (Tròn)
+    // RESCUE (Cứu hộ) -> Triangle (Tam giác)
+    // BOTH (Cả hai) -> Hexagon (Lục giác)
+    const shape =
+      sosType === "RESCUE"
+        ? "triangle"
+        : sosType === "BOTH"
+          ? "hexagon"
+          : "circle";
+
+    const strokeWidth = isSelected ? 5 : 7;
+    const textY = shape === "triangle" ? 72 : 58;
+
+    // SVG definition for shapes
+    const shapeSvg =
+      shape === "triangle"
+        ? `<polygon points="50,5 96,92 4,92" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round" />`
+        : shape === "hexagon"
+          ? `<polygon points="25,5 75,5 100,50 75,95 25,95 0,50" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round" />`
+          : `<circle cx="50" cy="50" r="45" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" />`;
 
     return L.divIcon({
       className: "custom-sos-marker",
@@ -1462,10 +1485,11 @@ function SOSRequestMarker({
               ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>`
               : ""
           }
-          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;border-radius:9999px;overflow:hidden;background-color:${color};border:${isSelected ? "3px" : "2px"} solid #ffffff;box-shadow:${isSelected ? `0 0 20px ${color}88, 0 4px 12px rgba(0,0,0,0.4)` : "0 2px 8px rgba(0,0,0,0.3)"};transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-            <span style="display:block;color:#ffffff;font-family:Arial,'Helvetica Neue',sans-serif;font-size:${labelFontSize}px;font-weight:900;line-height:1;letter-spacing:-0.02em;text-transform:uppercase;white-space:nowrap;transform:translateY(-0.5px);">
-              SOS
-            </span>
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <svg width="${badgeSize}" height="${badgeSize}" viewBox="0 0 100 100" style="overflow:visible;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+              ${shapeSvg}
+              <text x="50" y="${textY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="${labelFontSize * 3.5}px" font-weight="900" text-anchor="middle" letter-spacing="-0.05em">SOS</text>
+            </svg>
           </div>
           ${
             isSelected
@@ -1496,6 +1520,7 @@ function SOSRequestMarker({
     size,
     sos.priority,
     sos.status,
+    sos.sosType,
     isSelected,
     shouldRise,
   ]);

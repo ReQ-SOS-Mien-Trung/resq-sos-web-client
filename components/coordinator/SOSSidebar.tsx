@@ -1536,7 +1536,7 @@ const SOSSidebar = ({
                 <div
                   className={cn(
                     "grid flex-1 items-center gap-1.5",
-                    hasSOSFiltersApplied ? "grid-cols-4" : "grid-cols-3",
+                    hasSOSFiltersApplied ? "grid-cols-2" : "grid-cols-3",
                   )}
                 >
                   <Popover
@@ -2169,7 +2169,7 @@ const SOSSidebar = ({
                           className={cn(
                             "grid items-center gap-1.5",
                             hasClusterFiltersApplied
-                              ? "grid-cols-4"
+                              ? "grid-cols-2"
                               : "grid-cols-3",
                           )}
                         >
