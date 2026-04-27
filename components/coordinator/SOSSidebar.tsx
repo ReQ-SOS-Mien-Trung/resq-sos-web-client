@@ -8,7 +8,10 @@ import {
   useRemoveSOSRequestFromCluster,
   useAddSOSRequestToCluster,
 } from "@/services/sos_cluster/hooks";
-import { useSOSRequestsByIds } from "@/services/sos_request/hooks";
+import {
+  useSOSRequestsByIds,
+  useSOSRequestStatusCounts,
+} from "@/services/sos_request/hooks";
 import {
   DndContext,
   DragOverlay,
@@ -726,6 +729,8 @@ const SOSSidebar = ({
     mutateAsync: addSOSRequestToClusterAsync,
   } = useAddSOSRequestToCluster();
 
+  const { data: statusCountsData } = useSOSRequestStatusCounts();
+
   // Dnd state
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeDragSOS, setActiveDragSOS] = useState<SOSRequest | null>(null);
@@ -1056,12 +1061,36 @@ const SOSSidebar = ({
     );
   };
 
+  const apiStatusCounts = useMemo(() => {
+    if (!statusCountsData) return null;
+
+    const counts = {
+      pending: 0,
+      active: 0,
+    };
+
+    statusCountsData.statusCounts.forEach((sc) => {
+      const bucket = getSOSStatusBucket(sc.status);
+      if (bucket === "pending") {
+        counts.pending += sc.count;
+      } else if (bucket === "active") {
+        counts.active += sc.count;
+      }
+    });
+
+    return counts;
+  }, [statusCountsData]);
+
   const pendingRequests = sosRequests.filter(
     (s) => getSOSStatusBucket(getSOSEffectiveStatus(s)) === "pending",
   );
   const assignedRequests = sosRequests.filter(
     (s) => getSOSStatusBucket(getSOSEffectiveStatus(s)) === "active",
   );
+
+  const displayPendingCount = apiStatusCounts?.pending ?? pendingRequests.length;
+  const displayActiveCount = apiStatusCounts?.active ?? assignedRequests.length;
+
   const availableRescuers = rescuers.filter((r) => r.status === "AVAILABLE");
 
   // IDs that belong to any auto-cluster (to identify standalone requests)
@@ -1471,13 +1500,13 @@ const SOSSidebar = ({
       <div className="grid grid-cols-3 gap-2 p-3 border-b bg-muted/30">
         <div className="text-center">
           <div className="text-2xl font-bold text-red-500">
-            {pendingRequests.length}
+            {displayPendingCount}
           </div>
           <div className="text-sm tracking-tighter font-medium">Chờ xử lý</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-orange-500">
-            {assignedRequests.length}
+            {displayActiveCount}
           </div>
           <div className="text-sm tracking-tighter font-medium">Đang cứu</div>
         </div>

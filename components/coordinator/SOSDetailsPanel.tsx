@@ -1117,7 +1117,9 @@ const SOSDetailsPanel = ({
   const waitDurationLabel =
     waitTimeMinutes >= 1440
       ? `${Math.floor(waitTimeMinutes / 1440)} ngày`
-      : `${Math.max(1, Math.floor(waitTimeMinutes / 60))} giờ`;
+      : waitTimeMinutes >= 60
+        ? `${Math.floor(waitTimeMinutes / 60)} giờ`
+        : `${Math.max(1, waitTimeMinutes)} phút`;
 
   const severityLabel = (value?: string) => {
     const normalized = (value || "").toLowerCase();

@@ -11,6 +11,7 @@ export type MissionStatus =
   | "Pending"
   | "InProgress"
   | "Completed"
+  | "Incompleted"
   | "Cancelled";
 
 export type MissionActivityStatus =

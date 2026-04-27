@@ -27,6 +27,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -1094,6 +1102,7 @@ function AssemblyPointDetails({
   const [expandedTeamIds, setExpandedTeamIds] = useState<
     Record<number, boolean>
   >({});
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const {
     data: assemblyPointDetail,
@@ -1224,21 +1233,13 @@ function AssemblyPointDetails({
   const handleCancelEvent = async () => {
     if (!selectedEvent) return;
 
-    // Optional confirmation dialog could be added here, using window.confirm for simplicity
-    if (
-      !window.confirm(
-        "Bạn có chắc chắn muốn hủy sự kiện tập trung này không? Hành động này không thể hoàn tác.",
-      )
-    ) {
-      return;
-    }
-
     try {
       await cancelAssemblyPointEvent({
         eventId: selectedEvent.eventId,
         assemblyPointId: assemblyPoint.id,
       });
       toast.success("Hủy sự kiện tập trung thành công.");
+      setCancelConfirmOpen(false);
       // The event list will automatically refresh due to query invalidation
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
@@ -1617,7 +1618,7 @@ function AssemblyPointDetails({
                       <Button
                         variant="destructive"
                         className="w-full text-xs h-8 bg-red-500 hover:bg-red-600 shadow-none border-0"
-                        onClick={handleCancelEvent}
+                        onClick={() => setCancelConfirmOpen(true)}
                         disabled={isCancelingEvent}
                       >
                         {isCancelingEvent ? "Đang xử lý..." : "Hủy sự kiện tập trung"}
@@ -1778,6 +1779,43 @@ function AssemblyPointDetails({
         {/* Additional Info */}
         <div className="h-2 bg-muted/50" />
       </div>
+
+      <Dialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <WarningCircle className="h-5 w-5" weight="fill" />
+              Xác nhận hủy sự kiện
+            </DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn hủy sự kiện tập trung này không? Hành động
+              này không thể hoàn tác.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 text-sm text-muted-foreground">
+            Tất cả dữ liệu liên quan đến việc điểm danh và điều phối của sự kiện
+            này sẽ không còn khả dụng.
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelConfirmOpen(false)}
+              disabled={isCancelingEvent}
+            >
+              Quay lại
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelEvent}
+              disabled={isCancelingEvent}
+            >
+              {isCancelingEvent ? "Đang xử lý..." : "Xác nhận hủy"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

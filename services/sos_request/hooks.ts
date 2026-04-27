@@ -7,6 +7,7 @@ import {
   getSOSRequestById,
   getSOSRequestAnalysis,
   createSOSRequest,
+  getSOSRequestStatusCounts,
 } from "./api";
 import {
   GetSOSRequestsResponse,
@@ -17,6 +18,7 @@ import {
   GetSOSRequestAnalysisResponse,
   CreateSOSRequestPayload,
   SOSRequestEntity,
+  GetSOSRequestStatusCountsResponse,
 } from "./type";
 import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 
@@ -263,5 +265,20 @@ export function useCreateSOSRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SOS_REQUESTS_QUERY_KEY });
     },
+  });
+}
+
+/**
+ * Hook to fetch SOS request status counts
+ */
+export function useSOSRequestStatusCounts(options?: {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+}) {
+  return useQuery<GetSOSRequestStatusCountsResponse>({
+    queryKey: [...SOS_REQUESTS_QUERY_KEY, "status-counts"],
+    queryFn: getSOSRequestStatusCounts,
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval,
   });
 }
