@@ -762,8 +762,8 @@ function FormulaTooltip({
           >
             <div className="p-4">
               <ScrollArea className="max-h-[55vh]">
-                <div className="pr-4">
-                  <p className="font-bold text-foreground text-sm tracking-tight">
+                <div className="w-full pr-1">
+                  <p className="font-semibold text-foreground text-base tracking-tighter">
                     {title}
                   </p>
                   {description ? (
@@ -1547,11 +1547,13 @@ const SOSDetailsPanel = ({
     null;
 
   const aiPriorityFormulaContent = latestAiAnalysis ? (
-    <div className="space-y-3 p-1 max-w-[320px]">
+    <div className="w-full space-y-3 p-1">
       <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2 mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Brain className="h-4 w-4 text-violet-500" weight="fill" />
-          <span className="font-bold text-base">Phân tích AI</span>
+          <span className="font-semibold tracking-tighter text-base">
+            Phân tích AI
+          </span>
         </div>
         {latestAiAnalysis.suggestedPriorityScore != null && (
           <Badge className="font-mono bg-violet-600 text-white">
@@ -1562,10 +1564,10 @@ const SOSDetailsPanel = ({
 
       {aiExplanation && (
         <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <p className="text-sm font-normal tracking-tighter text-foreground/70">
             Nhận định chi tiết
           </p>
-          <p className="text-sm leading-relaxed text-foreground/90">
+          <p className="text-sm tracking-tighter font-medium text-foreground/90">
             {aiExplanation}
           </p>
         </div>
@@ -1573,10 +1575,10 @@ const SOSDetailsPanel = ({
 
       {latestAiAnalysis.handlingReason && (
         <div className="space-y-1 bg-violet-50 dark:bg-violet-900/20 p-2.5 rounded-md border border-violet-100 dark:border-violet-800/50">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+          <p className="text-xs font-medium tracking-tighter text-violet-700 dark:text-violet-300">
             Lý do xử lý
           </p>
-          <p className="text-[13px] italic leading-snug text-violet-900/90 dark:text-violet-200/90">
+          <p className="text-xs italic tracking-tighter text-violet-900/90 dark:text-violet-200/90">
             {latestAiAnalysis.handlingReason}
           </p>
         </div>
@@ -1596,11 +1598,8 @@ const SOSDetailsPanel = ({
     ) : null,
     latestAiAnalysis?.suggestedSeverityLevel ? (
       <div className="flex items-center gap-1.5">
-        <Icon
-          icon="ph:warning-circle-bold"
-          className="w-3.5 h-3.5 text-muted-foreground"
-        />
-        <span>
+        <Icon icon="ph:warning-circle-bold" className="w-3.5 h-3.5" />
+        <span className="tracking-tighter text-sm">
           Mức độ: {severityLabel(latestAiAnalysis.suggestedSeverityLevel)}
         </span>
       </div>
@@ -2101,7 +2100,7 @@ const SOSDetailsPanel = ({
           {sosRequest.incidentHistory &&
             sosRequest.incidentHistory.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <h4 className="text-base tracking-tighter font-semibold mb-3 flex items-center gap-2">
                   <Icon
                     icon="ph:clock-counter-clockwise-bold"
                     className="h-4 w-4 text-amber-500"
