@@ -581,7 +581,10 @@ function ParsedMessage({
                       } else if (lowerSeverity.includes("trung bình")) {
                         severityColor =
                           "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
-                      } else if (lowerSeverity.includes("nhẹ") || lowerSeverity.includes("thấp")) {
+                      } else if (
+                        lowerSeverity.includes("nhẹ") ||
+                        lowerSeverity.includes("thấp")
+                      ) {
                         severityColor =
                           "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900/50";
                       }
@@ -1111,6 +1114,10 @@ const SOSDetailsPanel = ({
       : waitTimeMinutes >= 60
         ? `${Math.floor(waitTimeMinutes / 60)} giờ`
         : `${Math.max(1, waitTimeMinutes)} phút`;
+  const peopleCount =
+    sosRequest.peopleCount ??
+    sosRequest.structuredData?.incident?.people_count ??
+    sosRequest.structuredData?.people_count;
 
   const severityLabel = (value?: string) => {
     const s = (value || "").toLowerCase();
@@ -1704,8 +1711,8 @@ const SOSDetailsPanel = ({
           <div className="bg-muted rounded-lg p-3 text-center flex flex-col items-center justify-center gap-1">
             <Users className="h-5 w-5 text-muted-foreground" />
             <div className="text-sm tracking-tighter text-muted-foreground">
-              {sosRequest.peopleCount
-                ? `${sosRequest.peopleCount.adult + sosRequest.peopleCount.child + sosRequest.peopleCount.elderly} người`
+              {peopleCount
+                ? `${peopleCount.adult + peopleCount.child + peopleCount.elderly} người`
                 : "-"}
             </div>
           </div>
@@ -1810,7 +1817,7 @@ const SOSDetailsPanel = ({
           )}
 
           {/* People Count Details */}
-          {sosRequest.peopleCount && (
+          {peopleCount && (
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <Users className="h-4 w-4 text-blue-500" weight="fill" />
@@ -1819,19 +1826,19 @@ const SOSDetailsPanel = ({
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
                   <div className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                    {sosRequest.peopleCount.adult}
+                    {peopleCount.adult}
                   </div>
                   <div className="text-sm text-muted-foreground">Người lớn</div>
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
                   <div className="text-lg font-bold text-amber-700 dark:text-amber-300">
-                    {sosRequest.peopleCount.child}
+                    {peopleCount.child}
                   </div>
                   <div className="text-sm text-muted-foreground">Trẻ em</div>
                 </div>
                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center">
                   <div className="text-lg font-bold text-purple-700 dark:text-purple-300">
-                    {sosRequest.peopleCount.elderly}
+                    {peopleCount.elderly}
                   </div>
                   <div className="text-sm text-muted-foreground">Người già</div>
                 </div>
@@ -1935,7 +1942,8 @@ const SOSDetailsPanel = ({
                       const v = (s || "").toLowerCase();
                       if (v.includes("critical")) return 4;
                       if (v.includes("high")) return 3;
-                      if (v.includes("medium") || v.includes("moderate")) return 2;
+                      if (v.includes("medium") || v.includes("moderate"))
+                        return 2;
                       if (v.includes("low")) return 1;
                       return 0;
                     };
