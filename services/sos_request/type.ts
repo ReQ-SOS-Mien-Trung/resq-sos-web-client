@@ -309,6 +309,18 @@ export interface GetSOSRequestsParams {
   Sort?: string;
 }
 
+export interface SOSStatusCount {
+  status: SOSRequestStatus;
+  count: number;
+}
+
+export interface GetSOSRequestStatusCountsResponse {
+  from: string;
+  to: string;
+  total: number;
+  statusCounts: SOSStatusCount[];
+}
+
 export interface GetSOSRequestsInBoundsParams {
   MinLat: number;
   MaxLat: number;

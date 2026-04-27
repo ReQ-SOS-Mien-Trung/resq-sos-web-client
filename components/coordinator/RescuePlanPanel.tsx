@@ -14,6 +14,7 @@ import {
   useMap,
 } from "react-leaflet";
 import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
+import { MapInvalidator } from "./MapInvalidator";
 import { divIcon, tileLayer } from "leaflet";
 import {
   activityTypeConfig,
@@ -2419,6 +2420,7 @@ const RoutePreviewMap = ({
         className="h-full w-full"
       >
         <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
         <RoutePreviewFitBounds points={points} />
         <Polyline
           positions={points}
@@ -5797,6 +5799,7 @@ const MissionRoutePreview = ({
                 className="h-full w-full"
               >
                 <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.flatMap((seg, idx) => {
@@ -7611,6 +7614,7 @@ const MissionTeamRoutePreview = ({
             className="h-full w-full"
           >
             <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
             <RoutePreviewFitBounds points={mapFitPoints} />
 
             {isUsingOriginConnector ? (
