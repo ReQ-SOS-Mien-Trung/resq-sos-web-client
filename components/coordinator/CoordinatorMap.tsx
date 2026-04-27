@@ -53,6 +53,7 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import { MapInvalidator } from "./MapInvalidator";
 import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
@@ -118,33 +119,7 @@ const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
-const MapInvalidator = () => {
-  const map = useMap();
-  useEffect(() => {
-    if (!map) return;
 
-    // Use a simple ResizeObserver to invalidate the map size when its container changes.
-    // This is much lighter than a forced requestAnimationFrame loop.
-    const observer = new ResizeObserver(() => {
-      // Small timeout to ensure the browser has finished the layout pass
-      // but still fast enough to feel responsive.
-      map.invalidateSize({ animate: false });
-    });
-
-    const container = map.getContainer();
-    observer.observe(container);
-
-    // Also trigger on window resize
-    const handleResize = () => map.invalidateSize({ animate: false });
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [map]);
-  return null;
-};
 
 const CoordinatorMap = ({
   sosRequests,

@@ -14,6 +14,7 @@ import {
   useMap,
 } from "react-leaflet";
 import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
+import { MapInvalidator } from "./MapInvalidator";
 import { divIcon, tileLayer } from "leaflet";
 import {
   activityTypeConfig,
@@ -116,11 +117,6 @@ import {
 } from "@/services/sos_cluster/type";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
-import MissionTeamReportSheet, {
-  getMissionReportStats,
-  getMissionReportStatusMeta,
-  normalizeMissionReportStatusKey,
-} from "@/components/coordinator/MissionTeamReportSheet";
 import type {
   RescueTeamByClusterEntity,
   RescueTeamStatusKey,
@@ -2424,6 +2420,7 @@ const RoutePreviewMap = ({
         className="h-full w-full"
       >
         <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
         <RoutePreviewFitBounds points={points} />
         <Polyline
           positions={points}
@@ -5008,6 +5005,14 @@ function getMissionStatusMeta(status: string | null | undefined): {
     };
   }
 
+  if (normalizedStatus === "incompleted") {
+    return {
+      label: "Chưa hoàn thành",
+      className:
+        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+    };
+  }
+
   return {
     label: status || "Chưa rõ",
     className:
@@ -5794,6 +5799,7 @@ const MissionRoutePreview = ({
                 className="h-full w-full"
               >
                 <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.flatMap((seg, idx) => {
@@ -7608,6 +7614,7 @@ const MissionTeamRoutePreview = ({
             className="h-full w-full"
           >
             <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <MapInvalidator />
             <RoutePreviewFitBounds points={mapFitPoints} />
 
             {isUsingOriginConnector ? (
@@ -11158,8 +11165,7 @@ const RescuePlanPanel = ({
                             getActiveMissionTeams(mission);
                           const hasAssignedTeams =
                             activeMissionTeams.length > 0;
-                          const missionReportStats =
-                            getMissionReportStats(activeMissionTeams);
+
                           const editableActivitiesCount =
                             mission.activities?.filter(
                               (activity) =>
@@ -11238,15 +11244,21 @@ const RescuePlanPanel = ({
                                             Chỉnh sửa
                                           </Button>
                                         ) : null}
-                                        <Badge
-                                          variant="outline"
+                                        <span
                                           className={cn(
-                                            "text-sm h-7 px-3 font-extrabold uppercase tracking-wide border-2",
-                                            missionStatus.className,
+                                            "text-[13px] font-bold uppercase tracking-wider",
+                                            missionStatus.className
+                                              .split(" ")
+                                              .filter(
+                                                (c) =>
+                                                  c.startsWith("text-") ||
+                                                  c.startsWith("dark:text-"),
+                                              )
+                                              .join(" "),
                                           )}
                                         >
                                           {missionStatus.label}
-                                        </Badge>
+                                        </span>
                                       </div>
                                     </div>
                                   );
@@ -11271,91 +11283,7 @@ const RescuePlanPanel = ({
                                           )
                                           .join(" • ")}
                                       </p>
-                                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                                        <div className="flex flex-wrap gap-1.5">
-                                          <Badge
-                                            variant="outline"
-                                            className="h-5 border-emerald-300/80 px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
-                                          >
-                                            Đã gửi:{" "}
-                                            {missionReportStats.submitted}
-                                          </Badge>
-                                          <Badge
-                                            variant="outline"
-                                            className="h-5 border-amber-300/80 px-1.5 text-sm text-amber-700 dark:border-amber-700 dark:text-amber-300"
-                                          >
-                                            Nháp: {missionReportStats.draft}
-                                          </Badge>
-                                          <Badge
-                                            variant="outline"
-                                            className="h-5 border-slate-300/80 px-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                                          >
-                                            Chưa báo cáo:{" "}
-                                            {missionReportStats.notStarted}
-                                          </Badge>
-                                        </div>
 
-                                        {activeMissionTeams.length > 0 && (
-                                          <div className="shrink-0">
-                                            {activeMissionTeams.length === 1 ? (
-                                              <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-7 gap-1 px-2.5 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20 shadow-sm"
-                                                onClick={() =>
-                                                  handleOpenMissionTeamReport(
-                                                    mission,
-                                                    activeMissionTeams[0],
-                                                  )
-                                                }
-                                              >
-                                                <Info
-                                                  className="h-3.5 w-3.5"
-                                                  weight="fill"
-                                                />
-                                                Xem báo cáo
-                                              </Button>
-                                            ) : (
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-7 gap-1 px-2.5 border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20 shadow-sm"
-                                                  >
-                                                    <Info
-                                                      className="h-3.5 w-3.5"
-                                                      weight="fill"
-                                                    />
-                                                    Xem báo cáo
-                                                    <CaretDown className="h-3 w-3" />
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                  {activeMissionTeams.map(
-                                                    (team) => (
-                                                      <DropdownMenuItem
-                                                        key={team.missionTeamId}
-                                                        onClick={() =>
-                                                          handleOpenMissionTeamReport(
-                                                            mission,
-                                                            team,
-                                                          )
-                                                        }
-                                                      >
-                                                        {team.teamName ||
-                                                          `Đội #${team.rescueTeamId}`}
-                                                      </DropdownMenuItem>
-                                                    ),
-                                                  )}
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
                                     </>
                                   )}
                                 </div>
@@ -11847,89 +11775,7 @@ const RescuePlanPanel = ({
                                                               </div>
                                                             )}
 
-                                                            {activityReportImageUrl && (
-                                                              <div className="mt-2.5 rounded-lg border border-cyan-200/80 bg-cyan-50/70 p-2.5 dark:border-cyan-700/60 dark:bg-cyan-900/20">
-                                                                <button
-                                                                  type="button"
-                                                                  className="flex w-full items-center justify-between gap-2 text-left"
-                                                                  aria-expanded={
-                                                                    isReportImageExpanded
-                                                                  }
-                                                                  onClick={() =>
-                                                                    toggleMissionReportImageExpansion(
-                                                                      mission.id,
-                                                                      activity.id,
-                                                                    )
-                                                                  }
-                                                                >
-                                                                  <span className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
-                                                                    <Info
-                                                                      className="h-3 w-3"
-                                                                      weight="fill"
-                                                                    />
-                                                                    Ảnh báo cáo
-                                                                    từ đội cứu
-                                                                    hộ
-                                                                  </span>
-                                                                  <span className="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-cyan-100/70 px-1.5 py-0.5 text-sm font-semibold text-cyan-700 dark:border-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
-                                                                    <span>
-                                                                      1 ảnh
-                                                                    </span>
-                                                                    {isReportImageExpanded ? (
-                                                                      <CaretUp className="h-3 w-3" />
-                                                                    ) : (
-                                                                      <CaretDown className="h-3 w-3" />
-                                                                    )}
-                                                                  </span>
-                                                                </button>
 
-                                                                {isReportImageExpanded ? (
-                                                                  <div className="mt-2 space-y-2">
-                                                                    <button
-                                                                      type="button"
-                                                                      className="group block w-full overflow-hidden rounded-md border border-cyan-200/80 bg-slate-50 p-1 dark:border-cyan-700/60 dark:bg-slate-950/40"
-                                                                      onClick={() =>
-                                                                        setActiveMissionReportImage(
-                                                                          {
-                                                                            src: activityReportImageUrl,
-                                                                            step: activity.step,
-                                                                            activityLabel:
-                                                                              config.label,
-                                                                          },
-                                                                        )
-                                                                      }
-                                                                    >
-                                                                      <img
-                                                                        src={
-                                                                          activityReportImageUrl
-                                                                        }
-                                                                        alt={`Ảnh báo cáo bước ${activity.step}`}
-                                                                        loading="lazy"
-                                                                        className="max-h-72 w-full rounded-md object-contain transition-transform duration-300 group-hover:scale-[1.01]"
-                                                                      />
-                                                                    </button>
-                                                                    <Button
-                                                                      type="button"
-                                                                      variant="outline"
-                                                                      className="h-8 border-cyan-300 text-sm font-semibold text-cyan-700 hover:bg-cyan-100 dark:border-cyan-700 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
-                                                                      onClick={() =>
-                                                                        setActiveMissionReportImage(
-                                                                          {
-                                                                            src: activityReportImageUrl,
-                                                                            step: activity.step,
-                                                                            activityLabel:
-                                                                              config.label,
-                                                                          },
-                                                                        )
-                                                                      }
-                                                                    >
-                                                                      Xem ảnh
-                                                                      chi tiết
-                                                                    </Button>
-                                                                  </div>
-                                                                ) : null}
-                                                              </div>
-                                                            )}
 
                                                             {teamsForStep.length >
                                                               0 && (
@@ -11978,10 +11824,7 @@ const RescuePlanPanel = ({
                                                                         ) &&
                                                                         normalizedRescueTeamStatus !==
                                                                           normalizedAssignmentStatus;
-                                                                      const reportStatusMeta =
-                                                                        getMissionReportStatusMeta(
-                                                                          team.reportStatus,
-                                                                        );
+
 
                                                                       return (
                                                                         <div
@@ -12061,40 +11904,7 @@ const RescuePlanPanel = ({
                                                                                 viên
                                                                               </Badge>
                                                                             )}
-                                                                            <Badge
-                                                                              variant="outline"
-                                                                              className={cn(
-                                                                                "h-5 px-1.5 text-sm font-semibold",
-                                                                                reportStatusMeta.className,
-                                                                              )}
-                                                                            >
-                                                                              Báo
-                                                                              cáo:{" "}
-                                                                              {
-                                                                                reportStatusMeta.label
-                                                                              }
-                                                                            </Badge>
-                                                                            {normalizeMissionReportStatusKey(
-                                                                              team.reportStatus,
-                                                                            ) ===
-                                                                              "submitted" && (
-                                                                              <Button
-                                                                                type="button"
-                                                                                variant="link"
-                                                                                size="sm"
-                                                                                className="h-5 p-0 text-sky-600 dark:text-sky-400 font-bold text-sm"
-                                                                                onClick={() =>
-                                                                                  handleOpenMissionTeamReport(
-                                                                                    mission,
-                                                                                    team,
-                                                                                  )
-                                                                                }
-                                                                              >
-                                                                                [Xem
-                                                                                chi
-                                                                                tiết]
-                                                                              </Button>
-                                                                            )}
+
                                                                           </div>
                                                                         </div>
                                                                       );
@@ -14853,39 +14663,7 @@ const RescuePlanPanel = ({
           </div>
         </div>
 
-        <MissionTeamReportSheet
-          open={Boolean(activeMissionTeamReport)}
-          onOpenChange={handleMissionTeamReportOpenChange}
-          mission={activeMissionTeamReport?.mission ?? null}
-          team={activeMissionTeamReport?.team ?? null}
-        />
 
-        <Dialog
-          open={Boolean(activeMissionReportImage)}
-          onOpenChange={handleMissionReportImageViewerOpenChange}
-        >
-          <DialogContent className="overflow-hidden border-cyan-200/80 bg-background p-0 sm:max-w-4xl">
-            <DialogHeader className="border-b border-cyan-100/80 px-4 py-3 dark:border-cyan-900/40">
-              <DialogTitle>
-                Ảnh báo cáo bước {activeMissionReportImage?.step ?? "-"}
-              </DialogTitle>
-              <DialogDescription>
-                {activeMissionReportImage
-                  ? `Hoạt động: ${activeMissionReportImage.activityLabel}`
-                  : "Ảnh báo cáo từ đội cứu hộ"}
-              </DialogDescription>
-            </DialogHeader>
-            {activeMissionReportImage ? (
-              <div className="flex max-h-[80vh] items-center justify-center bg-slate-100/80 p-3 dark:bg-slate-950/70">
-                <img
-                  src={activeMissionReportImage.src}
-                  alt={`Ảnh báo cáo bước ${activeMissionReportImage.step}`}
-                  className="max-h-[74vh] w-full rounded-md object-contain"
-                />
-              </div>
-            ) : null}
-          </DialogContent>
-        </Dialog>
 
         <Dialog
           open={removeConfirmOpen}

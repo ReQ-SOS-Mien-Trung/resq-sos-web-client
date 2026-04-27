@@ -77,11 +77,28 @@ const getStatusBadge = (status: string) => {
 const getMissionStatusIcon = (status: string) => {
   if (status === "Completed")
     return <CheckCircle size={14} className="text-emerald-500" weight="fill" />;
-  if (status === "Incompleted" || status === "Failed")
+  if (
+    status === "Incompleted" ||
+    status === "Incompleted" ||
+    status === "Failed"
+  )
     return <XCircle size={14} className="text-rose-500" weight="fill" />;
-  if (status === "InProgress")
+  if (status === "InProgress" || status === "OnGoing")
     return <Spinner size={14} className="text-blue-500 animate-spin" />;
   return <Clock size={14} className="text-muted-foreground" />;
+};
+
+const formatMissionStatusVi = (status: string) => {
+  const map: Record<string, string> = {
+    Completed: "Hoàn thành",
+    InProgress: "Đang thực hiện",
+    OnGoing: "Đang thực hiện",
+    Incompleted: "Chưa hoàn thành",
+    Failed: "Thất bại",
+    Cancelled: "Đã hủy",
+    Planned: "Đã lập kế hoạch",
+  };
+  return map[status] || status;
 };
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -383,17 +400,19 @@ const TeamDetailSheet = ({
                       <Badge variant="outline" className="font-normal whitespace-nowrap">{mission.missionType}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        className={`text-xs whitespace-nowrap ${
+                      <span
+                        className={cn(
+                          "text-xs font-bold uppercase tracking-wider",
                           mission.missionStatus === "Completed"
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                            : mission.missionStatus === "InProgress"
-                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                            : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                        }`}
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : mission.missionStatus === "InProgress" ||
+                                mission.missionStatus === "OnGoing"
+                              ? "text-blue-700 dark:text-blue-400"
+                              : "text-rose-700 dark:text-rose-400",
+                        )}
                       >
-                        {mission.missionStatus}
-                      </Badge>
+                        {formatMissionStatusVi(mission.missionStatus)}
+                      </span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{mission.reportStatus}</TableCell>
                     <TableCell className="whitespace-nowrap">{new Date(mission.assignedAt).toLocaleString("vi-VN")}</TableCell>
