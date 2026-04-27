@@ -64,6 +64,9 @@ interface InventoryItemEntityBase {
   categoryName: string;
   targetGroups: string[];
   lastStockedAt: string | null;
+  measurementUnit?: string | null;
+  weightPerUnit?: number | null;
+  volumePerUnit?: number | null;
 }
 
 export interface ConsumableItemEntity extends InventoryItemEntityBase {
@@ -381,6 +384,7 @@ export interface SearchDepotItemEntity {
   categoryName: string;
   itemType: string;
   unit: string;
+  measurementUnit?: string | null;
   totalAvailableAcrossWarehouses: number;
   warehouses: SearchDepotWarehouseEntity[];
 }

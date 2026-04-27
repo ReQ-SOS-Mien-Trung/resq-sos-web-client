@@ -254,6 +254,7 @@ export interface GetSOSRequestsParams {
   Statuses?: SOSRequestStatus[];
   Priorities?: SOSPriorityLevel[];
   SosTypes?: SOSRequestTypeFilter[];
+  Sort?: string;
 }
 
 export interface GetSOSRequestsInBoundsParams {
@@ -264,6 +265,7 @@ export interface GetSOSRequestsInBoundsParams {
   Statuses?: SOSRequestStatus[];
   Priorities?: SOSPriorityLevel[];
   SosTypes?: SOSRequestTypeFilter[];
+  Sort?: string;
 }
 
 // Get SOS Request By ID Response

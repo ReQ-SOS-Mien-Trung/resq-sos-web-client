@@ -123,32 +123,24 @@ const MapInvalidator = () => {
   useEffect(() => {
     if (!map) return;
 
-    let rafId: number | null = null;
-    let loopEnd = 0;
-
-    const runLoop = () => {
+    // Use a simple ResizeObserver to invalidate the map size when its container changes.
+    // This is much lighter than a forced requestAnimationFrame loop.
+    const observer = new ResizeObserver(() => {
+      // Small timeout to ensure the browser has finished the layout pass
+      // but still fast enough to feel responsive.
       map.invalidateSize({ animate: false });
-      if (Date.now() < loopEnd) {
-        rafId = requestAnimationFrame(runLoop);
-      } else {
-        rafId = null;
-      }
-    };
+    });
 
-    const startLoop = () => {
-      // Keep invalidating for slightly longer than the sidebar CSS transition (300ms)
-      loopEnd = Date.now() + 400;
-      if (rafId === null) {
-        rafId = requestAnimationFrame(runLoop);
-      }
-    };
+    const container = map.getContainer();
+    observer.observe(container);
 
-    const observer = new ResizeObserver(startLoop);
-    observer.observe(map.getContainer());
+    // Also trigger on window resize
+    const handleResize = () => map.invalidateSize({ animate: false });
+    window.addEventListener("resize", handleResize);
 
     return () => {
       observer.disconnect();
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", handleResize);
     };
   }, [map]);
   return null;
@@ -1423,6 +1415,7 @@ function ServiceZoneOverlay({
 }
 
 // SOS Request Marker Component
+// SOS Request Marker Component
 function SOSRequestMarker({
   sos,
   isSelected,
@@ -1442,9 +1435,9 @@ function SOSRequestMarker({
   };
 
   const color = priorityColors[sos.priority];
-  const size = isSelected ? 38 : 28;
-  const badgeSize = size - 6;
-  const labelFontSize = isSelected ? 11 : 9;
+  const size = isSelected ? 48 : 36;
+  const badgeSize = isSelected ? 38 : 28;
+  const labelFontSize = isSelected ? 11 : 9.5;
 
   // Create custom icon using divIcon with useMemo
   const icon = useMemo(() => {
@@ -1452,17 +1445,69 @@ function SOSRequestMarker({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const L = require("leaflet");
 
+    const isPending = sos.status === "PENDING";
+    const sosType = (sos.sosType || "").toUpperCase();
+
+    // Determine shape based on type
+    // RELIEF (Cứu trợ) -> Circle (Tròn)
+    // RESCUE (Cứu hộ) -> Triangle (Tam giác)
+    // BOTH (Cả hai) -> Hexagon (Lục giác)
+    const shape =
+      sosType === "RESCUE"
+        ? "triangle"
+        : sosType === "BOTH"
+          ? "hexagon"
+          : "circle";
+
+    const strokeWidth = isSelected ? 5 : 7;
+    const textY = shape === "triangle" ? 72 : 58;
+
+    // SVG definition for shapes
+    const shapeSvg =
+      shape === "triangle"
+        ? `<polygon points="50,5 96,92 4,92" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round" />`
+        : shape === "hexagon"
+          ? `<polygon points="25,5 75,5 100,50 75,95 25,95 0,50" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round" />`
+          : `<circle cx="50" cy="50" r="45" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" />`;
+
     return L.divIcon({
       className: "custom-sos-marker",
       html: `
-        <div class="${shouldRise ? "map-marker-rise" : ""}" style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">
-          ${sos.status === "PENDING" ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>` : ""}
-          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;border-radius:9999px;overflow:hidden;background-color:${color};border:2px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
-            <span style="display:block;color:#ffffff;font-family:Arial,'Helvetica Neue',sans-serif;font-size:${labelFontSize}px;font-weight:800;line-height:1;letter-spacing:-0.04em;text-transform:uppercase;white-space:nowrap;transform:translateY(-0.5px);">
-              SOS
-            </span>
+        <div class="${shouldRise ? "map-marker-rise" : ""}" style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;z-index:${isSelected ? 1000 : 1};">
+          ${
+            isSelected
+              ? `<div style="position:absolute;inset:-8px;border-radius:50%;background:${color};opacity:0.2;animation:sosSelectedPulse 2s ease-out infinite;"></div>
+                 <div style="position:absolute;inset:-12px;border-radius:50%;border:2px dashed ${color};opacity:0.4;animation:sosSelectedRotate 10s linear infinite;"></div>`
+              : ""
+          }
+          ${
+            isPending && !isSelected
+              ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>`
+              : ""
+          }
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <svg width="${badgeSize}" height="${badgeSize}" viewBox="0 0 100 100" style="overflow:visible;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+              ${shapeSvg}
+              <text x="50" y="${textY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="${labelFontSize * 3.5}px" font-weight="900" text-anchor="middle" letter-spacing="-0.05em">SOS</text>
+            </svg>
           </div>
+          ${
+            isSelected
+              ? `<div style="position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #ffffff;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.2));"></div>`
+              : ""
+          }
         </div>
+        <style>
+          @keyframes sosSelectedPulse {
+            0% { transform:scale(0.8); opacity:0.4; }
+            70% { transform:scale(1.3); opacity:0; }
+            100% { transform:scale(1.3); opacity:0; }
+          }
+          @keyframes sosSelectedRotate {
+            from { transform:rotate(0deg); }
+            to { transform:rotate(360deg); }
+          }
+        </style>
       `,
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
@@ -1475,6 +1520,7 @@ function SOSRequestMarker({
     size,
     sos.priority,
     sos.status,
+    sos.sosType,
     isSelected,
     shouldRise,
   ]);
@@ -1485,6 +1531,7 @@ function SOSRequestMarker({
     <Marker
       position={[sos.location.lat, sos.location.lng]}
       icon={icon}
+      zIndexOffset={isSelected ? 1000 : 0}
       eventHandlers={{ click: onClick }}
     />
   );

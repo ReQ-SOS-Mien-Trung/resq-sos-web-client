@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { RescuePlanPanelProps } from "@/type";
@@ -2755,6 +2755,10 @@ const DepotInventoryCard = ({
                                 unitName?: string;
                               };
                               const rawUnit =
+                                (typeof (item as any).measurementUnit ===
+                                "string"
+                                  ? (item as any).measurementUnit.trim()
+                                  : "") ||
                                 (typeof itemWithUnit.unit === "string"
                                   ? itemWithUnit.unit.trim()
                                   : "") ||
@@ -2771,6 +2775,8 @@ const DepotInventoryCard = ({
                                   availableQuantity,
                                   categoryName: item.categoryName,
                                   unit: rawUnit || null,
+                                  measurementUnit:
+                                    (item as any).measurementUnit || null,
                                   sourceDepotId: depotId,
                                   sourceDepotName: depotName,
                                   sourceDepotAddress: depotAddress,
@@ -8771,6 +8777,7 @@ const RescuePlanPanel = ({
         availableQuantity: number;
         itemType?: string | null;
         unit?: string | null;
+        measurementUnit?: string | null;
         sourceDepotId?: number | null;
         sourceDepotName?: string | null;
         sourceDepotAddress?: string | null;
@@ -8808,7 +8815,9 @@ const RescuePlanPanel = ({
             if (a._id !== activityId) return a;
 
             const dragUnit =
-              typeof item.unit === "string" ? item.unit.trim() : "";
+              (typeof item.measurementUnit === "string"
+                ? item.measurementUnit.trim()
+                : "") || (typeof item.unit === "string" ? item.unit.trim() : "");
             const cachedUnit =
               supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
             const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
@@ -10830,7 +10839,7 @@ const RescuePlanPanel = ({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-1100 transition-all duration-500 ease-out",
+        "absolute inset-0 z-1100 transition-all duration-300 ease-out will-change-transform",
         open
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-full pointer-events-none",
@@ -14993,4 +15002,4 @@ const RescuePlanPanel = ({
   );
 };
 
-export default RescuePlanPanel;
+export default memo(RescuePlanPanel);

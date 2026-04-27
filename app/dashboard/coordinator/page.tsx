@@ -91,6 +91,8 @@ import {
   UsersThree,
   ChatCircleDots,
   Warning,
+  Info,
+  X,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
@@ -452,64 +454,180 @@ const SIDEBAR_SOS_PAGE_SIZE = 8;
 // ── Legend Component ──
 
 const MapLegend = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <div className="absolute bottom-6 left-6 z-[40] pointer-events-none select-none">
-      <div className="bg-background/85 backdrop-blur-md border border-border/60 shadow-xl rounded-2xl p-3 flex flex-col gap-3 min-w-[160px] animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">
-            Mức độ SOS
-          </p>
-          <div className="grid grid-cols-1 gap-1.5">
-            {[
-              { label: "P1: Rất nghiêm trọng", color: "bg-[#ef4444]" },
-              { label: "P2: Nghiêm trọng", color: "bg-[#f97316]" },
-              { label: "P3: Trung bình", color: "bg-[#eab308]" },
-              { label: "P4: Thấp", color: "bg-[#14b8a6]" },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors"
-              >
+    <div className="absolute bottom-6 left-6 z-[40] pointer-events-auto select-none flex flex-col items-start gap-3">
+      {/* Legend Panel */}
+      {isOpen && (
+        <div className="bg-background/90 backdrop-blur-md border border-border/60 shadow-2xl rounded-2xl p-3.5 flex flex-col gap-3.5 min-w-[180px] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
+              Chú thích
+            </p>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+            >
+              <X size={12} weight="bold" />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
+              Mức độ SOS
+            </p>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                { label: "P1: Rất nghiêm trọng", color: "bg-[#ef4444]" },
+                { label: "P2: Nghiêm trọng", color: "bg-[#f97316]" },
+                { label: "P3: Trung bình", color: "bg-[#eab308]" },
+                { label: "P4: Thấp", color: "bg-[#14b8a6]" },
+              ].map((item) => (
                 <div
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-full shadow-sm shrink-0",
-                    item.color,
-                  )}
-                />
+                  key={item.label}
+                  className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors"
+                >
+                  <div
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full shadow-sm shrink-0",
+                      item.color,
+                    )}
+                  />
+                  <span className="text-[11px] font-medium text-foreground/90">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-px bg-border/30" />
+
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
+              Loại SOS
+            </p>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                {
+                  label: "Tam giác: Cứu hộ",
+                  icon: (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 100 100"
+                      className="shrink-0"
+                    >
+                      <polygon
+                        points="50,5 95,90 5,90"
+                        fill="#94a3b8"
+                        stroke="white"
+                        strokeWidth="8"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  label: "Hình tròn: Cứu trợ",
+                  icon: (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 100 100"
+                      className="shrink-0"
+                    >
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="#94a3b8"
+                        stroke="white"
+                        strokeWidth="8"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  label: "Lục giác: Cả hai",
+                  icon: (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 100 100"
+                      className="shrink-0"
+                    >
+                      <polygon
+                        points="25,5 75,5 100,50 75,95 25,95 0,50"
+                        fill="#94a3b8"
+                        stroke="white"
+                        strokeWidth="8"
+                      />
+                    </svg>
+                  ),
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors"
+                >
+                  {item.icon}
+                  <span className="text-[11px] font-medium text-foreground/90">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-px bg-border/30" />
+
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
+              Địa điểm
+            </p>
+            <div className="grid grid-cols-1 gap-1">
+              <div className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors">
+                <div className="w-5 h-5 rounded-md bg-purple-100 border border-purple-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
+                  📍
+                </div>
                 <span className="text-[11px] font-medium text-foreground/90">
-                  {item.label}
+                  Điểm tập kết
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="h-px bg-border/40" />
-
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">
-            Địa điểm
-          </p>
-          <div className="grid grid-cols-1 gap-1.5">
-            <div className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
-              <div className="w-5 h-5 rounded-md bg-purple-100 border border-purple-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
-                📍
+              <div className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors">
+                <div className="w-5 h-5 rounded-md bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
+                  📦
+                </div>
+                <span className="text-[11px] font-medium text-foreground/90">
+                  Kho vật phẩm
+                </span>
               </div>
-              <span className="text-[11px] font-medium text-foreground/90">
-                Điểm tập kết
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-accent/50 transition-colors">
-              <div className="w-5 h-5 rounded-md bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
-                📦
-              </div>
-              <span className="text-[11px] font-medium text-foreground/90">
-                Kho vật phẩm
-              </span>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Toggle Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-10 h-10 rounded-full flex items-center justify-center shadow-xl border transition-all duration-300 hover:scale-105 active:scale-95 group",
+          isOpen
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background/95 backdrop-blur-md text-foreground border-border/60",
+        )}
+        title={isOpen ? "Đóng chú thích" : "Xem chú thích bản đồ"}
+      >
+        <Info
+          size={20}
+          weight={isOpen ? "fill" : "bold"}
+          className={cn(
+            "transition-transform duration-300",
+            isOpen ? "rotate-0" : "group-hover:rotate-12",
+          )}
+        />
+      </button>
     </div>
   );
 };
@@ -562,6 +680,8 @@ const CoordinatorDashboardContent = () => {
   const [selectedClusterSosTypes, setSelectedClusterSosTypes] = useState<
     ClusterSOSType[]
   >([]);
+  const [sosSort, setSosSort] = useState<string>("time:desc");
+  const [clusterSort, setClusterSort] = useState<string>("time:desc");
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -678,13 +798,15 @@ const CoordinatorDashboardContent = () => {
               selectedClusterSosTypes.length > 0
                 ? selectedClusterSosTypes
                 : undefined,
+            Sort: clusterSort,
           }
-        : undefined,
+        : { Sort: clusterSort },
     [
       hasSidebarClusterBackendFilters,
       selectedClusterPriorities,
       selectedClusterSosTypes,
       selectedClusterStatuses,
+      clusterSort,
     ],
   );
 
@@ -697,6 +819,7 @@ const CoordinatorDashboardContent = () => {
         Statuses: statusQueryFilter,
         Priorities: priorityQueryFilter,
         SosTypes: sosTypeQueryFilter,
+        Sort: sosSort,
       },
       refetchInterval: COORDINATOR_SOS_REFETCH_INTERVAL_MS,
     });
@@ -723,7 +846,9 @@ const CoordinatorDashboardContent = () => {
   const { data: rescueTeamsData } = useRescueTeams({
     params: { pageSize: 200 },
   });
-  const { data: clustersData } = useSOSClusters();
+  const { data: clustersData } = useSOSClusters({
+    params: { Sort: clusterSort },
+  });
   const { data: sidebarFilteredClustersData } = useSOSClusters({
     params: sidebarClusterQueryParams,
     enabled: hasSidebarClusterBackendFilters,
@@ -1923,12 +2048,21 @@ const CoordinatorDashboardContent = () => {
             <SOSSidebar
               sosRequests={sosRequests}
               incomingRequests={sidebarSOSRequests}
-              incomingPagination={{
-                page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
-                pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
-                totalCount: sidebarSosData?.totalCount ?? 0,
-                onPageChange: setSidebarSOSPage,
-              }}
+              incomingPagination={useMemo(
+                () => ({
+                  page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
+                  pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
+                  totalCount: sidebarSosData?.totalCount ?? 0,
+                  onPageChange: setSidebarSOSPage,
+                }),
+                [
+                  sidebarSosData?.pageNumber,
+                  sidebarSOSPage,
+                  sidebarSosData?.pageSize,
+                  sidebarSosData?.totalCount,
+                  setSidebarSOSPage,
+                ],
+              )}
               isIncomingRequestsLoading={isSidebarSosLoading}
               rescuers={rescuers}
               teamIncidents={teamIncidents}
@@ -1965,6 +2099,10 @@ const CoordinatorDashboardContent = () => {
               onSelectedClusterPrioritiesChange={setSelectedClusterPriorities}
               selectedClusterSosTypes={selectedClusterSosTypes}
               onSelectedClusterSosTypesChange={setSelectedClusterSosTypes}
+              sosSort={sosSort}
+              onSosSortChange={setSosSort}
+              clusterSort={clusterSort}
+              onClusterSortChange={setClusterSort}
             />
           </div>
         </aside>
@@ -2035,7 +2173,12 @@ const CoordinatorDashboardContent = () => {
               {/* SOS Details Panel */}
               <SOSDetailsPanel
                 open={sosDetailOpen}
-                onOpenChange={setSOSDetailOpen}
+                onOpenChange={(open) => {
+                  setSOSDetailOpen(open);
+                  if (!open) {
+                    setSelectedSOS(null);
+                  }
+                }}
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
                 isProcessing={isProcessingSOS}
@@ -2141,7 +2284,12 @@ const CoordinatorDashboardContent = () => {
               {/* Location Details Panel */}
               <LocationDetailsPanel
                 open={locationPanelOpen}
-                onOpenChange={setLocationPanelOpen}
+                onOpenChange={(open) => {
+                  setLocationPanelOpen(open);
+                  if (!open) {
+                    setLocationPanelData(null);
+                  }
+                }}
                 location={locationPanelData}
               />
 

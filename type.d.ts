@@ -1011,6 +1011,10 @@ export interface SOSSidebarProps {
   onSelectedClusterSosTypesChange?: (
     sosTypes: import("@/services/sos_cluster/type").ClusterSOSType[],
   ) => void;
+  sosSort?: string;
+  onSosSortChange?: (sort: string) => void;
+  clusterSort?: string;
+  onClusterSortChange?: (sort: string) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

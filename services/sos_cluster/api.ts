@@ -340,6 +340,7 @@ export async function getSOSClusters(
   const requestedPageNumber = toPositiveInteger(params?.pageNumber);
   const requestedPageSize = toPositiveInteger(params?.pageSize);
   const requestedSOSRequestId = toPositiveInteger(params?.sosRequestId);
+  const requestedSort = params?.Sort;
   const requestedStatuses = Array.from(
     new Set(
       (params?.statuses ?? [])
@@ -372,6 +373,7 @@ export async function getSOSClusters(
     priorities:
       requestedPriorities.length > 0 ? requestedPriorities : undefined,
     sosTypes: requestedSOSTypes.length > 0 ? requestedSOSTypes : undefined,
+    Sort: requestedSort,
   };
 
   if (shouldUseSinglePageRequest) {
@@ -476,16 +478,16 @@ export async function removeSOSRequestFromCluster(
 }
 
 /**
- * Add a SOS request to an existing cluster
- * POST /emergency/sos-clusters/{clusterId}/sos-requests/{sosRequestId}
+ * Add multiple SOS requests to an existing cluster
+ * POST /emergency/sos-clusters/{clusterId}/sos-requests
  */
-export async function addSOSRequestToCluster(
+export async function addSOSRequestsToCluster(
   clusterId: number,
-  sosRequestId: number,
+  sosRequestIds: number[],
 ): Promise<void> {
-  await api.post(
-    `/emergency/sos-clusters/${clusterId}/sos-requests/${sosRequestId}`,
-  );
+  await api.post(`/emergency/sos-clusters/${clusterId}/sos-requests`, {
+    sosRequestIds,
+  });
 }
 
 /**
