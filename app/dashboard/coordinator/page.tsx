@@ -1863,7 +1863,7 @@ const CoordinatorDashboardContent = () => {
               className="dark:invert h-auto w-auto object-contain"
             />
             <Badge variant="secondary" className="text-xs">
-              Miền Trung
+              Trung Tâm Điều Phối
             </Badge>
           </div>
         </div>
