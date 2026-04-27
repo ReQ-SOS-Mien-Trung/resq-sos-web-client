@@ -156,7 +156,9 @@ import {
   Phone,
   FirstAid,
   ForkKnife,
+  WarehouseIcon,
 } from "@phosphor-icons/react";
+import { Icon } from "@iconify/react";
 
 // Extract lat/lng from activity description text
 // Matches patterns like "17.214, 106.785" or "17.2195,106.792"
@@ -1207,15 +1209,17 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="font-black text-foreground">SOS #{sos.id}</h4>
+              <h4 className="font-bold tracking-tighter text-foreground">
+                SOS #{sos.id}
+              </h4>
               <Badge
                 variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                className="h-5 px-1.5 text-sm font-black uppercase"
+                className="h-6 px-2 text-sm font-medium uppercase"
               >
                 {PRIORITY_LABELS[sos.priority]}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground font-bold uppercase tracking-tighter truncate max-w-[300px]">
+            <p className="text-sm text-foreground/80 font-semibold tracking-tighter full-width">
               {address || "Không rõ địa chỉ"}
             </p>
           </div>
@@ -1223,10 +1227,10 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
         <div className="text-right">
           {ruleScore !== undefined && (
             <div className="flex flex-col items-end">
-              <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">
+              <span className="text-sm font-semibold text-muted-foreground tracking-tighter leading-none mb-1">
                 Điểm ưu tiên AI
               </span>
-              <span className="text-xl font-black text-primary leading-none">
+              <span className="text-xl font-bold tracking-tighter text-primary leading-none">
                 {ruleScore.toFixed(1)}
               </span>
             </div>
@@ -1234,26 +1238,27 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Situation & Message */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-1 space-y-3">
-            <div className="space-y-1">
-              <p className="text-sm font-bold uppercase text-muted-foreground">
+      <div className="@container p-4 space-y-4">
+        {/* Stack in narrow split panels, switch directly to 3 columns when wide. */}
+        <div className="grid grid-cols-1 gap-4 items-start @4xl:grid-cols-[minmax(0,0.65fr)_minmax(0,1.2fr)_minmax(0,1.15fr)]">
+          {/* Col 1: Tình trạng & Nhân khẩu */}
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase">
                 Tình trạng
               </p>
               <Badge
                 variant="outline"
-                className="bg-background font-bold border-muted-foreground/30"
+                className="h-7 bg-background px-3 tracking-tighter font-semibold border-muted-foreground/30"
               >
                 {getSituationLabel(situation)}
               </Badge>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-bold uppercase text-muted-foreground">
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase">
                 Nhân khẩu
               </p>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 <Badge
                   variant="secondary"
                   className="h-5 px-1.5 text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
@@ -1275,110 +1280,114 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
               </div>
             </div>
           </div>
-          <div className="md:col-span-2 space-y-1.5">
-            <p className="text-sm font-bold uppercase text-muted-foreground">
+
+          {/* Col 2: Nội dung yêu cầu */}
+          <div className="space-y-1.5">
+            <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase">
               Nội dung yêu cầu
             </p>
-            <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-base leading-relaxed text-foreground/90 italic">
+            <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-sm tracking-tighter leading-relaxed text-foreground/90 italic">
               {sos.message}
             </div>
             {additionalDesc && (
-              <div className="mt-2 text-sm text-muted-foreground bg-amber-50/50 dark:bg-amber-900/10 p-2.5 rounded border border-amber-200/50">
-                <span className="font-bold uppercase text-amber-700 dark:text-amber-400 mr-1">
+              <div className="mt-2 text-sm tracking-tighter bg-amber-50/50 dark:bg-amber-900/10 p-2.5 rounded border border-amber-200/50">
+                <span className="font-semibold tracking-tighter text-amber-700 dark:text-amber-400 mr-1">
                   Ghi chú thêm:
                 </span>
                 {additionalDesc}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Victims List (Detailed) */}
-        {v3Victims.length > 0 && (
-          <div className="space-y-3">
-            <p className="text-base font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-              <Users className="h-4 w-4" />
+          {/* Col 3: Danh sách nạn nhân chi tiết */}
+          <div className="space-y-1.5">
+            <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5" />
               Danh sách nạn nhân chi tiết
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {v3Victims.map((v: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="rounded-lg border bg-background p-3.5 space-y-3 text-sm shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-base font-bold text-foreground flex items-center gap-1">
-                      {v.person_type === "CHILD"
-                        ? "👶"
-                        : v.person_type === "ELDERLY"
-                          ? "👴"
-                          : "🧑"}
-                      {v.custom_name || `Nạn nhân ${idx + 1}`}
-                    </span>
-                    {v.incident_status?.severity && (
-                      <Badge
-                        className={cn(
-                          "text-sm h-6 px-2",
-                          severityBadgeClass(v.incident_status.severity),
+            {v3Victims.length > 0 ? (
+              <div className="space-y-2">
+                {v3Victims.map((v: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="rounded-lg border bg-background p-3 space-y-2 text-sm shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold tracking-tighter text-foreground flex items-center gap-1">
+                        {/* {v.person_type === "CHILD"
+                          ? "👶"
+                          : v.person_type === "ELDERLY"
+                            ? "👴"
+                            : "🧑"} */}
+                        {v.custom_name || `Nạn nhân ${idx + 1}`}
+                      </span>
+                      {v.incident_status?.severity && (
+                        <Badge
+                          className={cn(
+                            "text-sm h-6 px-1.5 shrink-0",
+                            severityBadgeClass(v.incident_status.severity),
+                          )}
+                        >
+                          {severityLabel(v.incident_status.severity)}
+                        </Badge>
+                      )}
+                    </div>
+                    {v.incident_status?.medical_issues?.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {v.incident_status.medical_issues.map(
+                          (issue: string, i: number) => (
+                            <Badge
+                              key={i}
+                              variant="outline"
+                              className={cn(
+                                "text-sm h-5 px-1.5 border-transparent font-medium",
+                                getMedicalIssueColorClass(issue),
+                              )}
+                            >
+                              {getMedicalIssueLabel(issue)}
+                            </Badge>
+                          ),
                         )}
-                      >
-                        {severityLabel(v.incident_status.severity)}
-                      </Badge>
+                      </div>
+                    )}
+                    {(v.personal_needs?.diet?.has_special_diet ||
+                      v.personal_needs?.clothing?.needed) && (
+                      <div className="pt-1.5 border-t border-dashed space-y-1">
+                        {v.personal_needs.diet?.has_special_diet && (
+                          <div className="text-sm tracking-tighter text-muted-foreground flex items-start gap-1.5">
+                            <ForkKnife className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span>
+                              Ăn đặc biệt: {v.personal_needs.diet.description}
+                            </span>
+                          </div>
+                        )}
+                        {v.personal_needs.clothing?.needed && (
+                          <div className="text-sm text-muted-foreground tracking-tighter flex items-start gap-1.5">
+                            <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span>
+                              Cần quần áo{" "}
+                              {v.personal_needs.clothing.gender === "MALE"
+                                ? "(Nam)"
+                                : "(Nữ)"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-
-                  {v.incident_status?.medical_issues?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {v.incident_status.medical_issues.map(
-                        (issue: string, i: number) => (
-                          <Badge
-                            key={i}
-                            variant="outline"
-                            className={cn(
-                              "text-sm h-6 px-2 border-transparent font-medium",
-                              getMedicalIssueColorClass(issue),
-                            )}
-                          >
-                            {getMedicalIssueLabel(issue)}
-                          </Badge>
-                        ),
-                      )}
-                    </div>
-                  )}
-
-                  {(v.personal_needs?.diet?.has_special_diet ||
-                    v.personal_needs?.clothing?.needed) && (
-                    <div className="pt-2 border-t border-dashed mt-1 space-y-1.5">
-                      {v.personal_needs.diet?.has_special_diet && (
-                        <div className="text-sm text-muted-foreground flex items-start gap-1.5">
-                          <ForkKnife className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>
-                            Ăn đặc biệt: {v.personal_needs.diet.description}
-                          </span>
-                        </div>
-                      )}
-                      {v.personal_needs.clothing?.needed && (
-                        <div className="text-sm text-muted-foreground flex items-start gap-1.5">
-                          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>
-                            Cần quần áo{" "}
-                            {v.personal_needs.clothing.gender === "MALE"
-                              ? "(Nam)"
-                              : "(Nữ)"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm tracking-tighter text-muted-foreground italic">
+                Không có dữ liệu nạn nhân
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Needs & Supplies */}
         <div className="space-y-3 border-t pt-4">
-          <p className="text-base font-bold uppercase text-muted-foreground">
+          <p className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">
             Nhu yếu phẩm & Vật tư cần thiết
           </p>
           <div className="flex flex-wrap gap-2">
@@ -1386,7 +1395,7 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
               <Badge
                 key={idx}
                 variant="outline"
-                className="bg-blue-50/50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 font-bold text-sm px-2 py-1"
+                className="bg-blue-50/50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 font-medium text-sm px-2 py-1"
               >
                 {getSupplyLabel(s)}
               </Badge>
@@ -1394,7 +1403,7 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
             {otherSupplies && (
               <Badge
                 variant="outline"
-                className="bg-indigo-50/50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 font-bold text-sm px-2 py-1"
+                className="bg-indigo-50/50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 font-medium text-sm px-2 py-1"
               >
                 Khác: {otherSupplies}
               </Badge>
@@ -1404,27 +1413,27 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
             {v3GroupNeeds?.water?.duration && (
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-bold uppercase">
+                <p className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">
                   Nước uống còn lại
                 </p>
-                <p className="text-base font-medium">
+                <p className="text-base font-medium tracking-tighter">
                   {getWaterDurationLabel(v3GroupNeeds.water.duration)}
                 </p>
               </div>
             )}
             {v3GroupNeeds?.food?.duration && (
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-bold uppercase">
+                <p className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">
                   Thực phẩm còn lại
                 </p>
-                <p className="text-base font-medium">
+                <p className="text-base font-medium tracking-tighter">
                   {getFoodDurationLabel(v3GroupNeeds.food.duration)}
                 </p>
               </div>
             )}
             {v3GroupNeeds?.medicine?.needs_urgent_medicine && (
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-bold uppercase underline decoration-red-400">
+                <p className="text-base font-semibold tracking-tighter text-muted-foreground uppercase underline decoration-red-400">
                   Cần thuốc khẩn cấp
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -1432,7 +1441,7 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
                     (m: string, i: number) => (
                       <span
                         key={i}
-                        className="text-sm bg-red-100 text-red-700 px-1 rounded font-medium"
+                        className="text-sm bg-red-100 tracking-tighter text-red-700 px-1 rounded font-medium"
                       >
                         {getMedicalSupportNeedLabel(m)}
                       </span>
@@ -1443,10 +1452,12 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
             )}
             {v3GroupNeeds?.blanket?.is_cold_or_wet && (
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-bold uppercase text-blue-600">
+                <p className="text-base font-semibold tracking-tighter uppercase text-blue-600">
                   Đang bị lạnh/ướt
                 </p>
-                <p className="text-sm font-medium">Cần chăn mền/đồ giữ ấm</p>
+                <p className="text-sm tracking-tighter font-medium">
+                  Cần chăn mền/đồ giữ ấm
+                </p>
               </div>
             )}
           </div>
@@ -2419,7 +2430,9 @@ const RoutePreviewMap = ({
         attributionControl={false}
         className="h-full w-full"
       >
-        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <GoongLeafletLayer
+          apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+        />
         <MapInvalidator />
         <RoutePreviewFitBounds points={points} />
         <Polyline
@@ -2655,9 +2668,9 @@ const DepotInventoryCard = ({
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-2.5 py-2 bg-amber-50/50 dark:bg-amber-900/10 border-b">
-        <Storefront className="h-3.5 w-3.5 text-amber-600" weight="fill" />
+        <WarehouseIcon className="h-3.5 w-3.5 text-amber-600" weight="fill" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold truncate">{depotName}</p>
+          <p className="text-sm font-semibold truncate">{depotName}</p>
           {depotAddress && (
             <p className="text-sm text-muted-foreground truncate">
               {depotAddress}
@@ -2667,7 +2680,7 @@ const DepotInventoryCard = ({
         <Badge
           variant="outline"
           className={cn(
-            "h-5 shrink-0 rounded-full px-2 text-sm font-semibold",
+            "h-6 shrink-0 rounded-md px-2 text-sm font-semibold",
             kind === "alternative"
               ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-blue-300"
               : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300",
@@ -2678,7 +2691,7 @@ const DepotInventoryCard = ({
         {data ? (
           <Badge
             variant="secondary"
-            className="h-5 shrink-0 rounded-full px-2 text-sm font-semibold"
+            className="h-6 shrink-0 rounded-md px-2 text-sm font-semibold"
           >
             {data.totalCount} Vật phẩm
           </Badge>
@@ -2688,7 +2701,7 @@ const DepotInventoryCard = ({
         <div className="space-y-1">
           <Label
             htmlFor={`rescue-plan-depot-search-${depotId}`}
-            className="text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+            className="text-sm font-medium tracking-wider text-foreground/80"
           >
             Tìm vật phẩm
           </Label>
@@ -5798,8 +5811,10 @@ const MissionRoutePreview = ({
                 attributionControl={false}
                 className="h-full w-full"
               >
-                <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
-        <MapInvalidator />
+                <GoongLeafletLayer
+                  apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+                />
+                <MapInvalidator />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.flatMap((seg, idx) => {
@@ -7613,8 +7628,10 @@ const MissionTeamRoutePreview = ({
             attributionControl={false}
             className="h-full w-full"
           >
-            <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
-        <MapInvalidator />
+            <GoongLeafletLayer
+              apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+            />
+            <MapInvalidator />
             <RoutePreviewFitBounds points={mapFitPoints} />
 
             {isUsingOriginConnector ? (
@@ -8188,27 +8205,31 @@ const SuggestionCard = ({
                         (act.assemblyPointLatitude != null &&
                           act.assemblyPointLongitude != null) ? (
                           <div className="mt-1 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15 px-2 py-1.5">
-                            <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
-                              <MapPin className="h-3 w-3" weight="fill" />
-                              Điểm tập kết hoạt động
-                            </p>
-                            {act.assemblyPointName ? (
-                              <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
-                                {act.assemblyPointName}
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1 shrink-0">
+                                <MapPin className="h-3 w-3" weight="fill" />
+                                Điểm tập kết hoạt động
                               </p>
-                            ) : null}
-                            {formatCoordinateLabel(
-                              act.assemblyPointLatitude,
-                              act.assemblyPointLongitude,
-                            ) ? (
-                              <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                                Tọa độ:{" "}
+                              <div className="text-right min-w-0">
+                                {act.assemblyPointName ? (
+                                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 truncate">
+                                    {act.assemblyPointName}
+                                  </p>
+                                ) : null}
                                 {formatCoordinateLabel(
                                   act.assemblyPointLatitude,
                                   act.assemblyPointLongitude,
-                                )}
-                              </p>
-                            ) : null}
+                                ) ? (
+                                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80">
+                                    Tọa độ:{" "}
+                                    {formatCoordinateLabel(
+                                      act.assemblyPointLatitude,
+                                      act.assemblyPointLongitude,
+                                    )}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
                           </div>
                         ) : null}
                         {act.suppliesToCollect &&
@@ -8824,7 +8845,8 @@ const RescuePlanPanel = ({
             const dragUnit =
               (typeof item.measurementUnit === "string"
                 ? item.measurementUnit.trim()
-                : "") || (typeof item.unit === "string" ? item.unit.trim() : "");
+                : "") ||
+              (typeof item.unit === "string" ? item.unit.trim() : "");
             const cachedUnit =
               supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
             const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
@@ -10815,18 +10837,20 @@ const RescuePlanPanel = ({
       <>
         {activeSuggestion || hasEditSidebarContext ? <Separator /> : null}
         <section>
-          <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
-            <Storefront
-              className="h-3.5 w-3.5 text-amber-500"
-              weight="fill"
-            />
-            Kho vật phẩm
-          </h4>
-          <p className="text-sm text-muted-foreground mb-2">
-            {isEditMode
-              ? "Kéo vật phẩm vào bước thực hiện bên trái"
-              : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-x-2 mb-2">
+            <h4 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-1.5">
+              <WarehouseIcon
+                className="h-3.5 w-3.5 text-amber-500"
+                weight="fill"
+              />
+              Kho vật phẩm
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              {isEditMode
+                ? "Kéo vật phẩm vào bước thực hiện bên trái"
+                : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
+            </p>
+          </div>
           <div className="space-y-2">
             {visibleSidebarDepots.map((depot) => (
               <DepotInventoryCard
@@ -10846,7 +10870,7 @@ const RescuePlanPanel = ({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-1100 transition-all duration-300 ease-out will-change-transform",
+        "absolute inset-0 z-1100 transition-all duration-300 ease-out will-change-transform tracking-tighter [&_*]:tracking-tighter",
         open
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-full pointer-events-none",
@@ -10857,14 +10881,16 @@ const RescuePlanPanel = ({
         <div className="sticky top-0 z-30 p-3 pb-2 border-b shrink-0 bg-linear-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 shadow-sm">
-                <Rocket
-                  className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
-                  weight="fill"
+              <div className="ml-2 p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 shadow-sm">
+                <Icon
+                  icon="fluent-emoji-high-contrast:rescue-workers-helmet"
+                  width="32"
+                  height="32"
+                  className="text-emerald-600 dark:text-emerald-400"
                 />
               </div>
               <div>
-                <h2 className="text-base font-bold leading-tight">
+                <h2 className="text-lg font-semibold tracking-tighter leading-tight">
                   {activeSuggestion
                     ? activeSuggestion.suggestedMissionTitle ||
                       `Kế hoạch cứu hộ — Cụm #${clusterId}`
@@ -11070,10 +11096,10 @@ const RescuePlanPanel = ({
           <button
             type="button"
             className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              "px-4 py-2 text-sm tracking-tighter font-medium border-b-2 transition-colors",
               activeTab === "sos_list"
                 ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                : "border-transparent text-muted-foreground hover:text-black",
             )}
             onClick={() => setActiveTab("sos_list")}
           >
@@ -11086,10 +11112,10 @@ const RescuePlanPanel = ({
           <button
             type="button"
             className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              "px-4 py-2 text-sm tracking-tighter font-medium border-b-2 transition-colors",
               activeTab === "plan"
                 ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                : "border-transparent text-muted-foreground hover:text-black",
             )}
             onClick={() => setActiveTab("plan")}
           >
@@ -11102,10 +11128,10 @@ const RescuePlanPanel = ({
           <button
             type="button"
             className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              "px-4 py-2 text-sm font-medium tracking-tighter border-b-2 transition-colors",
               activeTab === "missions"
                 ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                : "border-transparent text-muted-foreground hover:text-black",
             )}
             onClick={() => setActiveTab("missions")}
           >
@@ -11184,7 +11210,7 @@ const RescuePlanPanel = ({
                             <Card
                               key={mission.id}
                               className={cn(
-                                "overflow-hidden border-2",
+                                "overflow-hidden border-2 py-0",
                                 hasAssignedTeams
                                   ? "border-emerald-300/70 dark:border-emerald-700/60"
                                   : "border-amber-300/70 dark:border-amber-700/60",
@@ -11203,14 +11229,17 @@ const RescuePlanPanel = ({
                                           className="h-4 w-4 text-emerald-500 shrink-0"
                                           weight="fill"
                                         />
-                                        <span className="text-base font-bold truncate">
+                                        <span
+                                          className="text-xl tracking-tighter font-bold leading-none"
+                                          style={{ fontSize: "1.1rem" }}
+                                        >
                                           {mission.suggestedMissionTitle ||
-                                            `Nhiệm vụ #${mission.id}`}
+                                            `Nhiệm vụ số ${mission.id}`}
                                         </span>
                                         <Badge
                                           variant="outline"
                                           className={cn(
-                                            "text-sm h-5 px-2 shrink-0 font-semibold",
+                                            "text-sm h-6 px-2 shrink-0 font-semibold",
                                             getMissionTypeBadgeClassName(
                                               mission.missionType,
                                             ),
@@ -11246,7 +11275,7 @@ const RescuePlanPanel = ({
                                         ) : null}
                                         <span
                                           className={cn(
-                                            "text-[13px] font-bold uppercase tracking-wider",
+                                            "text-sm font-semibold tracking-tighter",
                                             missionStatus.className
                                               .split(" ")
                                               .filter(
@@ -11274,7 +11303,7 @@ const RescuePlanPanel = ({
                                 >
                                   {hasAssignedTeams && (
                                     <>
-                                      <p className="text-sm text-foreground/75 mt-1 line-clamp-2">
+                                      <p className="text-sm tracking-tighter text-foreground/75 mt-1 line-clamp-2">
                                         {activeMissionTeams
                                           .map(
                                             (team) =>
@@ -11283,7 +11312,6 @@ const RescuePlanPanel = ({
                                           )
                                           .join(" • ")}
                                       </p>
-
                                     </>
                                   )}
                                 </div>
@@ -11291,46 +11319,48 @@ const RescuePlanPanel = ({
                                 {/* AI assessment */}
                                 {mission.overallAssessment && (
                                   <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
-                                    <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
+                                    <p className="text-sm tracking-tighter text-foreground/80 leading-relaxed line-clamp-3">
                                       {mission.overallAssessment}
                                     </p>
                                   </div>
                                 )}
 
-                                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
+                                    <Clock className="h-3 w-3 shrink-0" />
                                     {formatMissionTimeRangeLabel(
                                       mission.startTime,
                                       mission.expectedEndTime,
                                     )}
                                   </span>
                                   {mission.estimatedDuration && (
-                                    <span className="flex items-center gap-1">
-                                      <ClockCounterClockwise className="h-3 w-3" />
+                                    <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
+                                      <ClockCounterClockwise className="h-3 w-3 shrink-0" />
                                       {mission.estimatedDuration}
                                     </span>
                                   )}
-                                  <span>
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-sm font-bold tracking-tighter text-indigo-700 dark:border-indigo-700/50 dark:bg-indigo-900/20 dark:text-indigo-300">
                                     Ưu tiên: {mission.priorityScore.toFixed(1)}
                                   </span>
                                   {mission.suggestedSeverityLevel && (
-                                    <span>
+                                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
                                       Mức độ: {mission.suggestedSeverityLevel}
                                     </span>
                                   )}
-                                  <span>{mission.activityCount} bước</span>
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-bold tracking-tighter text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                    {mission.activityCount} bước
+                                  </span>
                                   {mission.modelName && (
-                                    <span className="flex items-center gap-1">
+                                    <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
                                       <Lightning
-                                        className="h-3 w-3"
+                                        className="h-3 w-3 shrink-0"
                                         weight="fill"
                                       />
                                       {mission.modelName}
                                     </span>
                                   )}
                                   {mission.aiConfidenceScore != null && (
-                                    <span>
+                                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
                                       Tin cậy:{" "}
                                       {(
                                         mission.aiConfidenceScore * 100
@@ -11502,13 +11532,13 @@ const RescuePlanPanel = ({
                                               {group.type === "depot" ? (
                                                 <>
                                                   <div className="p-2 rounded-lg bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 ring-1 ring-amber-400/40">
-                                                    <Storefront
+                                                    <WarehouseIcon
                                                       className="h-5 w-5"
                                                       weight="fill"
                                                     />
                                                   </div>
                                                   <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200 truncate tracking-tight">
+                                                    <p className="text-xl font-bold text-amber-900 dark:text-amber-200 tracking-tighter">
                                                       Kho:{" "}
                                                       <span className="underline decoration-amber-400 decoration-2 underline-offset-2">
                                                         {group.depotName}
@@ -11660,7 +11690,7 @@ const RescuePlanPanel = ({
                                                         <div className="flex h-full items-start gap-2.5">
                                                           <div
                                                             className={cn(
-                                                              "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base font-extrabold shadow-sm ring-1 ring-black/5",
+                                                              "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-4xl text-base font-extrabold",
                                                               config.bgColor,
                                                               config.color,
                                                             )}
@@ -11677,7 +11707,13 @@ const RescuePlanPanel = ({
                                                             >
                                                               <div className="min-w-0 space-y-2">
                                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                                  <span className="text-base font-bold text-foreground">
+                                                                  <span
+                                                                    className="text-xl font-bold text-foreground"
+                                                                    style={{
+                                                                      fontSize:
+                                                                        "1rem",
+                                                                    }}
+                                                                  >
                                                                     Bước{" "}
                                                                     {
                                                                       activity.step
@@ -11686,7 +11722,7 @@ const RescuePlanPanel = ({
                                                                   <Badge
                                                                     variant="outline"
                                                                     className={cn(
-                                                                      "h-6 border-transparent px-2 text-base font-semibold",
+                                                                      "h-6 border-transparent px-2 text-sm font-semibold",
                                                                       config.color,
                                                                       config.bgColor,
                                                                     )}
@@ -11698,7 +11734,7 @@ const RescuePlanPanel = ({
                                                                   <Badge
                                                                     variant="outline"
                                                                     className={cn(
-                                                                      "flex h-6 items-center gap-1 border px-2 text-base font-bold",
+                                                                      "flex h-6 items-center gap-1 border px-2 text-sm font-semibold",
                                                                       stepStatus.className,
                                                                     )}
                                                                   >
@@ -11710,7 +11746,7 @@ const RescuePlanPanel = ({
                                                                     }
                                                                   </Badge>
                                                                 </div>
-                                                                <p className="line-clamp-4 text-base font-medium leading-relaxed text-foreground/80">
+                                                                <p className="line-clamp-4 text-base font-medium text-foreground/80">
                                                                   {
                                                                     displayDescription
                                                                   }
@@ -11725,11 +11761,11 @@ const RescuePlanPanel = ({
                                                                       "self-start",
                                                                   )}
                                                                 >
-                                                                  <p className="text-sm font-semibold leading-tight text-muted-foreground">
+                                                                  <p className="text-sm font-medium leading-tight text-muted-foreground">
                                                                     Thời gian dự
                                                                     kiến đến
                                                                   </p>
-                                                                  <p className="text-base font-bold text-foreground">
+                                                                  <p className="text-base font-semibold text-foreground">
                                                                     {
                                                                       activity.estimatedTime
                                                                     }{" "}
@@ -11745,7 +11781,7 @@ const RescuePlanPanel = ({
                                                                 activity.assemblyPointLongitude !=
                                                                   null)) && (
                                                               <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
-                                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                                <p className="text-sm font-semibold uppercase tracking-tight text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
                                                                   <MapPin
                                                                     className="h-3 w-3"
                                                                     weight="fill"
@@ -11775,12 +11811,10 @@ const RescuePlanPanel = ({
                                                               </div>
                                                             )}
 
-
-
                                                             {teamsForStep.length >
                                                               0 && (
                                                               <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
-                                                                <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                                <p className="text-sm font-semibold uppercase tracking-tight text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
                                                                   <ShieldCheck
                                                                     className="h-3 w-3"
                                                                     weight="fill"
@@ -11824,7 +11858,6 @@ const RescuePlanPanel = ({
                                                                         ) &&
                                                                         normalizedRescueTeamStatus !==
                                                                           normalizedAssignmentStatus;
-
 
                                                                       return (
                                                                         <div
@@ -11904,7 +11937,6 @@ const RescuePlanPanel = ({
                                                                                 viên
                                                                               </Badge>
                                                                             )}
-
                                                                           </div>
                                                                         </div>
                                                                       );
@@ -12118,9 +12150,9 @@ const RescuePlanPanel = ({
                 {/* ═══ TAB: SOS List ═══ */}
                 {activeTab === "sos_list" && (
                   <ScrollArea className="h-full">
-                    <div className="p-4 space-y-4">
+                    <div className="px-4 space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <h3 className="text-base font-semibold tracking-tighter flex items-center gap-2">
                           <ListChecks className="h-4 w-4" />
                           Danh sách yêu cầu SOS trong cụm
                         </h3>
@@ -13720,7 +13752,7 @@ const RescuePlanPanel = ({
                         ) : null}
 
                         <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <h3 className="text-base font-semibold tracking-tighter flex items-center gap-2">
                             <Lightning
                               className="h-3.5 w-3.5 text-yellow-500"
                               weight="fill"
@@ -13781,7 +13813,7 @@ const RescuePlanPanel = ({
                         ) : (
                           <div className="text-center py-8 rounded-xl border-2 border-dashed border-border/50">
                             <Rocket className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
-                            <p className="text-sm text-muted-foreground/60">
+                            <p className="text-sm tracking-tighter text-muted-foreground/60">
                               Chưa có gợi ý AI nào cho cụm này
                             </p>
                             <div className="flex items-center justify-center gap-2 mt-3">
@@ -14068,30 +14100,36 @@ const RescuePlanPanel = ({
                                                 activity.assemblyPointLongitude !=
                                                   null)) && (
                                               <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
-                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
-                                                  <MapPin
-                                                    className="h-3 w-3"
-                                                    weight="fill"
-                                                  />
-                                                  Điểm tập kết hoạt động
-                                                </p>
-                                                {activity.assemblyPointName && (
-                                                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
-                                                    {activity.assemblyPointName}
+                                                <div className="flex items-start justify-between gap-3">
+                                                  <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1 shrink-0">
+                                                    <MapPin
+                                                      className="h-3 w-3"
+                                                      weight="fill"
+                                                    />
+                                                    Điểm tập kết hoạt động
                                                   </p>
-                                                )}
-                                                {formatCoordinateLabel(
-                                                  activity.assemblyPointLatitude,
-                                                  activity.assemblyPointLongitude,
-                                                ) && (
-                                                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                                                    Tọa độ:{" "}
+                                                  <div className="text-right min-w-0">
+                                                    {activity.assemblyPointName && (
+                                                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 truncate">
+                                                        {
+                                                          activity.assemblyPointName
+                                                        }
+                                                      </p>
+                                                    )}
                                                     {formatCoordinateLabel(
                                                       activity.assemblyPointLatitude,
                                                       activity.assemblyPointLongitude,
+                                                    ) && (
+                                                      <p className="text-sm text-blue-700/80 dark:text-blue-300/80">
+                                                        Tọa độ:{" "}
+                                                        {formatCoordinateLabel(
+                                                          activity.assemblyPointLatitude,
+                                                          activity.assemblyPointLongitude,
+                                                        )}
+                                                      </p>
                                                     )}
-                                                  </p>
-                                                )}
+                                                  </div>
+                                                </div>
                                               </div>
                                             )}
 
@@ -14585,7 +14623,6 @@ const RescuePlanPanel = ({
                             </section>
                           </>
                         )}
-
                     </>
                   )}
                   {editSuggestionSidebarSection}
@@ -14662,8 +14699,6 @@ const RescuePlanPanel = ({
             ) : null}
           </div>
         </div>
-
-
 
         <Dialog
           open={removeConfirmOpen}
