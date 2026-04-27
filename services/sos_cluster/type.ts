@@ -53,6 +53,7 @@ export interface GetSOSClustersParams {
   statuses?: ClusterLifecycleStatus[];
   priorities?: ClusterPriorityLevel[];
   sosTypes?: ClusterSOSType[];
+  Sort?: string;
 }
 
 // POST /emergency/sos-clusters request
@@ -67,6 +68,11 @@ export interface CreateSOSClusterResponse {
   sosRequestIds: number[];
   severityLevel: ClusterSeverityLevel;
   createdAt: string;
+}
+
+// POST /emergency/sos-clusters/{clusterId}/sos-requests request body
+export interface AddSOSRequestsToClusterRequest {
+  sosRequestIds: number[];
 }
 
 // ---- Mission Suggestions ----

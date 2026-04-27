@@ -4,7 +4,7 @@ import {
   getSOSClusters,
   createSOSCluster,
   removeSOSRequestFromCluster,
-  addSOSRequestToCluster,
+  addSOSRequestsToCluster,
   getMissionSuggestions,
   getAlternativeDepots,
   getClusterRescueSuggestion,
@@ -18,6 +18,7 @@ import {
   GetMissionSuggestionsResponse,
   ClusterRescueSuggestionResponse,
   AlternativeDepotsResponse,
+  AddSOSRequestsToClusterRequest,
 } from "./type";
 import { SOS_REQUESTS_QUERY_KEY } from "@/services/sos_request/hooks";
 
@@ -87,14 +88,20 @@ export function useRemoveSOSRequestFromCluster() {
 }
 
 /**
- * Hook to add a SOS request to an existing cluster (mutation)
+ * Hook to add multiple SOS requests to an existing cluster (mutation)
  */
 export function useAddSOSRequestToCluster() {
   const queryClient = useQueryClient();
+  const mutationKey = ["add-sos-to-cluster"] as const;
 
-  return useMutation<void, Error, { clusterId: number; sosRequestId: number }>({
-    mutationFn: ({ clusterId, sosRequestId }) =>
-      addSOSRequestToCluster(clusterId, sosRequestId),
+  return useMutation<
+    void,
+    Error,
+    { clusterId: number } & AddSOSRequestsToClusterRequest
+  >({
+    mutationKey,
+    mutationFn: ({ clusterId, sosRequestIds }) =>
+      addSOSRequestsToCluster(clusterId, sosRequestIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SOS_CLUSTERS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: SOS_REQUESTS_QUERY_KEY });
