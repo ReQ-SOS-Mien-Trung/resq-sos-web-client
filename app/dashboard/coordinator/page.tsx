@@ -111,6 +111,7 @@ import { useUserMe } from "@/services/user/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
+import { useSosRequestRealtime } from "@/hooks/useSosRequestRealtime";
 import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
@@ -178,7 +179,6 @@ function normalizeSOSRequestTypeFilterValue(
 }
 
 const AUTO_CLUSTER_RADIUS_STEP_KM = 1;
-const COORDINATOR_SOS_REFETCH_INTERVAL_MS = 10_000;
 const DEFAULT_COORDINATOR_SOS_STATUSES: SOSRequestStatus[] = [
   "Pending",
   "Assigned",
@@ -821,7 +821,6 @@ const CoordinatorDashboardContent = () => {
         SosTypes: sosTypeQueryFilter,
         Sort: sosSort,
       },
-      refetchInterval: COORDINATOR_SOS_REFETCH_INTERVAL_MS,
     });
   const { data: mapSosData } = useSOSRequestsInBounds({
     params: mapFetchBounds
@@ -836,7 +835,6 @@ const CoordinatorDashboardContent = () => {
         }
       : undefined,
     enabled: !isWeatherMode && !!mapFetchBounds,
-    refetchInterval: COORDINATOR_SOS_REFETCH_INTERVAL_MS,
   });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
@@ -1057,6 +1055,10 @@ const CoordinatorDashboardContent = () => {
   const operationalConnectionState = useOperationalRealtime({
     depotId: activeRealtimeDepotId,
     assemblyPointId: activeRealtimeAssemblyPointId,
+    clusterIds: activeRealtimeClusterIds,
+  });
+  useSosRequestRealtime({
+    subscribeUnclustered: true,
     clusterIds: activeRealtimeClusterIds,
   });
   const isConnected = operationalConnectionState === "connected";
