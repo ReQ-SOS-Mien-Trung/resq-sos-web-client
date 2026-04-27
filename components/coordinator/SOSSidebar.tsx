@@ -670,6 +670,8 @@ const SOSSidebar = ({
   onSelectedPrioritiesChange,
   selectedSosTypes = [],
   onSelectedSosTypesChange,
+  sosRequestId = "",
+  onSosRequestIdChange,
   selectedClusterStatuses = [],
   onSelectedClusterStatusesChange,
   selectedClusterPriorities = [],
@@ -908,7 +910,8 @@ const SOSSidebar = ({
   const hasSOSFiltersApplied =
     selectedStatuses.length > 0 ||
     selectedPriorities.length > 0 ||
-    selectedSosTypes.length > 0;
+    selectedSosTypes.length > 0 ||
+    sosRequestId.trim().length > 0;
   const selectedSOSId = selectedSOS
     ? normalizeSOSRequestId(selectedSOS.id)
     : null;
@@ -1556,10 +1559,87 @@ const SOSSidebar = ({
           {/* Incoming SOS Tab */}
           <TabsContent
             value="incoming"
-            className="m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
+            className="m-0 mt-3 flex min-h-0 flex-1 flex-col overflow-hidden"
           >
-            <div className="border-b bg-background/80 px-3 pb-3">
+            <div className="border-b bg-background/80 px-3 pb-3 pt-1 space-y-2">
               <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                <Icon
+                  icon="ph:magnifying-glass"
+                  className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  value={sosRequestId}
+                  onChange={(event) => {
+                    onSosRequestIdChange?.(event.target.value);
+                  }}
+                  placeholder="Tìm theo SOS ID"
+                  className="h-9 pl-8 pr-8 text-[14px]"
+                />
+                {sosRequestId.trim().length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                    onClick={() => {
+                      onSosRequestIdChange?.("");
+                    }}
+                    aria-label="Xóa tìm kiếm SOS"
+                  >
+                    <Icon icon="ph:x" className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
+              </div>
+
+              <Popover open={sosSortOpen} onOpenChange={setSosSortOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    title="Sắp xếp SOS"
+                  >
+                    <ArrowsDownUp className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-1.5" align="end">
+                  <div className="mb-1.5 px-2 py-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Sắp xếp SOS
+                  </div>
+                  {SORT_OPTIONS.map((option) => {
+                    const checked = sosSort === option.key;
+                    const Icon = option.icon;
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => {
+                          onSosSortChange?.(option.key);
+                          setSosSortOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60",
+                          checked && "bg-muted/80 font-medium",
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="flex-1">{option.label}</span>
+                        {checked && (
+                          <Check
+                            className="h-3.5 w-3.5 text-primary"
+                            weight="bold"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center gap-1.5">
                 <div
                   className={cn(
                     "grid flex-1 items-center gap-1.5",
@@ -1764,52 +1844,6 @@ const SOSSidebar = ({
                     </Button>
                   ) : null}
                 </div>
-
-                <Popover open={sosSortOpen} onOpenChange={setSosSortOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      title="Sắp xếp SOS mới"
-                    >
-                      <ArrowsDownUp className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-56 p-1.5" align="end">
-                    <div className="mb-1.5 px-2 py-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Sắp xếp SOS mới
-                    </div>
-                    {SORT_OPTIONS.map((option) => {
-                      const checked = sosSort === option.key;
-                      const Icon = option.icon;
-
-                      return (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => {
-                            onSosSortChange?.(option.key);
-                            setSosSortOpen(false);
-                          }}
-                          className={cn(
-                            "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60",
-                            checked && "bg-muted/80 font-medium",
-                          )}
-                        >
-                          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="flex-1">{option.label}</span>
-                          {checked && (
-                            <Check
-                              className="h-3.5 w-3.5 text-primary"
-                              weight="bold"
-                            />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </PopoverContent>
-                </Popover>
               </div>
             </div>
 

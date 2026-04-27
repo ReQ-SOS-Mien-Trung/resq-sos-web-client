@@ -543,14 +543,11 @@ function ParsedMessage({
             const getSeverityScore = (injury: string) => {
               const match = injury.match(/(.*?)\s*\((.*?)\)$/);
               if (match) {
-                const lowerSeverity = match[2].toLowerCase();
-                if (
-                  lowerSeverity.includes("nghiêm trọng") ||
-                  lowerSeverity.includes("nặng")
-                )
-                  return 3;
-                if (lowerSeverity.includes("trung bình")) return 2;
-                if (lowerSeverity.includes("nhẹ")) return 1;
+                const s = match[2].toLowerCase();
+                if (s.includes("critical")) return 4;
+                if (s.includes("high")) return 3;
+                if (s.includes("medium") || s.includes("moderate")) return 2;
+                if (s.includes("low")) return 1;
               }
               return 0;
             };
@@ -572,18 +569,21 @@ function ParsedMessage({
                         "bg-muted text-muted-foreground border-border";
                       const lowerSeverity = severity.toLowerCase();
 
-                      if (
+                      if (lowerSeverity.includes("rất nghiêm")) {
+                        severityColor =
+                          "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+                      } else if (
                         lowerSeverity.includes("nghiêm trọng") ||
                         lowerSeverity.includes("nặng")
                       ) {
                         severityColor =
-                          "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+                          "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
                       } else if (lowerSeverity.includes("trung bình")) {
                         severityColor =
-                          "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
-                      } else if (lowerSeverity.includes("nhẹ")) {
-                        severityColor =
                           "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+                      } else if (lowerSeverity.includes("nhẹ") || lowerSeverity.includes("thấp")) {
+                        severityColor =
+                          "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900/50";
                       }
 
                       const infoParts = text.split(":");
@@ -898,24 +898,15 @@ function VictimCard({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {isInjured ? (
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-sm px-2.5 py-0.5 h-6 font-medium",
-                  severityBadgeClass(severity ?? undefined),
-                )}
-              >
-                {severityLabel(severity ?? undefined)}
-              </Badge>
-            ) : (
-              <Badge
-                variant="outline"
-                className="text-sm px-2.5 py-0.5 h-6 font-medium bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
-              >
-                Bình thường
-              </Badge>
-            )}
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-sm px-2.5 py-0.5 h-6 font-medium",
+                severityBadgeClass(severity || "low"),
+              )}
+            >
+              {severityLabel(severity || "low")}
+            </Badge>
             <button
               type="button"
               aria-label="Xem nhu cầu cá nhân"
@@ -1001,7 +992,7 @@ function VictimCard({
                 {dietDescription || "Đặc biệt"}
               </span>
             ) : (
-              <span className="text-sm">Bình thường</span>
+              <span className="text-sm">Không</span>
             )}
           </div>
         </div>
@@ -1122,38 +1113,28 @@ const SOSDetailsPanel = ({
         : `${Math.max(1, waitTimeMinutes)} phút`;
 
   const severityLabel = (value?: string) => {
-    const normalized = (value || "").toLowerCase();
-    if (normalized === "none") {
-      return "Chưa đánh giá";
-    }
-    if (normalized.includes("high") || normalized.includes("cao")) {
-      return "Cao";
-    }
-    if (normalized.includes("critical") || normalized.includes("nghiêm")) {
-      return "Nghiêm trọng";
-    }
-    if (normalized.includes("moderate") || normalized.includes("trung")) {
-      return "Trung bình";
-    }
-    if (normalized.includes("low") || normalized.includes("nhẹ")) {
-      return "Nhẹ";
-    }
+    const s = (value || "").toLowerCase();
+    if (s.includes("critical")) return "Rất nghiêm trọng";
+    if (s.includes("high")) return "Nghiêm trọng";
+    if (s.includes("medium") || s.includes("moderate")) return "Trung bình";
+    if (s.includes("low")) return "Thấp";
+    if (s === "none") return "Chưa đánh giá";
     return value || "Chưa rõ";
   };
 
   const severityBadgeClass = (value?: string) => {
-    const normalized = (value || "").toLowerCase();
-    if (normalized.includes("critical") || normalized.includes("nghiêm")) {
+    const s = (value || "").toLowerCase();
+    if (s.includes("critical")) {
       return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
     }
-    if (normalized.includes("high") || normalized.includes("cao")) {
+    if (s.includes("high")) {
       return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
     }
-    if (normalized.includes("moderate") || normalized.includes("trung")) {
-      return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
-    }
-    if (normalized.includes("low") || normalized.includes("nhẹ")) {
+    if (s.includes("medium") || s.includes("moderate")) {
       return "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+    }
+    if (s.includes("low")) {
+      return "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900/50";
     }
     return "bg-muted text-muted-foreground border-border";
   };
@@ -1952,12 +1933,10 @@ const SOSDetailsPanel = ({
                   .sort((a, b) => {
                     const rank = (s?: string) => {
                       const v = (s || "").toLowerCase();
-                      if (v.includes("critical") || v.includes("nghiêm"))
-                        return 4;
-                      if (v.includes("high") || v.includes("cao")) return 3;
-                      if (v.includes("moderate") || v.includes("trung"))
-                        return 2;
-                      if (v.includes("low") || v.includes("nhẹ")) return 1;
+                      if (v.includes("critical")) return 4;
+                      if (v.includes("high")) return 3;
+                      if (v.includes("medium") || v.includes("moderate")) return 2;
+                      if (v.includes("low")) return 1;
                       return 0;
                     };
                     return rank(b.severity) - rank(a.severity);

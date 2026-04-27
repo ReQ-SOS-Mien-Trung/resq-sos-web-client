@@ -1003,6 +1003,8 @@ export interface SOSSidebarProps {
   onSelectedSosTypesChange?: (
     sosTypes: import("@/services/sos_request/type").SOSRequestTypeFilter[],
   ) => void;
+  sosRequestId?: string;
+  onSosRequestIdChange?: (id: string) => void;
   selectedClusterStatuses?: import("@/services/sos_cluster/type").ClusterLifecycleStatus[];
   onSelectedClusterStatusesChange?: (
     statuses: import("@/services/sos_cluster/type").ClusterLifecycleStatus[],
