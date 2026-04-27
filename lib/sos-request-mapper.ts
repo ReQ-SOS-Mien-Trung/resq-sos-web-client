@@ -106,7 +106,9 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     foodDuration: supplyDetails?.food_duration ?? undefined,
     areBlanketsEnough: supplyDetails?.are_blankets_enough,
     blanketRequestCount: supplyDetails?.blanket_request_count,
-    address: structuredData?.address ?? undefined,
+    address: (structuredData?.address ??
+      (structuredData?.incident as Record<string, unknown> | null | undefined)
+        ?.address) as string | undefined,
     victimPhone: victimInfo?.user_phone ?? undefined,
     victimName: victimInfo?.user_name ?? undefined,
     reporterPhone: reporterInfo?.user_phone ?? undefined,
@@ -126,6 +128,8 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     hopCount: networkMetadata?.hop_count,
     locationAccuracy: entity.locationAccuracy,
     evaluation: entity.evaluation ?? null,
+    victims: structuredData?.victims ?? null,
+    incidentHistory: entity.incidentHistory ?? null,
   };
 }
 

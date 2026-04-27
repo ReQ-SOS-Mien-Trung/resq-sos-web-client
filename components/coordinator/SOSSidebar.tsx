@@ -80,8 +80,6 @@ import {
   Tray,
   Trash,
   ArrowsDownUp,
-  SortAscending,
-  SortDescending,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
@@ -117,7 +115,7 @@ function useTimeElapsed(date: Date): string {
 // Time elapsed display component
 function TimeElapsed({ date }: { date: Date }) {
   const elapsed = useTimeElapsed(date);
-  return <span>{elapsed}</span>;
+  return <span className="tracking-tighter">{elapsed}</span>;
 }
 
 function WaterLevelIcon({ className }: { className?: string }) {
@@ -142,6 +140,12 @@ const CLUSTER_SEVERITY_LABELS: Record<ClusterSeverityLevel, string> = {
   Medium: "Trung bình",
   Low: "Thấp",
 };
+
+const SOS_PRIMARY_ID_CLASS =
+  "font-bold tracking-tighter text-foreground whitespace-nowrap";
+
+const SOS_COMPACT_ID_CLASS =
+  "text-[18px] leading-none font-bold tracking-tighter text-foreground/90 whitespace-nowrap";
 
 const CLUSTER_CONTAINER_CLASS_BY_SEVERITY: Record<
   ClusterSeverityLevel,
@@ -814,7 +818,9 @@ const SOSSidebar = ({
 
         addSOSRequestToClusterAsync({ clusterId, sosRequestIds })
           .then(() => {
-            toast.success(`Đã thêm ${sosRequestIds.length} SOS vào cụm #${clusterId}.`);
+            toast.success(
+              `Đã thêm ${sosRequestIds.length} SOS vào cụm #${clusterId}.`,
+            );
             const idSet = new Set(sosRequestIds);
             setCartItems((prev) =>
               prev.filter((item) => {
@@ -1188,6 +1194,7 @@ const SOSSidebar = ({
         return right.id - left.id;
       });
   }, [
+    clusterSort,
     clusterDataSource,
     hasSOSFiltersApplied,
     shouldIncludeCompletedClusters,
@@ -1333,7 +1340,7 @@ const SOSSidebar = ({
     return Array.from(byId.values()).sort((left, right) =>
       compareSOSRequests(left, right, sosSort),
     );
-  }, [backendClusteredIds, incomingRequests, sosRequests]);
+  }, [backendClusteredIds, incomingRequests, sosRequests, sosSort]);
   const visibleIncomingRequests = hasIncomingServerPagination
     ? serverIncomingRequests
     : paginatedStandaloneRequests;
@@ -1460,36 +1467,27 @@ const SOSSidebar = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-background text-[14px]">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <h2 className="font-bold text-[16px] flex items-center gap-2">
-          <Warning className="h-5 w-5 text-red-500" weight="fill" />
-          Trung Tâm Điều Phối
-        </h2>
-        <p className="text-[15px] text-muted-foreground mt-1">
-          ResQ-SOS Miền Trung
-        </p>
-      </div>
-
       {/* Stats Bar */}
       <div className="grid grid-cols-3 gap-2 p-3 border-b bg-muted/30">
         <div className="text-center">
           <div className="text-2xl font-bold text-red-500">
             {pendingRequests.length}
           </div>
-          <div className="text-[14px] text-muted-foreground">Chờ xử lý</div>
+          <div className="text-sm tracking-tighter font-medium">Chờ xử lý</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-orange-500">
             {assignedRequests.length}
           </div>
-          <div className="text-[14px] text-muted-foreground">Đang cứu</div>
+          <div className="text-sm tracking-tighter font-medium">Đang cứu</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-green-500">
             {availableRescuers.length}
           </div>
-          <div className="text-[14px] text-muted-foreground">Đội sẵn sàng</div>
+          <div className="text-sm tracking-tighter font-medium">
+            Đội sẵn sàng
+          </div>
         </div>
       </div>
 
@@ -1531,7 +1529,7 @@ const SOSSidebar = ({
             value="incoming"
             className="m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
           >
-            <div className="border-b bg-background/80 p-3">
+            <div className="border-b bg-background/80 px-3 pb-3">
               <div className="flex items-center gap-1.5">
                 <div
                   className={cn(
@@ -1787,10 +1785,10 @@ const SOSSidebar = ({
             </div>
 
             <div className="h-full min-h-0 flex-1 overflow-y-auto">
-              <div className="p-3 space-y-3">
+              <div className="px-3 pb-3 space-y-3">
                 {visibleIncomingRequests.length > 0 && (
                   <>
-                    <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <div className="text-base font-semibold tracking-tighter mb-2">
                       {incomingSectionTitle}
                     </div>
                     <PaginationControls
@@ -1835,7 +1833,14 @@ const SOSSidebar = ({
                           >
                             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                <span
+                                  className={SOS_PRIMARY_ID_CLASS}
+                                  style={{
+                                    fontSize: 18,
+                                    lineHeight: 1,
+                                    letterSpacing: 0,
+                                  }}
+                                >
                                   SOS {sos.id}
                                 </span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1871,7 +1876,7 @@ const SOSSidebar = ({
                                   {sos.clusterId ? (
                                     <Badge
                                       variant="outline"
-                                      className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                      className="text-sm tracking-tighter h-6 px-2 leading-none whitespace-nowrap shrink-0"
                                     >
                                       Cụm #{sos.clusterId}
                                     </Badge>
@@ -1900,10 +1905,10 @@ const SOSSidebar = ({
                                       className="h-3.5 w-3.5 text-blue-500 shrink-0"
                                       weight="fill"
                                     />
-                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">
+                                    <span className="text-xs font-medium text-muted-foreground tracking-tighter">
                                       Hệ thống:
                                     </span>
-                                    <span className="text-[12px] font-mono font-bold text-foreground">
+                                    <span className="text-xs font-mono font-bold text-foreground">
                                       {sos.evaluation.ruleEvaluation.totalScore.toFixed(
                                         1,
                                       )}
@@ -2012,12 +2017,14 @@ const SOSSidebar = ({
                     {isIncomingRequestsLoading ? (
                       <>
                         <Spinner className="h-8 w-8 mx-auto mb-2 animate-spin opacity-70" />
-                        <p className="text-[15px]">Đang tải danh sách SOS...</p>
+                        <p className="text-sm tracking-tighter">
+                          Đang tải danh sách SOS...
+                        </p>
                       </>
                     ) : (
                       <>
                         <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-[15px]">
+                        <p className="text-sm tracking-tighter">
                           {hasIncomingServerPagination
                             ? "Không có yêu cầu SOS phù hợp với bộ lọc hiện tại."
                             : pendingRequests.length > 0 ||
@@ -2040,13 +2047,13 @@ const SOSSidebar = ({
             className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
           >
             <div className="h-full min-h-0 flex-1 overflow-y-auto">
-              <div className="p-3 space-y-3">
+              <div className="px-3 pb-3 space-y-3">
                 {/* Auto-cluster all nearby groups button */}
                 {autoClusters.length > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full h-10 text-[15px] font-semibold border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                    className="w-full h-10 text-sm tracking-tighter font-semibold border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                     onClick={() => onClusterOnly(autoClusters)}
                     disabled={isCreatingCluster}
                   >
@@ -2073,7 +2080,7 @@ const SOSSidebar = ({
                 {shouldShowBackendClusterControls && (
                   <>
                     <div className="space-y-2">
-                      <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide">
+                      <div className="text-base tracking-tighter font-semibold">
                         Cụm đã gom ({filteredActiveClusters.length}/
                         {activeClusters.length})
                       </div>
@@ -2104,7 +2111,9 @@ const SOSSidebar = ({
                                 onClick={() => {
                                   setClusterSearchTerm("");
                                   setClusterPage(1);
-                                  setManualClusterPageSelectionKey(selectedSOSId);
+                                  setManualClusterPageSelectionKey(
+                                    selectedSOSId,
+                                  );
                                 }}
                                 aria-label="Xóa tìm kiếm cụm"
                               >
@@ -2423,7 +2432,6 @@ const SOSSidebar = ({
                               <span className="truncate">Xóa lọc</span>
                             </Button>
                           ) : null}
-
                         </div>
                       </div>
                     </div>
@@ -2455,7 +2463,6 @@ const SOSSidebar = ({
                             clusterRequestCount > clusterMaxSize;
                           const isClusterAtCapacity =
                             clusterRemainingCapacity === 0;
-                          const sosCount = clusterRequestCount;
                           const isExpanded =
                             expandedClusters.has(cluster.id) ||
                             (selectedClusterId === cluster.id &&
@@ -2476,26 +2483,6 @@ const SOSSidebar = ({
                                 bucket === "pending" || bucket === "active"
                               );
                             },
-                          );
-                          const pendingClusterSOS = unresolvedClusterSOS.filter(
-                            (s) =>
-                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
-                              "pending",
-                          );
-                          const activeClusterSOS = unresolvedClusterSOS.filter(
-                            (s) =>
-                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
-                              "active",
-                          );
-                          const rescuedClusterSOS = clusterSOS.filter(
-                            (s) =>
-                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
-                              "resolved",
-                          );
-                          const cancelledClusterSOS = clusterSOS.filter(
-                            (s) =>
-                              getSOSStatusBucket(getSOSEffectiveStatus(s)) ===
-                              "cancelled",
                           );
                           const displayClusterSOS = [
                             ...unresolvedClusterSOS,
@@ -2530,7 +2517,7 @@ const SOSSidebar = ({
                               )}
                             >
                               <div
-                                className="px-3 py-2.5 cursor-pointer"
+                                className="relative px-3 py-2.5 cursor-pointer"
                                 onClick={() => {
                                   setExpandedClusters((prev) => {
                                     const next = new Set(prev);
@@ -2556,8 +2543,8 @@ const SOSSidebar = ({
                                   });
                                 }}
                               >
-                                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 min-w-0 pr-28">
                                     <TreeStructure
                                       className="h-4 w-4 text-violet-600 dark:text-violet-400"
                                       weight="fill"
@@ -2565,6 +2552,8 @@ const SOSSidebar = ({
                                     <span className="text-[15px] font-semibold">
                                       Cụm #{cluster.id}
                                     </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                     <Badge
                                       variant="outline"
                                       className={cn(
@@ -2591,54 +2580,34 @@ const SOSSidebar = ({
                                     >
                                       {CLUSTER_STATUS_LABELS[clusterStatus]}
                                     </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        "text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0",
-                                        isClusterOverCapacity
-                                          ? "border-red-300 bg-red-100 text-red-700 dark:border-red-800/60 dark:bg-red-900/30 dark:text-red-300"
-                                          : isClusterAtCapacity
-                                            ? "border-muted-foreground/30 bg-muted text-muted-foreground"
-                                            : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-300",
-                                      )}
-                                    >
-                                      {clusterRequestCount}/{clusterMaxSize} SOS
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                                    <span className="text-[14px] text-muted-foreground whitespace-nowrap">
-                                      {pendingClusterSOS.length > 0
-                                        ? `${pendingClusterSOS.length} chờ xử lý`
-                                        : activeClusterSOS.length > 0
-                                          ? `${activeClusterSOS.length} đang cứu hộ`
-                                          : unresolvedClusterSOS.length > 0
-                                            ? `${unresolvedClusterSOS.length} chờ/đang cứu`
-                                            : rescuedClusterSOS.length > 0
-                                              ? `${rescuedClusterSOS.length} đã xử lý`
-                                              : cancelledClusterSOS.length > 0
-                                                ? `${cancelledClusterSOS.length} đã hủy`
-                                                : `${sosCount} SOS`}
-                                    </span>
-                                    {isExpanded ? (
-                                      <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
-                                    ) : (
-                                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                                    )}
                                   </div>
                                 </div>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "absolute right-3 top-2.5 text-[14px] h-6 px-2 leading-none whitespace-nowrap",
+                                    isClusterOverCapacity
+                                      ? "border-red-300 bg-red-100 text-red-700 dark:border-red-800/60 dark:bg-red-900/30 dark:text-red-300"
+                                      : isClusterAtCapacity
+                                        ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                        : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-300",
+                                  )}
+                                >
+                                  {clusterRequestCount}/{clusterMaxSize} SOS
+                                </Badge>
 
-                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[14px] text-muted-foreground mt-1.5">
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm tracking-tighter mt-1.5">
                                   {cluster.victimEstimated && (
-                                    <span className="flex items-center gap-1">
+                                    <span className="flex items-center gap-1 font-medium">
                                       <Users
                                         className="h-3 w-3"
                                         weight="fill"
                                       />
-                                      ~{cluster.victimEstimated} nạn nhân
+                                      Khoảng {cluster.victimEstimated} nạn nhân
                                     </span>
                                   )}
                                   {cluster.waterLevel && (
-                                    <span className="flex items-center gap-1">
+                                    <span className="flex items-center gap-1 font-medium">
                                       <WaterLevelIcon />
                                       {cluster.waterLevel}
                                     </span>
@@ -2680,7 +2649,11 @@ const SOSSidebar = ({
                                           >
                                             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                               <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                                <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                                <span
+                                                  className={
+                                                    SOS_COMPACT_ID_CLASS
+                                                  }
+                                                >
                                                   SOS {sos.id}
                                                 </span>
                                                 {canDetachThisSOS ? (
@@ -2790,10 +2763,10 @@ const SOSSidebar = ({
                                                       className="h-3.5 w-3.5 text-blue-500 shrink-0"
                                                       weight="fill"
                                                     />
-                                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">
+                                                    <span className="text-xs font-medium tracking-tighter">
                                                       Hệ thống:
                                                     </span>
-                                                    <span className="text-[12px] font-mono font-bold text-foreground">
+                                                    <span className="text-xs font-mono font-bold text-foreground">
                                                       {sos.evaluation.ruleEvaluation.totalScore.toFixed(
                                                         1,
                                                       )}
@@ -2844,7 +2817,7 @@ const SOSSidebar = ({
                                         );
                                       })
                                     ) : clusterSOS.length > 0 ? (
-                                      <div className="px-3 py-2 text-[14px] text-muted-foreground">
+                                      <div className="px-3 py-2 text-sm tracking-tighter">
                                         Các SOS trong cụm này đã xử lý xong hoặc
                                         đã hủy, nên không còn hiển thị trong
                                         danh sách theo dõi nhanh.
@@ -2856,7 +2829,9 @@ const SOSSidebar = ({
                                           className="px-3 py-2"
                                         >
                                           <div className="flex items-center justify-between gap-2">
-                                            <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                            <span
+                                              className={SOS_COMPACT_ID_CLASS}
+                                            >
                                               SOS {sosId}
                                             </span>
                                             <Badge
@@ -2984,7 +2959,7 @@ const SOSSidebar = ({
                                     >
                                       {PRIORITY_LABELS[sos.priority]}
                                     </Badge>
-                                    <span className="text-[14px] font-mono text-muted-foreground">
+                                    <span className={SOS_COMPACT_ID_CLASS}>
                                       SOS {sos.id}
                                     </span>
                                   </div>
@@ -3270,9 +3245,7 @@ function DragOverlaySOSCard({ sos }: { sos: SOSRequest | null }) {
   return (
     <div className="w-[300px] rounded-xl border border-border shadow-xl bg-background/90 backdrop-blur-sm p-3 pointer-events-none cursor-grabbing">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[14px] font-mono font-semibold text-foreground/90">
-          SOS {sos.id}
-        </span>
+        <span className={SOS_COMPACT_ID_CLASS}>SOS {sos.id}</span>
         <Badge
           variant={PRIORITY_BADGE_VARIANT[sos.priority]}
           className="text-[14px] h-6 px-2 leading-none"
@@ -3294,10 +3267,10 @@ function DragOverlayCartBundle({ cartItems }: { cartItems: SOSRequest[] }) {
         <Tray className="h-5 w-5" weight="fill" />
       </div>
       <div>
-        <div className="text-[15px] font-semibold text-foreground">
+        <div className="text-base tracking-tighter font-semibold">
           Khay chờ SOS
         </div>
-        <div className="text-[13px] text-muted-foreground">
+        <div className="text-sm tracking-tighter">
           {cartItems.length} yêu cầu đang kéo
         </div>
       </div>
@@ -3376,7 +3349,7 @@ function DroppableCartArea({
           <div className="flex flex-col">
             <span
               className={cn(
-                "font-semibold text-[15px]",
+                "font-semibold text-sm tracking-tighter",
                 isDraggingSOS && "text-primary",
               )}
             >
@@ -3384,7 +3357,7 @@ function DroppableCartArea({
             </span>
             <span
               className={cn(
-                "text-[13px] transition-colors",
+                "text-sm tracking-tighter transition-colors",
                 isDraggingSOS
                   ? "text-primary font-medium"
                   : "text-muted-foreground",
@@ -3443,9 +3416,7 @@ function DroppableCartArea({
               onClick={() => onSOSSelect(sos)}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
-                  SOS {sos.id}
-                </span>
+                <span className={SOS_COMPACT_ID_CLASS}>SOS {sos.id}</span>
                 <Badge
                   variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                   className="text-[12px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"

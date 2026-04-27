@@ -8,6 +8,8 @@ import type {
   SOSSpecialDietPerson,
   SOSStructuredData,
   SOSSupplyDetails,
+  SOSVictimProfile,
+  SOSIncidentHistoryEntry,
 } from "@/services/sos_request/type";
 
 interface Ticker {
@@ -121,6 +123,8 @@ export interface SOSRequest {
   hopCount?: number;
   locationAccuracy?: number | null;
   evaluation?: SOSRequestEvaluationSummary | null;
+  victims?: SOSVictimProfile[] | null;
+  incidentHistory?: SOSIncidentHistoryEntry[] | null;
 }
 
 export interface Rescuer {

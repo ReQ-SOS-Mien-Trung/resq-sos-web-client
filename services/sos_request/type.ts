@@ -90,6 +90,36 @@ export type FoodDurationType =
   | "2_TO_3_DAYS"
   | "OVER_3_DAYS";
 
+// Victim incident status in new API format
+export interface SOSVictimIncidentStatus {
+  is_injured: boolean;
+  severity: string | null;
+  medical_issues: string[];
+}
+
+// Victim personal needs in new API format
+export interface SOSVictimPersonalNeeds {
+  clothing: {
+    needed: boolean;
+    gender: string | null;
+  };
+  diet: {
+    has_special_diet: boolean;
+    description: string | null;
+  };
+}
+
+// Victim profile in new API format (structuredData.victims[])
+export interface SOSVictimProfile {
+  person_id: string;
+  person_type: string;
+  index: number;
+  custom_name: string | null;
+  person_phone: string | null;
+  incident_status: SOSVictimIncidentStatus;
+  personal_needs: SOSVictimPersonalNeeds;
+}
+
 // Injured person in SOS request
 export interface InjuredPerson {
   index: number;
@@ -175,6 +205,11 @@ export interface SOSStructuredData {
   address?: string | null;
   operation_support?: SOSOperationSupportContext | null;
   team_incident_context?: SOSTeamIncidentContext | null;
+  // New API format fields
+  incident?: Record<string, unknown> | null;
+  group_needs?: Record<string, unknown> | null;
+  victims?: SOSVictimProfile[] | null;
+  prepared_profiles?: unknown[] | null;
 }
 
 // Network metadata from mesh relay
@@ -233,7 +268,24 @@ export interface SOSRequestEntity {
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
   latestIncidentNote?: string | null;
+  latestIncidentAt?: string | null;
+  incidentHistory?: SOSIncidentHistoryEntry[] | null;
+  companions?: unknown[] | null;
   evaluation?: SOSRequestEvaluationSummary | null;
+}
+
+export interface SOSIncidentHistoryEntry {
+  id: number;
+  teamIncidentId?: number | null;
+  missionId?: number | null;
+  missionTeamId?: number | null;
+  missionActivityId?: number | null;
+  incidentScope?: string | null;
+  note: string;
+  reportedById?: string | null;
+  createdAt: string;
+  teamName?: string | null;
+  activityType?: string | null;
 }
 
 // Paginated Response
