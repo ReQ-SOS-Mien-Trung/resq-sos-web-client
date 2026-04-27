@@ -221,7 +221,7 @@ function CampaignFundFlowChart() {
           borderRadius: 4,
         },
         {
-          label: "Số dư ròng (VND)",
+          label: "Còn lại (VND)",
           data: data.dataPoints.map((p) => p.netBalance),
           backgroundColor: "rgba(59,130,246,0.75)",
           borderColor: "rgb(59,130,246)",

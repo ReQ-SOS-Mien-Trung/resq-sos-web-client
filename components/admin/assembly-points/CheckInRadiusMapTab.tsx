@@ -342,6 +342,25 @@ function CheckInRadiusMapLogic({
   const radiusHandleRef = useRef<L.Marker | null>(null);
   const lastViewportKeyRef = useRef<string>("");
 
+  // Invalidate map size whenever the container resizes (e.g. sidebar toggle)
+  // Debounced to avoid flicker during CSS transition animation
+  useEffect(() => {
+    if (!map) return;
+    const container = map.getContainer();
+    let timer: ReturnType<typeof setTimeout>;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        map.invalidateSize({ animate: false });
+      }, 200);
+    });
+    ro.observe(container);
+    return () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, [map]);
+
   // Keep callback in a ref so the handle effect never re-runs just because the fn changed
   const onEditingRadiusChangeRef = useRef(onEditingRadiusChange);
   useEffect(() => {
@@ -554,12 +573,7 @@ function CheckInRadiusMapLogic({
 
   // Fly to selected point
   useEffect(() => {
-    if (
-      !flyTo ||
-      !map ||
-      isAwaitingSelectedRadius ||
-      isEditingRadius
-    ) {
+    if (!flyTo || !map || isAwaitingSelectedRadius || isEditingRadius) {
       return;
     }
     const viewportKey = `${flyTo.lat}:${flyTo.lng}:${selectedRadiusMeters ?? "none"}`;
@@ -586,7 +600,13 @@ function CheckInRadiusMapLogic({
       duration: 0.85,
       easeLinearity: 0.2,
     });
-  }, [map, flyTo, isAwaitingSelectedRadius, isEditingRadius, selectedRadiusMeters]);
+  }, [
+    map,
+    flyTo,
+    isAwaitingSelectedRadius,
+    isEditingRadius,
+    selectedRadiusMeters,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -595,8 +615,8 @@ function CheckInRadiusMapLogic({
         cancelAnimationFrame(pendingRadiusRafRef.current);
       }
       radiusHandleRef.current?.remove();
-      markersRef.current.forEach(m => m.remove());
-      circlesRef.current.forEach(c => c.remove());
+      markersRef.current.forEach((m) => m.remove());
+      circlesRef.current.forEach((c) => c.remove());
     };
   }, []);
 
@@ -614,8 +634,25 @@ function CheckInRadiusMapInner(props: {
   onSelect: (id: number) => void;
   flyTo: { lat: number; lng: number } | null;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Clean up any lingering Leaflet instance on the DOM node before mounting
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    return () => {
+      // Remove Leaflet's internal marker so MapContainer can remount cleanly
+      const mapEl = el.querySelector(".leaflet-container") as HTMLElement & {
+        _leaflet_id?: number;
+      };
+      if (mapEl) {
+        delete mapEl._leaflet_id;
+      }
+    };
+  }, []);
+
   return (
-    <div className="h-full w-full relative">
+    <div ref={containerRef} className="h-full w-full relative">
       <MapContainer
         center={[16.4637, 107.5909]}
         zoom={13}
@@ -623,7 +660,9 @@ function CheckInRadiusMapInner(props: {
         zoomControl={false}
         attributionControl={false}
       >
-        <GoongLeafletLayer apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""} />
+        <GoongLeafletLayer
+          apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+        />
         <CheckInRadiusMapLogic {...props} />
       </MapContainer>
     </div>

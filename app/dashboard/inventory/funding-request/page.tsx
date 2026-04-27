@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -224,15 +224,15 @@ const FUND_TX_REFERENCE_TYPE_OPTIONS: Array<{
   value: DepotFundReferenceType;
   label: string;
 }> = [
-    {
-      value: "CampaignDisbursement",
-      label: "Giải ngân chiến dịch",
-    },
-    {
-      value: "VatInvoice",
-      label: "Hóa đơn VAT",
-    },
-  ];
+  {
+    value: "CampaignDisbursement",
+    label: "Giải ngân chiến dịch",
+  },
+  {
+    value: "VatInvoice",
+    label: "Hóa đơn VAT",
+  },
+];
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -532,10 +532,7 @@ function validateRow(row: Omit<ImportRow, "errors">): Record<string, string> {
   if (!row.targetGroups?.length) {
     errors.targetGroups = "Đối tượng không được trống";
   }
-  if (
-    row.itemType === "Reusable" &&
-    !row.targetGroups?.includes("Rescuer")
-  ) {
+  if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer")) {
     errors.targetGroups = "Đồ tái sử dụng phải có Lực lượng cứu hộ";
   }
   return errors;
@@ -743,7 +740,21 @@ export default function FundingRequestPage() {
   const selectedFundTxReferenceType =
     fundTxReferenceTypes.length === 1 ? fundTxReferenceTypes[0] : "all";
 
-  const [activeTab, setActiveTab] = useState<TabType>("create");
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as TabType | null;
+  const validTabs: TabType[] = ["create", "history", "funds", "ledger"];
+  const [activeTab, setActiveTabState] = useState<TabType>(
+    tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "create",
+  );
+  const setActiveTab = useCallback(
+    (tab: TabType) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.set("tab", tab);
+      router.replace(`?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
   const [ledgerMode, setLedgerMode] = useState<LedgerMode>("advance");
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [selectedLedgerContributorKey, setSelectedLedgerContributorKey] =
@@ -841,7 +852,7 @@ export default function FundingRequestPage() {
   const defaultFundSourceId = fundSources[0] ? String(fundSources[0].id) : "";
   const effectiveAdvanceFundId =
     selectedAdvanceFundId &&
-      fundSources.some((fund) => String(fund.id) === selectedAdvanceFundId)
+    fundSources.some((fund) => String(fund.id) === selectedAdvanceFundId)
       ? selectedAdvanceFundId
       : defaultFundSourceId;
   const effectiveSelectedLedgerContributorKey = filteredLedgerContributors.some(
@@ -889,8 +900,8 @@ export default function FundingRequestPage() {
   const advanceCapacity = useMemo(() => {
     const selectedFundBalance =
       selectedAdvanceFund &&
-        typeof selectedAdvanceFund.balance === "number" &&
-        Number.isFinite(selectedAdvanceFund.balance)
+      typeof selectedAdvanceFund.balance === "number" &&
+      Number.isFinite(selectedAdvanceFund.balance)
         ? selectedAdvanceFund.balance
         : 0;
     return selectedFundBalance + remainingAdvanceHeadroom;
@@ -899,68 +910,68 @@ export default function FundingRequestPage() {
 
   const ledgerShellMotionProps = prefersReducedMotion
     ? {
-      initial: { opacity: 0 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0 },
-      transition: { duration: 0.2 },
-    }
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+        transition: { duration: 0.2 },
+      }
     : {
-      initial: { opacity: 0, y: 20, scale: 0.985 },
-      animate: { opacity: 1, y: 0, scale: 1 },
-      exit: { opacity: 0, y: -12, scale: 0.992 },
-      transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
-    };
+        initial: { opacity: 0, y: 20, scale: 0.985 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -12, scale: 0.992 },
+        transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
+      };
   const ledgerLeftPageMotionProps = prefersReducedMotion
     ? {
-      initial: { opacity: 0 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0 },
-      transition: { duration: 0.2 },
-    }
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+        transition: { duration: 0.2 },
+      }
     : {
-      initial: { opacity: 0.2, rotateY: -92, x: 58, scale: 0.985 },
-      animate: { opacity: 1, rotateY: 0, x: 0, scale: 1 },
-      exit: { opacity: 0, rotateY: -18, x: -24, scale: 0.992 },
-      transition: {
-        duration: 0.82,
-        delay: 0.06,
-        ease: [0.16, 1, 0.3, 1] as const,
-      },
-    };
+        initial: { opacity: 0.2, rotateY: -92, x: 58, scale: 0.985 },
+        animate: { opacity: 1, rotateY: 0, x: 0, scale: 1 },
+        exit: { opacity: 0, rotateY: -18, x: -24, scale: 0.992 },
+        transition: {
+          duration: 0.82,
+          delay: 0.06,
+          ease: [0.16, 1, 0.3, 1] as const,
+        },
+      };
   const ledgerRightPageMotionProps = prefersReducedMotion
     ? {
-      initial: { opacity: 0 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0 },
-      transition: { duration: 0.2 },
-    }
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+        transition: { duration: 0.2 },
+      }
     : {
-      initial: { opacity: 0.2, rotateY: 92, x: -58, scale: 0.985 },
-      animate: { opacity: 1, rotateY: 0, x: 0, scale: 1 },
-      exit: { opacity: 0, rotateY: 18, x: 24, scale: 0.992 },
-      transition: {
-        duration: 0.82,
-        delay: 0.1,
-        ease: [0.16, 1, 0.3, 1] as const,
-      },
-    };
+        initial: { opacity: 0.2, rotateY: 92, x: -58, scale: 0.985 },
+        animate: { opacity: 1, rotateY: 0, x: 0, scale: 1 },
+        exit: { opacity: 0, rotateY: 18, x: 24, scale: 0.992 },
+        transition: {
+          duration: 0.82,
+          delay: 0.1,
+          ease: [0.16, 1, 0.3, 1] as const,
+        },
+      };
   const ledgerBinderMotionProps = prefersReducedMotion
     ? {
-      initial: { opacity: 0 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0 },
-      transition: { duration: 0.2 },
-    }
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+        transition: { duration: 0.2 },
+      }
     : {
-      initial: { opacity: 0, scaleY: 0.74, y: 20 },
-      animate: { opacity: 1, scaleY: 1, y: 0 },
-      exit: { opacity: 0, scaleY: 0.86, y: -12 },
-      transition: {
-        duration: 0.48,
-        delay: 0.28,
-        ease: [0.16, 1, 0.3, 1] as const,
-      },
-    };
+        initial: { opacity: 0, scaleY: 0.74, y: 20 },
+        animate: { opacity: 1, scaleY: 1, y: 0 },
+        exit: { opacity: 0, scaleY: 0.86, y: -12 },
+        transition: {
+          duration: 0.48,
+          delay: 0.28,
+          ease: [0.16, 1, 0.3, 1] as const,
+        },
+      };
 
   // ── Create form state ──
   const [description, setDescription] = useState("");
@@ -1101,9 +1112,9 @@ export default function FundingRequestPage() {
         currentRows.map((row) =>
           row.id === rowId
             ? {
-              ...row,
-              [field]: field === "amount" ? value.replace(/\D/g, "") : value,
-            }
+                ...row,
+                [field]: field === "amount" ? value.replace(/\D/g, "") : value,
+              }
             : row,
         ),
       );
@@ -1223,7 +1234,7 @@ export default function FundingRequestPage() {
     for (const [index, row] of filledRows.entries()) {
       const resolvedDepotFundId =
         row.depotFundId.trim() &&
-          fundSources.some((fund) => String(fund.id) === row.depotFundId)
+        fundSources.some((fund) => String(fund.id) === row.depotFundId)
           ? row.depotFundId
           : defaultFundSourceId;
 
@@ -1367,9 +1378,9 @@ export default function FundingRequestPage() {
 
             const newRows = append
               ? [...prev, ...parsed].map((r, i) => ({
-                ...r,
-                row: i + 1,
-              }))
+                  ...r,
+                  row: i + 1,
+                }))
               : parsed;
             return newRows;
           });
@@ -1753,20 +1764,22 @@ export default function FundingRequestPage() {
         >
           <button
             onClick={() => setActiveTab("create")}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "create"
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
+              activeTab === "create"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
-              }`}
+            }`}
           >
             <PaperPlaneTilt size={20} />
             Tạo yêu cầu
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "history"
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
+              activeTab === "history"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
-              }`}
+            }`}
           >
             <ListBullets size={20} />
             Lịch sử yêu cầu cấp quỹ
@@ -1778,10 +1791,11 @@ export default function FundingRequestPage() {
           </button>
           <button
             onClick={() => setActiveTab("funds")}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "funds"
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
+              activeTab === "funds"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
-              }`}
+            }`}
           >
             <Bank size={20} />
             Quỹ kho
@@ -2247,7 +2261,7 @@ export default function FundingRequestPage() {
                                   key={row.id}
                                   className={cn(
                                     hasErrors &&
-                                    "bg-red-50/50 dark:bg-red-950/10",
+                                      "bg-red-50/50 dark:bg-red-950/10",
                                   )}
                                 >
                                   <TableCell className="text-center text-sm text-muted-foreground font-mono">
@@ -2335,50 +2349,45 @@ export default function FundingRequestPage() {
                                                 e.preventDefault()
                                               }
                                             >
-                                              {targetGroupOptions.map(
-                                                (opt) => {
-                                                  const checked =
-                                                    selected.includes(
-                                                      opt.value,
-                                                    );
-                                                  return (
-                                                    <button
-                                                      key={opt.value}
-                                                      type="button"
-                                                      onClick={() => {
-                                                        const next = checked
-                                                          ? selected.filter(
-                                                              (v) =>
-                                                                v !==
-                                                                opt.value,
-                                                            )
-                                                          : [
-                                                              ...selected,
-                                                              opt.value,
-                                                            ];
-                                                        updateRow(
-                                                          row.id,
-                                                          "targetGroups",
-                                                          next,
-                                                        );
-                                                      }}
-                                                      className="flex items-center gap-2 px-2 py-1.5 rounded-md w-full hover:bg-muted text-sm cursor-pointer"
+                                              {targetGroupOptions.map((opt) => {
+                                                const checked =
+                                                  selected.includes(opt.value);
+                                                return (
+                                                  <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const next = checked
+                                                        ? selected.filter(
+                                                            (v) =>
+                                                              v !== opt.value,
+                                                          )
+                                                        : [
+                                                            ...selected,
+                                                            opt.value,
+                                                          ];
+                                                      updateRow(
+                                                        row.id,
+                                                        "targetGroups",
+                                                        next,
+                                                      );
+                                                    }}
+                                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md w-full hover:bg-muted text-sm cursor-pointer"
+                                                  >
+                                                    <div
+                                                      className={cn(
+                                                        "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px] font-bold",
+                                                        checked
+                                                          ? "bg-primary border-primary text-primary-foreground"
+                                                          : "border-muted-foreground/40",
+                                                      )}
                                                     >
-                                                      <div
-                                                        className={cn(
-                                                          "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px] font-bold",
-                                                          checked
-                                                            ? "bg-primary border-primary text-primary-foreground"
-                                                            : "border-muted-foreground/40",
-                                                        )}
-                                                      >
-                                                        {checked && "✓"}
-                                                      </div>
-                                                      {opt.label}
-                                                    </button>
-                                                  );
-                                                },
-                                              )}
+                                                      {checked && "✓"}
+                                                    </div>
+                                                    {opt.label}
+                                                  </button>
+                                                );
+                                              })}
                                             </PopoverContent>
                                           </Popover>
                                           {error && (
@@ -2394,16 +2403,16 @@ export default function FundingRequestPage() {
                                   <TableCell>
                                     {itemTypeOptions.length > 0
                                       ? renderSelectCell(
-                                        row,
-                                        "itemType",
-                                        itemTypeOptions,
-                                        "Chọn loại vật phẩm",
-                                      )
+                                          row,
+                                          "itemType",
+                                          itemTypeOptions,
+                                          "Chọn loại vật phẩm",
+                                        )
                                       : renderInputCell(
-                                        row,
-                                        "itemType",
-                                        "Hàng khô...",
-                                      )}
+                                          row,
+                                          "itemType",
+                                          "Hàng khô...",
+                                        )}
                                   </TableCell>
                                   {/* F: Đơn vị */}
                                   <TableCell>
@@ -2851,8 +2860,8 @@ export default function FundingRequestPage() {
                             Cập nhật gần nhất:{" "}
                             {latestFundUpdatedAt
                               ? new Date(latestFundUpdatedAt).toLocaleString(
-                                "vi-VN",
-                              )
+                                  "vi-VN",
+                                )
                               : "—"}
                           </span>
                         </div>
@@ -2892,10 +2901,11 @@ export default function FundingRequestPage() {
                               onClick={() =>
                                 setSelectedLedgerContributorKey(item.key)
                               }
-                              className={`w-full border-x-0 border-t-0 border-b px-1 py-2.5 text-left transition-all ${selectedLedgerContributor?.key === item.key
+                              className={`w-full border-x-0 border-t-0 border-b px-1 py-2.5 text-left transition-all ${
+                                selectedLedgerContributor?.key === item.key
                                   ? "border-blue-200/70 bg-blue-50/60"
                                   : "border-slate-200/70 bg-transparent hover:border-blue-200/60 hover:bg-blue-50/30"
-                                }`}
+                              }`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -3015,10 +3025,10 @@ export default function FundingRequestPage() {
                               prefersReducedMotion
                                 ? undefined
                                 : {
-                                  duration: 0.28,
-                                  delay: 0.34 + index * 0.04,
-                                  ease: [0.16, 1, 0.3, 1],
-                                }
+                                    duration: 0.28,
+                                    delay: 0.34 + index * 0.04,
+                                    ease: [0.16, 1, 0.3, 1],
+                                  }
                             }
                           >
                             <div className="absolute left-1/2 top-1/2 h-[42px] w-[8px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-300/85 bg-gradient-to-b from-slate-300 via-white to-slate-400 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.36)]" />
@@ -3084,10 +3094,11 @@ export default function FundingRequestPage() {
                             onClick={() =>
                               setLedgerMode(mode.key as LedgerMode)
                             }
-                            className={`rounded-full px-4 py-[7px] text-sm font-medium tracking-tight leading-[26px] transition-colors ${ledgerMode === mode.key
+                            className={`rounded-full px-4 py-[7px] text-sm font-medium tracking-tight leading-[26px] transition-colors ${
+                              ledgerMode === mode.key
                                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                                 : "border border-primary/20 bg-white text-slate-700 hover:bg-primary/5"
-                              }`}
+                            }`}
                           >
                             {mode.label}
                           </button>
@@ -3318,11 +3329,11 @@ export default function FundingRequestPage() {
                                       <Select
                                         value={
                                           row.depotFundId &&
-                                            fundSources.some(
-                                              (fund) =>
-                                                String(fund.id) ===
-                                                row.depotFundId,
-                                            )
+                                          fundSources.some(
+                                            (fund) =>
+                                              String(fund.id) ===
+                                              row.depotFundId,
+                                          )
                                             ? row.depotFundId
                                             : defaultFundSourceId
                                         }
@@ -3411,11 +3422,11 @@ export default function FundingRequestPage() {
                                 </div>
                                 {repaymentTotal >
                                   selectedRepaymentContributor.outstandingAmount && (
-                                    <div className="mt-[26px] px-1 text-sm tracking-tight text-rose-600 leading-[26px]">
-                                      Tổng tiền đang lớn hơn số dư cần quyết toán
-                                      cho người chi hộ được chọn.
-                                    </div>
-                                  )}
+                                  <div className="mt-[26px] px-1 text-sm tracking-tight text-rose-600 leading-[26px]">
+                                    Tổng tiền đang lớn hơn số dư cần quyết toán
+                                    cho người chi hộ được chọn.
+                                  </div>
+                                )}
                               </div>
 
                               {/* ── Submit button ── */}
@@ -4227,7 +4238,7 @@ export default function FundingRequestPage() {
                                 <span className="text-sm font-bold text-emerald-600 shrink-0">
                                   {formatMoney(
                                     item.totalPrice ??
-                                    item.quantity * item.unitPrice,
+                                      item.quantity * item.unitPrice,
                                   )}
                                 </span>
                               </div>

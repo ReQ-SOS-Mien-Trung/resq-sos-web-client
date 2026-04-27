@@ -121,7 +121,7 @@ export function resolveNotificationRoute(
   }
 
   if (normalizedType === "fund_allocation") {
-    return "/dashboard/inventory/funding-request";
+    return "/dashboard/inventory/funding-request?tab=funds";
   }
 
   if (
