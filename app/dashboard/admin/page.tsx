@@ -79,6 +79,7 @@ const AdminDashboardPage = () => {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] xl:grid-cols-[minmax(0,1fr)_340px]">
           {/* Left Column - Victims Bar Chart */}
           <div
+            id="victims-chart"
             className="min-w-0 animate-in fade-in slide-in-from-left-4 duration-500"
             style={{ animationDelay: "200ms" }}
           >
@@ -97,6 +98,7 @@ const AdminDashboardPage = () => {
         <div className="grid grid-cols-1 gap-6">
           {/* Depot Fund Movement */}
           <div
+            id="depot-fund-movement"
             className="animate-in fade-in slide-in-from-bottom-4 duration-500"
             style={{ animationDelay: "400ms" }}
           >

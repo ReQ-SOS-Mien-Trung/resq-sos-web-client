@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -24,14 +25,22 @@ import {
   ArrowLeft,
   CaretDown,
   CaretRight,
+  MagnifyingGlass,
+  X,
+  Funnel,
+  ArrowsClockwise,
 } from "@phosphor-icons/react";
-import { useRescueTeamsOverview } from "@/services/admin_dashboard/team-overview.hooks";
-import { RescueTeamOverviewItem } from "@/services/admin_dashboard/team-overview.type";
 import {
-  useRescueTeamStatuses,
-  useRescueTeamTypes,
-} from "@/services/rescue_teams/hooks";
+  useRescueTeamsOverview,
+  useTeamOverviewTeamTypes,
+  useTeamOverviewStatuses,
+  useTeamOverviewAssemblyPointNames,
+  TEAM_OVERVIEW_KEYS,
+} from "@/services/admin_dashboard/team-overview.hooks";
+import { RescueTeamOverviewItem } from "@/services/admin_dashboard/team-overview.type";
+import { Input } from "@/components/ui/input";
 import { TeamDetailPanel } from "@/components/admin/team-overview/TeamDetailPanel";
+import { useRescueTeamRealtime } from "@/hooks/useRescueTeamRealtime";
 
 type SortColumn =
   | "name"
@@ -96,11 +105,56 @@ const SortHeader = ({
 
 const TeamOverviewPage = () => {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: TEAM_OVERVIEW_KEYS.all });
+    setIsRefreshing(false);
+  }, [queryClient]);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<SortState>(null);
   const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null);
+
+  // ─── Realtime hub ───
+  useRescueTeamRealtime({
+    subscribeList: true,
+    teamId: expandedTeamId,
+  });
+
+  // ─── Filter state ───
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterTeamType, setFilterTeamType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterAssemblyPoint, setFilterAssemblyPoint] = useState("");
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const resetFilters = useCallback(() => {
+    setSearch("");
+    setDebouncedSearch("");
+    setFilterTeamType("");
+    setFilterStatus("");
+    setFilterAssemblyPoint("");
+    setPage(1);
+  }, []);
+
+  const hasActiveFilters =
+    debouncedSearch !== "" ||
+    filterTeamType !== "" ||
+    filterStatus !== "" ||
+    filterAssemblyPoint !== "";
 
   useEffect(() => {
     getDashboardData().then(setDashboardData).catch(console.error);
@@ -109,9 +163,14 @@ const TeamOverviewPage = () => {
   const { data, isLoading } = useRescueTeamsOverview({
     pageNumber: page,
     pageSize,
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(filterTeamType ? { teamType: filterTeamType } : {}),
+    ...(filterStatus ? { status: filterStatus } : {}),
+    ...(filterAssemblyPoint ? { assemblyPointName: filterAssemblyPoint } : {}),
   });
-  const { data: rescueTeamStatuses = [] } = useRescueTeamStatuses();
-  const { data: rescueTeamTypes = [] } = useRescueTeamTypes();
+  const { data: rescueTeamStatuses = [] } = useTeamOverviewStatuses();
+  const { data: rescueTeamTypes = [] } = useTeamOverviewTeamTypes();
+  const { data: assemblyPointNames = [] } = useTeamOverviewAssemblyPointNames();
 
   const teams = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
@@ -213,6 +272,121 @@ const TeamOverviewPage = () => {
               Danh sách tất cả đội, ưu tiên biến động mới nhất
             </p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-9 gap-1.5 text-sm tracking-tighter"
+          >
+            <ArrowsClockwise
+              size={15}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+            Làm mới
+          </Button>
+        </motion.div>
+
+        {/* Filters */}
+        <motion.div
+          className="flex items-center gap-3"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.08, ease: "easeOut" }}
+        >
+          <div className="relative w-full max-w-xs">
+           
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc mã đội..."
+              className="h-9 pl-9 pr-8 bg-white text-sm tracking-tighter dark:bg-card"
+            />
+             <MagnifyingGlass
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <Select
+              value={filterTeamType}
+              onValueChange={(v) => {
+                setFilterTeamType(v === "__all__" ? "" : v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-full bg-white text-sm tracking-tighter dark:bg-card">
+                <SelectValue placeholder="Loại đội" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tất cả loại</SelectItem>
+                {rescueTeamTypes.map((t) => (
+                  <SelectItem key={t.key} value={t.key}>
+                    {t.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filterStatus}
+              onValueChange={(v) => {
+                setFilterStatus(v === "__all__" ? "" : v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-full bg-white text-sm tracking-tighter dark:bg-card">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tất cả trạng thái</SelectItem>
+                {rescueTeamStatuses.map((s) => (
+                  <SelectItem key={s.key} value={s.key}>
+                    {s.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filterAssemblyPoint}
+              onValueChange={(v) => {
+                setFilterAssemblyPoint(v === "__all__" ? "" : v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-full bg-white text-sm tracking-tighter dark:bg-card">
+                <SelectValue placeholder="Điểm tập kết" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tất cả điểm tập kết</SelectItem>
+                {assemblyPointNames.map((a) => (
+                  <SelectItem key={a.key} value={a.key}>
+                    {a.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+          </Select>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="h-9 gap-1.5 text-sm tracking-tighter text-muted-foreground hover:text-foreground"
+            >
+              <Funnel size={14} />
+              Xóa bộ lọc
+            </Button>
+          )}
         </motion.div>
 
         {/* Table Card */}
@@ -303,8 +477,11 @@ const TeamOverviewPage = () => {
                                 onClick={() => handleRowClick(team.id)}
                                 className={`transition-colors cursor-pointer ${isExpanded ? "bg-muted/40" : ""}`}
                                 style={{
+                                  animationName: "fadeSlideIn",
+                                  animationDuration: "0.35s",
+                                  animationTimingFunction: "ease-out",
+                                  animationFillMode: "both",
                                   animationDelay: `${rowIdx * 40}ms`,
-                                  animation: "fadeSlideIn 0.35s ease-out both",
                                 }}
                               >
                                 <td className="p-3 w-8">

@@ -26,6 +26,11 @@ export type ActivityStatus = MissionActivityStatus;
 
 export type ActivityStatusInput = ActivityStatus | string;
 
+export interface ActivityStatusMetadataOption {
+  key: string;
+  value: string;
+}
+
 export interface MissionTeam {
   missionTeamId: number;
   rescueTeamId: number;
