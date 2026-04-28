@@ -2050,7 +2050,7 @@ const CoordinatorDashboardContent = () => {
         {/* Sidebar */}
         <aside
           className={cn(
-            "h-full min-h-0 shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
+            "h-full min-h-0 shrink-0 overflow-hidden transition-[width] duration-300 ease-out will-change-[width]",
             sidebarOpen ? "w-88" : "w-0",
           )}
         >

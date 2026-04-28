@@ -12,36 +12,46 @@ export const MapInvalidator = () => {
   useEffect(() => {
     if (!map) return;
 
-    // Use a simple ResizeObserver to invalidate the map size when its container changes.
-    // To handle smooth transitions (like the sidebar opening/closing), we can use a small
-    // requestAnimationFrame loop triggered by the resize event.
+    // Sidebar width transitions can emit many resize ticks. Keep Leaflet's
+    // center stable while the container changes, then do one final settle pass.
     let rafId: number | null = null;
-    
-    const invalidate = () => {
-      map.invalidateSize({ animate: false });
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const invalidate = (isSettling = false) => {
+      map.invalidateSize({
+        animate: false,
+        pan: false,
+        debounceMoveend: !isSettling,
+      });
     };
 
-    const observer = new ResizeObserver(() => {
-      // During a CSS transition, ResizeObserver will fire multiple times.
-      // We use requestAnimationFrame to ensure we only invalidate once per frame.
+    const scheduleInvalidate = () => {
       if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(invalidate);
-    });
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        invalidate();
+      });
+
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
+        invalidate(true);
+      }, 120);
+    };
 
     const container = map.getContainer();
+    const observer = new ResizeObserver(scheduleInvalidate);
     observer.observe(container);
 
     // Also trigger on window resize
-    const handleResize = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(invalidate);
-    };
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", scheduleInvalidate);
+    scheduleInvalidate();
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", scheduleInvalidate);
       if (rafId) cancelAnimationFrame(rafId);
+      if (settleTimer) clearTimeout(settleTimer);
     };
   }, [map]);
   return null;

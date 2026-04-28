@@ -1864,7 +1864,9 @@ export default function CoordinatorRescuerManagementPage() {
                       : "border-slate-300 bg-slate-50 text-slate-700",
                   )}
                 >
-                  {rescuer.hasTeam ? "Đã vào team" : "Chưa vào team"}
+                  {rescuer.hasTeam
+                    ? (rescuer.activeTeamName || "Đã vào team")
+                    : "Chưa vào team"}
                 </Badge>
 
                 {rescuer.rescuerType ? (
