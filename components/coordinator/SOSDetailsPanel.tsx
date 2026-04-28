@@ -274,64 +274,29 @@ function compactFormulaDetails(
 }
 
 const ITEMS_NEEDED_LABELS: Record<string, { label: string; icon: string }> = {
-  FIRST_AID_KIT: {
-    label: "Bộ sơ cứu",
-    icon: "ph:first-aid-kit",
-  },
-  MEDICAL_SUPPLIES: {
-    label: "Vật phẩm y tế",
-    icon: "ph:pill",
-  },
-  BANDAGES: {
-    label: "Băng gạc",
-    icon: "uil:band-aid",
-  },
-  BLOOD_CLOTTING_AGENTS: {
-    label: "Thuốc cầm máu",
-    icon: "healthicons:medicine-bottle-outline",
-  },
-  LIFE_JACKET: {
-    label: "Áo phao",
-    icon: "ph:lifebuoy",
-  },
-  RESCUE_BOAT: {
-    label: "Xuồng cứu hộ",
-    icon: "ph:boat",
-  },
-  ROPE: {
-    label: "Dây thừng",
-    icon: "game-icons:rope-coil",
-  },
-  RESCUE_EQUIPMENT: {
-    label: "Thiết bị cứu hộ",
-    icon: "ion:help-buoy-outline",
-  },
-  FIRE_EXTINGUISHER: {
-    label: "Bình chữa cháy",
-    icon: "fluent-emoji-high-contrast:fire-extinguisher",
-  },
-  PROTECTIVE_GEAR: {
-    label: "Đồ bảo hộ",
-    icon: "fluent-emoji-high-contrast:rescue-workers-helmet",
-  },
-  FOOD_RATIONS: {
-    label: "Lương thực",
-    icon: "fluent:food-toast-16-regular",
-  },
+  // ── Mobile SupplyNeed enum (primary keys) ──────────────────────────────────
   WATER: { label: "Nước uống", icon: "fa6-solid:bottle-water" },
-  CLOTHING: {
-    label: "Quần áo",
-    icon: "ph:t-shirt",
-  },
+  FOOD: { label: "Lương thực", icon: "fluent:food-toast-16-regular" },
+  CLOTHES: { label: "Quần áo", icon: "ph:t-shirt" },
+  BLANKET: { label: "Chăn mền", icon: "boxicons:blanket" },
+  MEDICINE: { label: "Vật phẩm y tế", icon: "ph:pill" },
+  OTHER: { label: "Nhu cầu khác", icon: "ph:dots-three-outline" },
+  // ── Legacy / backward-compat aliases ──────────────────────────────────────
+  FOOD_RATIONS: { label: "Lương thực", icon: "fluent:food-toast-16-regular" },
+  CLOTHING: { label: "Quần áo", icon: "ph:t-shirt" },
   BLANKETS: { label: "Chăn mền", icon: "boxicons:blanket" },
-  TRANSPORT_VEHICLE: {
-    label: "Phương tiện vận chuyển",
-    icon: "ph:ambulance",
-  },
-  STRETCHER: {
-    label: "Cáng cứu thương",
-    icon: "uil:stretcher",
-  },
+  FIRST_AID_KIT: { label: "Bộ sơ cứu", icon: "ph:first-aid-kit" },
+  MEDICAL_SUPPLIES: { label: "Vật phẩm y tế", icon: "ph:pill" },
+  BANDAGES: { label: "Băng gạc", icon: "uil:band-aid" },
+  BLOOD_CLOTTING_AGENTS: { label: "Thuốc cầm máu", icon: "healthicons:medicine-bottle-outline" },
+  LIFE_JACKET: { label: "Áo phao", icon: "ph:lifebuoy" },
+  RESCUE_BOAT: { label: "Xuồng cứu hộ", icon: "ph:boat" },
+  ROPE: { label: "Dây thừng", icon: "game-icons:rope-coil" },
+  RESCUE_EQUIPMENT: { label: "Thiết bị cứu hộ", icon: "ion:help-buoy-outline" },
+  FIRE_EXTINGUISHER: { label: "Bình chữa cháy", icon: "fluent-emoji-high-contrast:fire-extinguisher" },
+  PROTECTIVE_GEAR: { label: "Đồ bảo hộ", icon: "fluent-emoji-high-contrast:rescue-workers-helmet" },
+  TRANSPORT_VEHICLE: { label: "Phương tiện vận chuyển", icon: "ph:ambulance" },
+  STRETCHER: { label: "Cáng cứu thương", icon: "uil:stretcher" },
 };
 
 function FormulaVar({

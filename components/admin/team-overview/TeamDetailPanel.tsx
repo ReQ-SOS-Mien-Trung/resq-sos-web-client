@@ -43,6 +43,7 @@ import {
   MissionActivity,
 } from "@/services/admin_dashboard/team-overview.type";
 import RescuerScoreSheet from "./RescuerScoreSheet";
+import MissionTeamReportInline from "./MissionTeamReportInline";
 import { Icon } from "@iconify/react";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
@@ -85,6 +86,8 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
   });
 
   const [isMissionSheetOpen, setIsMissionSheetOpen] = useState(false);
+
+  const [expandedReportMissionTeamId, setExpandedReportMissionTeamId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
@@ -400,6 +403,23 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                       <Badge variant="outline" className="font-normal">
                                         Báo cáo: {mission.reportStatus || "-"}
                                       </Badge>
+                                      {mission.reportStatus && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 text-xs tracking-tighter"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedReportMissionTeamId((prev) =>
+                                              prev === mission.missionTeamId ? null : mission.missionTeamId,
+                                            );
+                                          }}
+                                        >
+                                          {expandedReportMissionTeamId === mission.missionTeamId
+                                            ? "Ẩn báo cáo"
+                                            : "Xem báo cáo"}
+                                        </Button>
+                                      )}
                                       <span>
                                         Giao lúc:{" "}
                                         {new Date(
@@ -453,6 +473,15 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                       <p className="text-sm text-muted-foreground">
                                         Chưa có hoạt động nào cho nhiệm vụ này
                                       </p>
+                                    )}
+
+                                    {expandedReportMissionTeamId === mission.missionTeamId && (
+                                      <div className="mt-4 border-t border-border/30 pt-4">
+                                        <MissionTeamReportInline
+                                          missionId={mission.missionId}
+                                          missionTeamId={mission.missionTeamId}
+                                        />
+                                      </div>
                                     )}
                                   </div>
                                 </motion.div>
