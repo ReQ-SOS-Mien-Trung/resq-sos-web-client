@@ -11,8 +11,9 @@ import {
 } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Spinner, ClipboardText, CheckCircle } from "@phosphor-icons/react";
+import { Spinner, ClipboardText, CheckCircle, ArrowRight } from "@phosphor-icons/react";
 import { useMissionTeamReportsSummary } from "@/services/admin_dashboard";
+import Link from "next/link";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
@@ -114,37 +115,30 @@ const MissionReportComplianceChart = () => {
   );
 
   return (
-    <Card className="border border-border/50 overflow-hidden group hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 h-full">
+    <Card className="border border-border/50 overflow-hidden group hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <ClipboardText
-            size={20}
-            weight="duotone"
-            className="text-violet-500"
-          />
-          <CardTitle className="text-sm font-semibold text-foreground xl:text-base">
-            Tuân thủ báo cáo nhiệm vụ
-          </CardTitle>
-        </div>
+        <CardTitle className="text-base font-semibold tracking-tighter text-foreground xl:text-xl text-center">
+          Thống kê báo cáo nhiệm vụ
+        </CardTitle>
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className="py-0">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <Spinner size={32} className="animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {/* Doughnut chart + center label */}
             <div className="flex flex-col items-center gap-1">
-              <div style={{ width: 160, height: 160, lineHeight: 0 }}>
+              <div style={{ width: 200, height: 200, lineHeight: 0 }}>
                 <Doughnut ref={chartRef} data={chartData} options={options} />
               </div>
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center -mt-1">
                 <span className="text-2xl font-black tracking-tighter leading-none">
                   {total}
                 </span>
-                <span className="text-xs text-muted-foreground mt-0.5">
+                <span className="text-xs tracking-tighter text-muted-foreground mt-0.5">
                   đội
                 </span>
               </div>
@@ -164,15 +158,15 @@ const MissionReportComplianceChart = () => {
                       <span
                         className={`w-2.5 h-2.5 rounded-full shrink-0 ${seg.dot}`}
                       />
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm tracking-tighter text-muted-foreground">
                         {seg.label}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-sm font-semibold ${seg.text}`}>
+                      <span className={`text-sm font-semibold tracking-tighter ${seg.text}`}>
                         {val}
                       </span>
-                      <span className="text-xs text-muted-foreground w-9 text-right">
+                      <span className="text-xs tracking-tighter text-muted-foreground w-9 text-right">
                         {pct}%
                       </span>
                     </div>
@@ -182,7 +176,7 @@ const MissionReportComplianceChart = () => {
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2">
               {/* Total Completed Teams */}
               <div className="rounded-xl bg-muted/50 p-2.5 flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
@@ -216,6 +210,17 @@ const MissionReportComplianceChart = () => {
                   {summary.submissionRate}%
                 </span>
               </div>
+            </div>
+
+            {/* Link */}
+            <div className="flex justify-end">
+              <Link
+                href="/dashboard/admin/team-overview"
+                className="flex items-center gap-1 text-xs tracking-tighter text-muted-foreground hover:text-primary transition-colors"
+              >
+                Xem chi tiết
+                <ArrowRight size={12} />
+              </Link>
             </div>
           </div>
         )}

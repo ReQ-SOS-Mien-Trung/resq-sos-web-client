@@ -321,7 +321,7 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
         variants={shouldReduceMotion ? undefined : panelContainerVariants}
       >
         {/* ── Top row: info + pie chart + members ────────────────────────── */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Pie chart */}
           <motion.div
             className="h-full"
@@ -349,8 +349,8 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                     Chưa có thống kê
                   </p>
                 ) : (
-                  <div className="flex flex-row items-center justify-center gap-4">
-                    <div className="h-52 w-52 shrink-0 xl:h-60 xl:w-60 tracking-normal -m-4 relative z-10">
+                  <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+                    <div className="h-40 w-40 shrink-0 sm:h-52 sm:w-52 xl:h-60 xl:w-60 tracking-normal -m-4 relative z-10">
                       <Doughnut
                         data={{
                           labels: ["Hoàn thành", "Chưa hoàn thành"],
