@@ -815,6 +815,9 @@ export async function exportInventoryMovements(
   if (params.year !== undefined) {
     searchParams.set("year", String(params.year));
   }
+  if (params.itemModelId !== undefined) {
+    searchParams.set("itemModelId", String(params.itemModelId));
+  }
 
   const token = useAuthStore.getState().accessToken;
   const response = await fetch(

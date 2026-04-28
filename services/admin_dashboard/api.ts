@@ -7,6 +7,7 @@ import {
   MissionSuccessRateSummaryResponse,
   SosRequestsSummaryResponse,
   MissionTeamReportsSummaryResponse,
+  RescuerOverviewResponse,
 } from "./type";
 
 /**
@@ -70,5 +71,17 @@ export async function getMissionTeamReportsSummary(): Promise<MissionTeamReports
   const { data } = await api.get(
     "/personnel/dashboard/mission-team-reports/summary",
   );
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/rescuers/overview
+ */
+export async function getRescuerOverview(
+  months?: number,
+): Promise<RescuerOverviewResponse> {
+  const { data } = await api.get("/personnel/dashboard/rescuers/overview", {
+    params: months ? { months } : undefined,
+  });
   return data;
 }

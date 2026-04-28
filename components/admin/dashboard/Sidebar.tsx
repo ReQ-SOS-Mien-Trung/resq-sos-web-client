@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -16,12 +16,32 @@ import {
   getFavoriteIcon,
   navigationItems,
 } from "@/lib/constants";
+import { useRescuerOverview, useVictimsByPeriod } from "@/services/admin_dashboard";
+import { useDepotMetadata } from "@/services/depot/hooks";
+
+const QUICK_STATS_ITEMS = [
+  { id: "1", name: "Cứu hộ viên" },
+  { id: "2", name: "Nạn nhân" },
+  { id: "3", name: "Biến động quỹ theo kho" },
+];
 
 const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
-  const [projectsExpanded, setProjectsExpanded] = useState(false);
+
+  const { data: rescuerData } = useRescuerOverview();
+  const { data: victimsData } = useVictimsByPeriod();
+  const { data: depotMetadata } = useDepotMetadata();
+
+  const realCounts: Record<string, number | undefined> = useMemo(
+    () => ({
+      "Cứu hộ viên": rescuerData?.totals.total,
+      "Nạn nhân": victimsData?.reduce((sum, item) => sum + item.totalVictims, 0),
+      "Biến động quỹ theo kho": depotMetadata?.length,
+    }),
+    [rescuerData, victimsData, depotMetadata],
+  );
   // Track which parent nav groups are open (by label)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     // Auto-open any group whose child matches current pathname
@@ -97,7 +117,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
           </div>
 
           {/* Navigation Menu */}
-          <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+          <nav className="flex-1 overflow-y-auto px-3 py-2 pb-16 space-y-1">
             {navigationItems.map((item, index) => {
               const Icon = item.icon;
 
@@ -254,74 +274,30 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                 )}
               >
                 <div className="mt-1 space-y-0.5">
-                  {favorites.map((favorite, index) => {
-                    const Icon = getFavoriteIcon(favorite.name);
+                  {QUICK_STATS_ITEMS.map((item, index) => {
+                    const Icon = getFavoriteIcon(item.name);
+                    const count = realCounts[item.name];
                     return (
                       <Link
-                        key={favorite.id}
-                        href={getFavoriteHref(favorite.name)}
-                        onClick={(e) => handleFavoriteClick(e, favorite.name)}
-                        className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
+                        key={item.id}
+                        href={getFavoriteHref(item.name)}
+                        onClick={(e) => handleFavoriteClick(e, item.name)}
+                        className="flex items-center justify-between px-3 py-2 rounded-lg text-sm tracking-tighter text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <Icon
                             size={16}
                             className="text-sidebar-foreground/50 group-hover:text-red-500 transition-colors"
                           />
-                          <span>{favorite.name}</span>
+                          <span>{item.name}</span>
                         </div>
                         <span className="text-sm tracking-tighter font-medium px-2 py-0.5 rounded-full bg-sidebar-accent text-sidebar-foreground/60 group-hover:bg-red-500/10 group-hover:text-red-500 transition-colors">
-                          {favorite.count.toLocaleString()}
+                          {count !== undefined ? count.toLocaleString() : "—"}
                         </span>
                       </Link>
                     );
                   })}
-                </div>
-              </div>
-            </div>
-
-            {/* Projects Section */}
-            <div className="mt-4">
-              <button
-                onClick={() => setProjectsExpanded(!projectsExpanded)}
-                className="flex items-center justify-between w-full px-3 py-2 text-sm tracking-tighter font-semibold text-sidebar-foreground/50 uppercase hover:text-sidebar-foreground transition-colors"
-              >
-                <span>Khu vực cứu hộ</span>
-                <div className="flex items-center gap-1.5">
-                  <Plus
-                    size={14}
-                    className="hover:text-red-500 transition-colors"
-                  />
-                  <DotsThreeVertical size={14} />
-                  <CaretDown
-                    size={14}
-                    className={cn(
-                      "transition-transform duration-200",
-                      !projectsExpanded && "-rotate-90",
-                    )}
-                  />
-                </div>
-              </button>
-              <div
-                className={cn(
-                  "overflow-hidden transition-all duration-300",
-                  projectsExpanded
-                    ? "max-h-96 opacity-100"
-                    : "max-h-0 opacity-0",
-                )}
-              >
-                <div className="mt-1 space-y-0.5">
-                  {projects.map((project, index) => (
-                    <Link
-                      key={project.id}
-                      href="#"
-                      className="block px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      {project.name}
-                    </Link>
-                  ))}
                 </div>
               </div>
             </div>

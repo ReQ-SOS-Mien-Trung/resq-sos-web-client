@@ -67,3 +67,47 @@ export interface SosRequestsSummaryResponse {
   changeDirection: ChangeDirection;
   comparisonLabel: string;
 }
+
+// ─── Personnel Dashboard: Rescuers Overview ───
+
+export interface RescuerOverviewTotals {
+  total: number;
+  core: number;
+  volunteer: number;
+  active: number;
+  banned: number;
+}
+
+export interface RescuerOverviewThisMonth {
+  month: number;
+  year: number;
+  newCount: number;
+  previousNewCount: number;
+  growthPercent: number;
+}
+
+export interface RescuerOverviewPeakMonth {
+  month: number;
+  year: number;
+  monthLabel: string;
+  newCount: number;
+}
+
+export interface RescuerOverviewMonthlyItem {
+  month: number;
+  year: number;
+  monthLabel: string;
+  total: number;
+  newCount: number;
+  core: number;
+  volunteer: number;
+}
+
+export interface RescuerOverviewResponse {
+  generatedAt: string;
+  timezone: string;
+  totals: RescuerOverviewTotals;
+  thisMonth: RescuerOverviewThisMonth;
+  peakMonth: RescuerOverviewPeakMonth;
+  monthly: RescuerOverviewMonthlyItem[];
+}
