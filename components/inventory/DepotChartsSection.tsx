@@ -61,6 +61,8 @@ const formatVND = (v: number) =>
     maximumFractionDigits: 1,
   }).format(v);
 
+const formatVNDFull = (v: number) => new Intl.NumberFormat("vi-VN").format(v);
+
 // ─── Card wrapper ─────────────────────────────────────────────────────────────
 
 function ChartCard({
@@ -564,7 +566,7 @@ function Chart3FundMovement({ depotId }: { depotId: number }) {
               tooltip: {
                 callbacks: {
                   label: (ctx) =>
-                    ` ${ctx.dataset.label}: ${formatVND(ctx.parsed.y)}đ`,
+                    ` ${ctx.dataset.label}: ${formatVNDFull(ctx.parsed.y)}đ`,
                 },
               },
             },

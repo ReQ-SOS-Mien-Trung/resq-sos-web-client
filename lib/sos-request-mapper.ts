@@ -41,6 +41,11 @@ export function mapSOSRequestStatusToStatus(
 
 export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const structuredData = entity.structuredData;
+  const teamIncidentContext = structuredData?.team_incident_context;
+  const latestIncidentNote =
+    entity.latestIncidentNote ??
+    (entity as { LatestIncidentNote?: string | null }).LatestIncidentNote ??
+    null;
   const victimInfo = entity.victimInfo ?? null;
   // Prefer explicit reporter info. Keep senderInfo as backward-compatible fallback.
   const reporterInfo = entity.reporterInfo ?? entity.senderInfo ?? null;
@@ -63,7 +68,11 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     needs,
     status: mapSOSRequestStatusToStatus(entity.status),
     rawStatus: entity.status,
-    message: entity.msg,
+    message:
+      entity.msg ||
+      latestIncidentNote ||
+      teamIncidentContext?.original_incident_description ||
+      "SOS từ sự cố đội cứu hộ",
     createdAt,
     receivedAt: entity.receivedAt ? new Date(entity.receivedAt) : null,
     peopleCount: structuredData?.people_count,
@@ -97,7 +106,9 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     foodDuration: supplyDetails?.food_duration ?? undefined,
     areBlanketsEnough: supplyDetails?.are_blankets_enough,
     blanketRequestCount: supplyDetails?.blanket_request_count,
-    address: structuredData?.address ?? undefined,
+    address: (structuredData?.address ??
+      (structuredData?.incident as Record<string, unknown> | null | undefined)
+        ?.address) as string | undefined,
     victimPhone: victimInfo?.user_phone ?? undefined,
     victimName: victimInfo?.user_name ?? undefined,
     reporterPhone: reporterInfo?.user_phone ?? undefined,
@@ -111,10 +122,14 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
       null,
     isSentOnBehalf:
       entity.isSentOnBehalf ?? Boolean(entity.createdByCoordinatorId),
+    latestIncidentNote,
     reporterIsOnline:
       reporterInfo?.is_online ?? entity.senderInfo?.is_online ?? undefined,
     hopCount: networkMetadata?.hop_count,
     locationAccuracy: entity.locationAccuracy,
+    evaluation: entity.evaluation ?? null,
+    victims: structuredData?.victims ?? null,
+    incidentHistory: entity.incidentHistory ?? null,
   };
 }
 

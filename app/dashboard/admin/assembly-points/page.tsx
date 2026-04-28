@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -204,9 +203,8 @@ export default function AssemblyPointsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [search, setSearch] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<AssemblyPointStatus | null>(
-    null,
-  );
+  const [selectedStatus, setSelectedStatus] =
+    useState<AssemblyPointStatus | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [actionReason, setActionReason] = useState("");
 
@@ -221,19 +219,18 @@ export default function AssemblyPointsPage() {
   }>({ open: false, action: null, item: null });
 
   const contentRef = useRef<HTMLDivElement>(null);
-  const handlePanelChange = useCallback((state: {
-    open: boolean;
-    isFullscreen: boolean;
-    dockedWidth: number;
-  }) => {
-    if (!contentRef.current) return;
+  const handlePanelChange = useCallback(
+    (state: { open: boolean; isFullscreen: boolean; dockedWidth: number }) => {
+      if (!contentRef.current) return;
 
-    contentRef.current.style.marginRight = state.open
-      ? `${state.dockedWidth}px`
-      : "0px";
-    contentRef.current.style.transition =
-      "margin-right 380ms cubic-bezier(0.22,1,0.36,1)";
-  }, []);
+      contentRef.current.style.marginRight = state.open
+        ? `${state.dockedWidth}px`
+        : "0px";
+      contentRef.current.style.transition =
+        "margin-right 380ms cubic-bezier(0.22,1,0.36,1)";
+    },
+    [],
+  );
 
   const { data: summaryData } = useAssemblyPoints({
     params: { pageNumber: 1, pageSize: 200 },
@@ -252,7 +249,10 @@ export default function AssemblyPointsPage() {
   const closePointMutation = useCloseAssemblyPoint();
 
   const items = useMemo(() => data?.items ?? [], [data]);
-  const allItems = useMemo(() => summaryData?.items ?? items, [summaryData, items]);
+  const allItems = useMemo(
+    () => summaryData?.items ?? items,
+    [summaryData, items],
+  );
   const assemblyPointStatusConfig = useMemo(
     () => buildAssemblyPointStatusConfig(statusMetadata),
     [statusMetadata],
@@ -283,7 +283,9 @@ export default function AssemblyPointsPage() {
   const hasPreviousPage = data?.hasPreviousPage ?? false;
   const hasNextPage = data?.hasNextPage ?? false;
 
-  const availableCount = allItems.filter((i) => i.status === "Available").length;
+  const availableCount = allItems.filter(
+    (i) => i.status === "Available",
+  ).length;
   const createdCount = allItems.filter((i) => i.status === "Created").length;
   const unavailableCount = allItems.filter(
     (i) => i.status === "Unavailable",
@@ -348,6 +350,11 @@ export default function AssemblyPointsPage() {
   };
 
   const openDetail = (id: number) => {
+    if (detailOpen && detailId === id) {
+      setDetailOpen(false);
+      setDetailId(null);
+      return;
+    }
     setDetailId(id);
     setDetailOpen(true);
   };
@@ -508,7 +515,8 @@ export default function AssemblyPointsPage() {
                 Trạng thái
                 {selectedStatus ? (
                   <Badge className="h-5 max-w-32 truncate px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                    {assemblyPointStatusConfig[selectedStatus]?.label ?? selectedStatus}
+                    {assemblyPointStatusConfig[selectedStatus]?.label ??
+                      selectedStatus}
                   </Badge>
                 ) : (
                   <CaretDown size={13} className="text-muted-foreground" />
@@ -531,7 +539,9 @@ export default function AssemblyPointsPage() {
                     key={status}
                     onClick={() => {
                       setPage(1);
-                      setSelectedStatus((prev) => (prev === status ? null : status));
+                      setSelectedStatus((prev) =>
+                        prev === status ? null : status,
+                      );
                       setStatusOpen(false);
                     }}
                     className="flex items-center gap-2 w-full px-2.5 py-1.5 text-sm rounded-md hover:bg-muted/60 transition-colors"
@@ -759,14 +769,22 @@ export default function AssemblyPointsPage() {
                             <CaretDown size={12} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-52"
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           {availableActions.map((action) => (
                             <DropdownMenuItem
                               key={action}
                               variant={
-                                action === "close" ? "destructive" : "default"
+                                action === "close" ||
+                                action === "setUnavailable"
+                                  ? "destructive"
+                                  : "default"
                               }
-                              className="cursor-pointer"
+                              className={`cursor-pointer${action === "setAvailable" || action === "activate" ? " text-green-600 focus:text-green-600" : ""}`}
+                              onClick={(event) => event.stopPropagation()}
                               onSelect={() => {
                                 setActionDialog({
                                   open: true,
@@ -868,13 +886,13 @@ export default function AssemblyPointsPage() {
                 <p className="text-sm font-medium tracking-tight text-foreground">
                   Lý do {actionRequiresReason(actionDialog.action) ? "*" : ""}
                 </p>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs tracking-tighter text-muted-foreground">
                   {actionRequiresReason(actionDialog.action)
                     ? "Bắt buộc"
                     : "Không bắt buộc"}
                 </span>
               </div>
-              <Textarea
+              <Input
                 value={actionReason}
                 onChange={(event) => setActionReason(event.target.value)}
                 placeholder={
@@ -884,14 +902,9 @@ export default function AssemblyPointsPage() {
                       ? "Ví dụ: Đã sửa xong"
                       : "Nhập lý do đóng điểm tập kết"
                 }
-                rows={4}
+                // rows={4}
                 disabled={isStatusActionPending}
               />
-              <p className="text-xs text-muted-foreground tracking-tight">
-                {actionDialog.action === "close"
-                  ? "API yêu cầu lý do đóng không được để trống."
-                  : "Bạn có thể để trống nếu không cần ghi chú thêm."}
-              </p>
             </div>
           )}
           <DialogFooter>
@@ -902,7 +915,7 @@ export default function AssemblyPointsPage() {
                 setActionReason("");
               }}
               disabled={isStatusActionPending}
-              className="tracking-tight"
+              className="tracking-tighter"
             >
               Hủy
             </Button>
@@ -915,11 +928,11 @@ export default function AssemblyPointsPage() {
                 isStatusActionPending ||
                 Boolean(
                   actionDialog.action &&
-                    actionRequiresReason(actionDialog.action) &&
-                    !actionReason.trim(),
+                  actionRequiresReason(actionDialog.action) &&
+                  !actionReason.trim(),
                 )
               }
-              className="gap-2 tracking-tight"
+              className="gap-2 tracking-tighter"
             >
               {isStatusActionPending && (
                 <Spinner size={14} className="animate-spin" />

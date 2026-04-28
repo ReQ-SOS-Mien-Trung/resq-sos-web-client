@@ -130,11 +130,9 @@ const CategoryOverview = ({
             return (
               <div
                 key={cat.id}
-                onClick={() => onCategorySelect?.(cat.code)}
                 className={cn(
-                  "relative cursor-pointer rounded-xl border p-4 transition-all hover:shadow-md",
+                  "relative rounded-xl border p-4",
                   theme.container,
-                  selectedCategory === cat.code ? "ring-2 ring-primary" : "",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">

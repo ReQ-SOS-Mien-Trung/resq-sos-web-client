@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import { Check } from "@phosphor-icons/react";
 import {
-  CalendarWidget,
   DashboardLayout,
-  LeadsManagement,
-  RetentionRate,
+  DepotFundMovementChart,
+  MissionReportComplianceChart,
   RescuerOverview,
   SOSOverview,
   SummaryCards,
-  TopCountries,
   VictimsBarChart,
 } from "@/components/admin/dashboard";
 import { DashboardData } from "@/type";
@@ -79,47 +76,31 @@ const AdminDashboardPage = () => {
           <RescuerOverview />
         </div>
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] xl:grid-cols-[minmax(0,1fr)_340px]">
           {/* Left Column - Victims Bar Chart */}
           <div
-            className="lg:col-span-2 animate-in fade-in slide-in-from-left-4 duration-500"
+            className="min-w-0 animate-in fade-in slide-in-from-left-4 duration-500"
             style={{ animationDelay: "200ms" }}
           >
             <VictimsBarChart />
           </div>
 
-          {/* Right Column - Calendar */}
+          {/* Right Column - Mission Report Compliance */}
           <div
-            className="animate-in fade-in slide-in-from-right-4 duration-500"
+            className="min-w-0 animate-in fade-in slide-in-from-right-4 duration-500"
             style={{ animationDelay: "300ms" }}
           >
-            <CalendarWidget data={data.calendar} />
+            <MissionReportComplianceChart />
           </div>
         </div>
         {/* Second Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Leads Management */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Depot Fund Movement */}
           <div
-            className="lg:col-span-1 animate-in fade-in slide-in-from-bottom-4 duration-500"
+            className="animate-in fade-in slide-in-from-bottom-4 duration-500"
             style={{ animationDelay: "400ms" }}
           >
-            <LeadsManagement data={data.leads} />
-          </div>
-
-          {/* Top Countries */}
-          <div
-            className="lg:col-span-1 animate-in fade-in slide-in-from-bottom-4 duration-500"
-            style={{ animationDelay: "500ms" }}
-          >
-            <TopCountries data={data.topCountries} />
-          </div>
-
-          {/* Retention Rate */}
-          <div
-            className="lg:col-span-1 animate-in fade-in slide-in-from-bottom-4 duration-500"
-            style={{ animationDelay: "600ms" }}
-          >
-            <RetentionRate data={data.retention} />
+            <DepotFundMovementChart />
           </div>
         </div>
       </div>

@@ -47,6 +47,7 @@ import {
   getDepotCapacityChart,
   getDepotInventoryMovementChart,
   getDepotFundMovementChart,
+  getDepotFundMovementMultiLineChart,
   getDepotFundTransactionsByFundId,
 } from "./api";
 import {
@@ -1143,6 +1144,18 @@ export function useDepotFundMovementChart(
     queryKey: ["depot-fund-movement-chart", depotId, params],
     queryFn: () => getDepotFundMovementChart(depotId!, params),
     enabled: (options?.enabled ?? true) && !!depotId,
+  });
+}
+
+export function useDepotFundMovementMultiLineChart(
+  depotId: number | undefined,
+  params?: import("./type").GetDepotFundMovementParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["depot-fund-movement-multi-line-chart", depotId, params],
+    queryFn: () => getDepotFundMovementMultiLineChart(depotId!, params),
+    enabled: (options?.enabled ?? true) && depotId !== undefined,
   });
 }
 

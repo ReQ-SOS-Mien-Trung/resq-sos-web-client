@@ -7,11 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   CaretDown,
-  CaretRight,
   Plus,
   DotsThreeVertical,
-  Gear,
-  Question,
 } from "@phosphor-icons/react";
 import { SidebarProps } from "@/type";
 import {
@@ -329,39 +326,6 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
               </div>
             </div>
           </nav>
-
-          {/* Bottom Links - Fixed at bottom */}
-          <div className="shrink-0 p-3 pb-16 border-t border-sidebar-border space-y-0.5">
-            <Link
-              href="#"
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
-            >
-              <div className="flex items-center gap-3">
-                <Gear
-                  size={16}
-                  className="group-hover:rotate-90 transition-transform duration-300"
-                />
-                <span>Cài đặt</span>
-              </div>
-              <CaretRight
-                size={16}
-                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
-              />
-            </Link>
-            <Link
-              href="#"
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
-            >
-              <div className="flex items-center gap-3">
-                <Question size={16} />
-                <span>Trung tâm hỗ trợ</span>
-              </div>
-              <CaretRight
-                size={16}
-                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
-              />
-            </Link>
-          </div>
         </div>
       )}
     </aside>

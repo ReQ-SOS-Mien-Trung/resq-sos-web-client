@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -24,6 +25,7 @@ import {
   Gear,
   User,
   ArrowsClockwise,
+  Broadcast,
   WifiHigh,
   WifiSlash,
   Plus,
@@ -49,6 +51,7 @@ import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import DepotChartsSection from "@/components/inventory/DepotChartsSection";
 import { DepotClosureTransferTable } from "@/components/inventory/DepotClosureTransferTable";
+import { InventoryExportReportCards } from "@/components/inventory/InventoryExportReportCards";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -267,6 +270,18 @@ const InventoryDashboardPage = () => {
     [activeTab, router],
   );
 
+  const scrollToExportReports = useCallback(() => {
+    if (activeTab !== "inventory") {
+      router.replace("/dashboard/inventory");
+    }
+
+    window.setTimeout(() => {
+      document
+        .getElementById("inventory-export-report")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [activeTab, router]);
+
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
@@ -415,7 +430,7 @@ const InventoryDashboardPage = () => {
     [allRequestsPagedData, trackerRequestId],
   );
 
-  useInventoryOperationalRealtime({
+  const operationalConnectionState = useInventoryOperationalRealtime({
     supplyRequests: {
       depotId: selectedDepotId,
       requestId: trackerOpen ? trackerRequestId : null,
@@ -425,6 +440,17 @@ const InventoryDashboardPage = () => {
     },
     enabled: Boolean(selectedDepotId),
   });
+
+  const isConnected = operationalConnectionState === "connected";
+  const isConnectingLike =
+    operationalConnectionState === "connecting" ||
+    operationalConnectionState === "reconnecting";
+
+  const connectionLabel = isConnected
+    ? "Đã kết nối trực tiếp"
+    : isConnectingLike
+      ? "Đang kết nối..."
+      : "Mất kết nối trực tiếp";
 
   // Use the first depot as the current managed depot
   const currentDepot =
@@ -517,7 +543,6 @@ const InventoryDashboardPage = () => {
   // ── Handlers ──
   const handleItemSelect = useCallback((item: InventoryItem) => {
     setSelectedItem(item);
-    setItemSheetOpen(true);
   }, []);
 
   const handleRequestSelect = useCallback((request: SupplyRequest) => {
@@ -656,30 +681,37 @@ const InventoryDashboardPage = () => {
           </div>
           <div
             className={cn(
-              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex",
-              currentDepot
+              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex transition-colors duration-300",
+              isConnected
                 ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
-                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+                : isConnectingLike
+                  ? "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-400"
+                  : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
             )}
-            title={currentDepot ? "Đang kết nối" : "Mất kết nối"}
-            aria-label={currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            title={connectionLabel}
+            aria-label={connectionLabel}
           >
-            {currentDepot ? (
+            {isConnected ? (
               <>
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
               </>
+            ) : isConnectingLike ? (
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-amber-500 dark:border-zinc-900/70" />
+              </>
             ) : (
               <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
-            {currentDepot ? (
-              <WifiHigh className="h-4 w-4" weight="bold" />
+            {isConnected ? (
+              <Broadcast className="h-4 w-4" weight="fill" />
+            ) : isConnectingLike ? (
+              <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
-              <WifiSlash className="h-4 w-4" weight="bold" />
+              <Broadcast className="h-4 w-4" weight="bold" />
             )}
-            <span className="sr-only">
-              {currentDepot ? "Đang kết nối" : "Mất kết nối"}
-            </span>
+            <span className="sr-only">{connectionLabel}</span>
           </div>
         </div>
 
@@ -719,12 +751,10 @@ const InventoryDashboardPage = () => {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() =>
-              navigateFromInventory("/dashboard/inventory/export-report")
-            }
+            onClick={scrollToExportReports}
           >
             <FileArrowDownIcon className="h-4 w-4" />
             Xuất báo cáo
@@ -732,7 +762,7 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2"
+            className="hidden md:flex gap-2 border-slate-300 text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900/40"
             onClick={() =>
               navigateFromInventory("/dashboard/inventory/stock-movements")
             }
@@ -787,7 +817,13 @@ const InventoryDashboardPage = () => {
           </Button>
 
           {/* Settings */}
-          <Button variant="ghost" size="icon">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/threshold-config")
+            }
+          >
             <Gear className="h-5 w-5" />
           </Button>
 
@@ -795,9 +831,18 @@ const InventoryDashboardPage = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <div className="h-8 w-8 rounded-full bg-linear-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
-                  {userInitials}
-                </div>
+                <Avatar className="h-8 w-8 ring-2 ring-border">
+                  {userMe?.avatarUrl ? (
+                    <AvatarImage
+                      src={userMe.avatarUrl}
+                      alt={displayName}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-linear-to-br from-red-400 to-orange-500 text-sm font-semibold text-white">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -1111,27 +1156,13 @@ const InventoryDashboardPage = () => {
                 {selectedDepotId && (
                   <DepotChartsSection depotId={selectedDepotId} />
                 )}
+
+                <InventoryExportReportCards depotId={selectedDepotId} />
               </>
             )}
           </motion.div>
         </main>
       </div>
-
-      {/* Item Details Sheet */}
-      <ItemDetailsSheet
-        item={selectedItem}
-        open={itemSheetOpen}
-        onOpenChange={setItemSheetOpen}
-        onRequestInbound={() => {
-          console.log("Request inbound for:", selectedItem?.name);
-        }}
-        onRequestOutbound={() => {
-          console.log("Request outbound for:", selectedItem?.name);
-        }}
-        onEdit={() => {
-          console.log("Edit item:", selectedItem?.name);
-        }}
-      />
 
       {/* Vat Tu Details Sheet - rendered at page level for full overlay */}
       <VatTuDetailsSheet

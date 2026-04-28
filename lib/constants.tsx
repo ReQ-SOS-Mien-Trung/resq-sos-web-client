@@ -293,17 +293,20 @@ export const AI_PROVIDER_OPTIONS = [
         code: "gemini-3-flash-preview",
       },
       {
-        label: "Gemini 2.5 Flash",
-        code: "gemini-2.5-flash",
-      },
-
-      {
-        label: "Gemini 2 Flash",
-        code: "gemini-2-flash",
+        label: "Gemini 2.0 Flash",
+        code: "gemini-2.0-flash",
       },
       {
-        label: "Gemini 2 Flash Lite",
-        code: "gemini-2-flash-lite",
+        label: "Gemini 2.0 Flash Lite",
+        code: "gemini-2.0-flash-lite-preview-02-05",
+      },
+      {
+        label: "Gemini 1.5 Flash",
+        code: "gemini-1.5-flash",
+      },
+      {
+        label: "Gemini 1.5 Pro",
+        code: "gemini-1.5-pro",
       },
     ],
   },
@@ -523,6 +526,18 @@ export const navigationItems = [
         label: "Cấu hình AI Prompt",
         href: "/dashboard/admin/ai-prompt",
       },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="mdi:radius-outline"
+            width={18}
+            height={18}
+            className={className}
+          />
+        ),
+        label: "Cấu hình bán kính",
+        href: "/dashboard/admin/radius-config",
+      },
     ],
   },
   {
@@ -700,15 +715,15 @@ export const WINDY_LAYERS: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-    { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-    { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-    {
-      id: "rain",
-      label: "Mưa",
-      icon: <Drop className="h-4 w-4" weight="fill" />,
-    },
-    { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-  ];
+  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
+  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
+  {
+    id: "rain",
+    label: "Mưa",
+    icon: <Drop className="h-4 w-4" weight="fill" />,
+  },
+  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
+];
 
 // ════════════════════════════════
 // Location Details Panel - Status Configs

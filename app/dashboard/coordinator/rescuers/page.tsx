@@ -1966,7 +1966,14 @@ export default function CoordinatorRescuerManagementPage() {
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-          <div>
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/dashboard/coordinator">
+              <ArrowLeft className="h-4 w-4" />
+              Quay về bản đồ điều phối
+            </Link>
+          </Button>
+
+          <div className="text-right">
             <p className="text-sm uppercase tracking-[0.14em] text-[#FF5722]">
               Coordinator Dashboard
             </p>
@@ -1974,13 +1981,6 @@ export default function CoordinatorRescuerManagementPage() {
               Quản lý người cứu hộ theo điểm tập kết
             </h1>
           </div>
-
-          <Button asChild variant="outline" className="gap-2">
-            <Link href="/dashboard/coordinator">
-              <ArrowLeft className="h-4 w-4" />
-              Quay về bản đồ điều phối
-            </Link>
-          </Button>
         </div>
 
         <div className="grid gap-2.5 md:grid-cols-3">

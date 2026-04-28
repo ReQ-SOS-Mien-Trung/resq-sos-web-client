@@ -10,6 +10,7 @@ export type SOSRequestStatus =
 
 // SOS Request Priority Level
 export type SOSPriorityLevel = "Low" | "Medium" | "High" | "Critical";
+export type SOSRequestTypeFilter = "Rescue" | "Relief" | "Both";
 
 export interface SOSMetadataOption<T extends string = string> {
   key: T;
@@ -89,6 +90,36 @@ export type FoodDurationType =
   | "2_TO_3_DAYS"
   | "OVER_3_DAYS";
 
+// Victim incident status in new API format
+export interface SOSVictimIncidentStatus {
+  is_injured: boolean;
+  severity: string | null;
+  medical_issues: string[];
+}
+
+// Victim personal needs in new API format
+export interface SOSVictimPersonalNeeds {
+  clothing: {
+    needed: boolean;
+    gender: string | null;
+  };
+  diet: {
+    has_special_diet: boolean;
+    description: string | null;
+  };
+}
+
+// Victim profile in new API format (structuredData.victims[])
+export interface SOSVictimProfile {
+  person_id: string;
+  person_type: string;
+  index: number;
+  custom_name: string | null;
+  person_phone: string | null;
+  incident_status: SOSVictimIncidentStatus;
+  personal_needs: SOSVictimPersonalNeeds;
+}
+
 // Injured person in SOS request
 export interface InjuredPerson {
   index: number;
@@ -134,6 +165,23 @@ export interface SOSSupplyDetails {
   clothing_persons?: SOSClothingPerson[] | null;
 }
 
+export interface SOSOperationSupportContext {
+  origin?: string | null;
+  [key: string]: unknown;
+}
+
+export interface SOSTeamIncidentContext {
+  mission_id?: number | null;
+  mission_team_id?: number | null;
+  mission_activity_id?: number | null;
+  incident_scope?: string | null;
+  incident_type?: string | null;
+  decision_code?: string | null;
+  team_name?: string | null;
+  original_incident_description?: string | null;
+  [key: string]: unknown;
+}
+
 // Structured data from SOS request
 export interface SOSStructuredData {
   situation: SOSSituation | string;
@@ -155,6 +203,13 @@ export interface SOSStructuredData {
   additional_description: string | null;
   injured_persons: InjuredPerson[];
   address?: string | null;
+  operation_support?: SOSOperationSupportContext | null;
+  team_incident_context?: SOSTeamIncidentContext | null;
+  // New API format fields
+  incident?: Record<string, unknown> | null;
+  group_needs?: Record<string, unknown> | null;
+  victims?: SOSVictimProfile[] | null;
+  prepared_profiles?: unknown[] | null;
 }
 
 // Network metadata from mesh relay
@@ -212,6 +267,25 @@ export interface SOSRequestEntity {
   reviewedById: string | null;
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
+  latestIncidentNote?: string | null;
+  latestIncidentAt?: string | null;
+  incidentHistory?: SOSIncidentHistoryEntry[] | null;
+  companions?: unknown[] | null;
+  evaluation?: SOSRequestEvaluationSummary | null;
+}
+
+export interface SOSIncidentHistoryEntry {
+  id: number;
+  teamIncidentId?: number | null;
+  missionId?: number | null;
+  missionTeamId?: number | null;
+  missionActivityId?: number | null;
+  incidentScope?: string | null;
+  note: string;
+  reportedById?: string | null;
+  createdAt: string;
+  teamName?: string | null;
+  activityType?: string | null;
 }
 
 // Paginated Response
@@ -230,7 +304,21 @@ export interface GetSOSRequestsParams {
   pageNumber?: number;
   pageSize?: number;
   Statuses?: SOSRequestStatus[];
-  PriorityLevels?: SOSPriorityLevel[];
+  Priorities?: SOSPriorityLevel[];
+  SosTypes?: SOSRequestTypeFilter[];
+  Sort?: string;
+}
+
+export interface SOSStatusCount {
+  status: SOSRequestStatus;
+  count: number;
+}
+
+export interface GetSOSRequestStatusCountsResponse {
+  from: string;
+  to: string;
+  total: number;
+  statusCounts: SOSStatusCount[];
 }
 
 export interface GetSOSRequestsInBoundsParams {
@@ -239,7 +327,9 @@ export interface GetSOSRequestsInBoundsParams {
   MinLng: number;
   MaxLng: number;
   Statuses?: SOSRequestStatus[];
-  PriorityLevels?: SOSPriorityLevel[];
+  Priorities?: SOSPriorityLevel[];
+  SosTypes?: SOSRequestTypeFilter[];
+  Sort?: string;
 }
 
 // Get SOS Request By ID Response
@@ -360,8 +450,8 @@ export interface RuleEvaluation {
   itemsNeeded: string[];
   breakdown?: Record<string, unknown> | null;
   createdAt: string;
-  priorityThresholds: PriorityThresholds;
-  scoreWeights: ScoreWeights;
+  priorityThresholds?: PriorityThresholds | null;
+  scoreWeights?: ScoreWeights | null;
 }
 
 export interface AiAnalysisResult {
@@ -385,7 +475,12 @@ export interface AiAnalysis {
   analysisType: string;
   suggestedSeverityLevel: SeverityLevel;
   suggestedPriority: SOSPriorityLevel;
+  suggestedPriorityScore: number;
+  agreesWithRuleBase: boolean;
+  needsImmediateSafeTransfer: boolean;
+  canWaitForCombinedMission: boolean;
   explanation: string;
+  handlingReason?: string;
   confidenceScore: number;
   suggestionScope: string;
   metadata: AiAnalysisMetadata;
@@ -393,12 +488,26 @@ export interface AiAnalysis {
   adoptedAt: string | null;
 }
 
-export interface GetSOSRequestAnalysisResponse {
+export interface SOSRequestEvaluationSummary {
+  sosRequestId?: number;
+  sosType?: string;
+  status?: SOSRequestStatus;
+  currentPriorityLevel?: SOSPriorityLevel;
+  ruleEvaluation?: RuleEvaluation | null;
+  // Backend may return either a single object (aiAnalysis) or an array (aiAnalyses).
+  aiAnalysis?: AiAnalysis | null;
+  aiAnalyses?: AiAnalysis[] | null;
+  hasAiAnalysis?: boolean | null;
+}
+
+export interface GetSOSRequestAnalysisResponse extends SOSRequestEvaluationSummary {
   sosRequestId: number;
   sosType: string;
   status: SOSRequestStatus;
   currentPriorityLevel: SOSPriorityLevel;
   ruleEvaluation: RuleEvaluation;
+  // May be returned as a single object by the backend.
+  aiAnalysis?: AiAnalysis | null;
   aiAnalyses: AiAnalysis[];
   hasAiAnalysis: boolean;
 }

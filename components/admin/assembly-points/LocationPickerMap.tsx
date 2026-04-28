@@ -1,25 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  useMapEvents,
-  useMap,
-} from "react-leaflet";
-import L from "leaflet";
+import { useEffect, useRef } from "react";
+import "@goongmaps/goong-js/dist/goong-js.css";
+// @ts-ignore
+import goongjs from "@goongmaps/goong-js";
 
-// Fix default marker icon (Leaflet + webpack/next issue)
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
-const DEFAULT_CENTER: [number, number] = [16.047079, 108.20623];
+const DEFAULT_CENTER: [number, number] = [108.20623, 16.047079]; // lng, lat
 const DEFAULT_ZOOM = 12;
 
 interface LocationPickerMapProps {
@@ -30,41 +16,6 @@ interface LocationPickerMapProps {
   className?: string;
 }
 
-function ClickHandler({
-  onPick,
-}: {
-  onPick: (lat: number, lng: number) => void;
-}) {
-  const map = useMapEvents({
-    click: (e) => {
-      onPick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-
-  useEffect(() => {
-    map.getContainer().style.cursor = "crosshair";
-    return () => {
-      map.getContainer().style.cursor = "";
-    };
-  }, [map]);
-
-  return null;
-}
-
-function FlyToMarker({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap();
-  const prevRef = useRef<string>("");
-
-  useEffect(() => {
-    const key = `${lat},${lng}`;
-    if (key === prevRef.current) return;
-    prevRef.current = key;
-    map.flyTo([lat, lng], Math.max(map.getZoom(), 14), { duration: 0.6 });
-  }, [lat, lng, map]);
-
-  return null;
-}
-
 export default function LocationPickerMap({
   lat,
   lng,
@@ -72,56 +23,75 @@ export default function LocationPickerMap({
   height = 280,
   className = "",
 }: LocationPickerMapProps) {
-  const [cssReady, setCssReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+
+  const onPickRef = useRef(onPick);
+  useEffect(() => {
+    onPickRef.current = onPick;
+  }, [onPick]);
 
   useEffect(() => {
-    const existingLink = document.querySelector('link[href*="leaflet.css"]');
-    if (existingLink) {
-      requestAnimationFrame(() => setCssReady(true));
-      return;
-    }
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
-    link.crossOrigin = "";
-    link.onload = () => setCssReady(true);
-    document.head.appendChild(link);
+    if (!containerRef.current || mapRef.current) return;
+
+    goongjs.accessToken = process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || "";
+
+    const map = new goongjs.Map({
+      container: containerRef.current,
+      style: `https://tiles.goong.io/assets/goong_map_web.json?api_key=${process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}`,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+    });
+    mapRef.current = map;
+
+    map.addControl(new goongjs.NavigationControl(), "bottom-right");
+    map.getCanvas().style.cursor = "crosshair";
+
+    map.on("click", (e: any) => {
+      onPickRef.current(e.lngLat.lat, e.lngLat.lng);
+    });
+
+    return () => {
+      markerRef.current?.remove();
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
-  const hasMarker =
-    lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng);
-  const center: [number, number] = hasMarker ? [lat, lng] : DEFAULT_CENTER;
-  const zoom = hasMarker ? 14 : DEFAULT_ZOOM;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
 
-  if (!cssReady) {
-    return (
-      <div
-        style={{ height }}
-        className={`w-full animate-pulse rounded-lg bg-muted/40 ${className}`}
-      />
-    );
-  }
+    const hasMarker =
+      lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng);
+
+    if (hasMarker) {
+      if (!markerRef.current) {
+        markerRef.current = new goongjs.Marker({ color: "#ef4444" })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 14) });
+      } else {
+        const currentLngLat = markerRef.current.getLngLat();
+        if (currentLngLat.lng !== lng || currentLngLat.lat !== lat) {
+          markerRef.current.setLngLat([lng, lat]);
+          map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 14) });
+        }
+      }
+    } else {
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
+    }
+  }, [lat, lng]);
 
   return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
+    <div
+      ref={containerRef}
       className={`w-full z-0 rounded-lg ${className}`}
       style={{ height }}
-      zoomControl={true}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <ClickHandler onPick={onPick} />
-      {hasMarker && (
-        <>
-          <Marker position={[lat, lng]} />
-          <FlyToMarker lat={lat} lng={lng} />
-        </>
-      )}
-    </MapContainer>
+    />
   );
 }

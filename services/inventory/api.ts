@@ -16,6 +16,7 @@ import {
   InventoryOrganization,
   InventoryTargetGroup,
   InventoryActionType,
+  InventoryItemModelMetadata,
   InventorySourceType,
   InventoryReliefItem,
   ReusableItemCondition,
@@ -66,6 +67,7 @@ import {
   SearchDepotReusableUnitsResponse,
   UpdateReusableStatusParams,
   UpdateReusableStatusResponse,
+  DepotFundMetadataItem,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -368,6 +370,19 @@ export async function getInventoryItemModels(): Promise<
 }
 
 /**
+ * Get item models available in a depot
+ * GET /logistics/inventory/metadata/item-models/depot/{depotId}
+ */
+export async function getDepotInventoryItemModels(
+  depotId: number,
+): Promise<InventoryItemModelMetadata[]> {
+  const { data } = await api.get(
+    `/logistics/inventory/metadata/item-models/depot/${depotId}`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/**
  * Get list of relief items by category code
  * GET /logistics/inventory/metadata/relief-items/category/{categoryCode}
  */
@@ -658,6 +673,19 @@ export async function importRegularInventory(
   await api.post("/logistics/inventory/import-purchase", payload, {
     timeout: 60000,
   });
+}
+
+/**
+ * Get valid depot funds for purchase import payment
+ * GET /finance/depot-funds/my/funds-metadata
+ */
+export async function getMyDepotFundsMetadata(
+  depotId: number,
+): Promise<DepotFundMetadataItem[]> {
+  const { data } = await api.get("/finance/depot-funds/my/funds-metadata", {
+    params: { depotId },
+  });
+  return Array.isArray(data) ? data : [];
 }
 
 export async function updateItemModel(

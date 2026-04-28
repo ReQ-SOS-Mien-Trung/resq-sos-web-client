@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, memo } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { ServiceZoneEntity } from "@/services/map/type";
@@ -46,7 +46,6 @@ import {
 // and the isMounted guard inside this component.
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Polygon,
   Popup,
@@ -54,6 +53,8 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import { MapInvalidator } from "./MapInvalidator";
+import { GoongLeafletLayer } from "@/components/GoongLeafletLayer";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -118,6 +119,8 @@ const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
+
+
 const CoordinatorMap = ({
   sosRequests,
   rescuers,
@@ -172,6 +175,7 @@ const CoordinatorMap = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentZoom, setCurrentZoom] = useState(13);
   const [layerFilter, setLayerFilter] = useState(DEFAULT_LAYER_FILTER);
+  const [hideGoongPoi, setHideGoongPoi] = useState(true);
   const risingSOSMarkerIdSet = useMemo(
     () => new Set(risingSOSMarkerIds),
     [risingSOSMarkerIds],
@@ -344,7 +348,8 @@ const CoordinatorMap = ({
       teamIncidents.filter(
         (incident) =>
           Number.isFinite(incident.latitude) &&
-          Number.isFinite(incident.longitude),
+          Number.isFinite(incident.longitude) &&
+          incident.hasSupportRequest === true,
       ),
     [teamIncidents],
   );
@@ -900,6 +905,35 @@ const CoordinatorMap = ({
               </Tooltip>
             </div>
 
+            <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <MapTrifold size={14} weight="fill" />
+                  <span className="truncate">Nền Goong</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHideGoongPoi((current) => !current)}
+                  aria-pressed={hideGoongPoi}
+                  aria-label={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
+                  title={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
+                  className={cn(
+                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors",
+                    hideGoongPoi
+                      ? "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                      : "bg-primary/10 text-primary hover:bg-primary/15",
+                  )}
+                >
+                  {hideGoongPoi ? (
+                    <Eye size={13} weight="bold" />
+                  ) : (
+                    <EyeSlash size={13} weight="bold" />
+                  )}
+                  {hideGoongPoi ? "Hiện POI" : "Ẩn POI"}
+                </button>
+              </div>
+            </div>
+
             <div className="mt-3 flex flex-col gap-2">
               {layerOptions.map((layer) => {
                 const isEnabled = layerFilter[layer.key];
@@ -996,9 +1030,10 @@ const CoordinatorMap = ({
         className="w-full h-full z-0 coordinator-map"
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        <MapInvalidator />
+        <GoongLeafletLayer
+          apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+          hidePointsOfInterest={hideGoongPoi}
         />
 
         {/* Fly to location handler */}
@@ -1182,7 +1217,7 @@ const CoordinatorMap = ({
   );
 };
 
-export default CoordinatorMap;
+export default memo(CoordinatorMap);
 
 function ServiceZoneOverlay({
   zone,
@@ -1355,6 +1390,7 @@ function ServiceZoneOverlay({
 }
 
 // SOS Request Marker Component
+// SOS Request Marker Component
 function SOSRequestMarker({
   sos,
   isSelected,
@@ -1374,9 +1410,9 @@ function SOSRequestMarker({
   };
 
   const color = priorityColors[sos.priority];
-  const size = isSelected ? 38 : 28;
-  const badgeSize = size - 6;
-  const labelFontSize = isSelected ? 11 : 9;
+  const size = isSelected ? 48 : 36;
+  const badgeSize = isSelected ? 38 : 28;
+  const labelFontSize = isSelected ? 11 : 9.5;
 
   // Create custom icon using divIcon with useMemo
   const icon = useMemo(() => {
@@ -1384,17 +1420,69 @@ function SOSRequestMarker({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const L = require("leaflet");
 
+    const isPending = sos.status === "PENDING";
+    const sosType = (sos.sosType || "").toUpperCase();
+
+    // Determine shape based on type
+    // RELIEF (Cứu trợ) -> Circle (Tròn)
+    // RESCUE (Cứu hộ) -> Triangle (Tam giác)
+    // BOTH (Cả hai) -> Hexagon (Lục giác)
+    const shape =
+      sosType === "RESCUE"
+        ? "triangle"
+        : sosType === "BOTH"
+          ? "hexagon"
+          : "circle";
+
+    const strokeWidth = isSelected ? 5 : 7;
+    const textY = shape === "triangle" ? 72 : 58;
+
+    // SVG definition for shapes
+    const shapeSvg =
+      shape === "triangle"
+        ? `<polygon points="50,5 96,92 4,92" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round" />`
+        : shape === "hexagon"
+          ? `<polygon points="25,5 75,5 100,50 75,95 25,95 0,50" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" stroke-linejoin="round" />`
+          : `<circle cx="50" cy="50" r="45" fill="${color}" stroke="#ffffff" stroke-width="${strokeWidth}" />`;
+
     return L.divIcon({
       className: "custom-sos-marker",
       html: `
-        <div class="${shouldRise ? "map-marker-rise" : ""}" style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">
-          ${sos.status === "PENDING" ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>` : ""}
-          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;border-radius:9999px;overflow:hidden;background-color:${color};border:2px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
-            <span style="display:block;color:#ffffff;font-family:Arial,'Helvetica Neue',sans-serif;font-size:${labelFontSize}px;font-weight:800;line-height:1;letter-spacing:-0.04em;text-transform:uppercase;white-space:nowrap;transform:translateY(-0.5px);">
-              SOS
-            </span>
+        <div class="${shouldRise ? "map-marker-rise" : ""}" style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;z-index:${isSelected ? 1000 : 1};">
+          ${
+            isSelected
+              ? `<div style="position:absolute;inset:-8px;border-radius:50%;background:${color};opacity:0.2;animation:sosSelectedPulse 2s ease-out infinite;"></div>
+                 <div style="position:absolute;inset:-12px;border-radius:50%;border:2px dashed ${color};opacity:0.4;animation:sosSelectedRotate 10s linear infinite;"></div>`
+              : ""
+          }
+          ${
+            isPending && !isSelected
+              ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>`
+              : ""
+          }
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <svg width="${badgeSize}" height="${badgeSize}" viewBox="0 0 100 100" style="overflow:visible;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+              ${shapeSvg}
+              <text x="50" y="${textY}" fill="#ffffff" font-family="Arial, sans-serif" font-size="${labelFontSize * 3.5}px" font-weight="900" text-anchor="middle" letter-spacing="-0.05em">SOS</text>
+            </svg>
           </div>
+          ${
+            isSelected
+              ? `<div style="position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #ffffff;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.2));"></div>`
+              : ""
+          }
         </div>
+        <style>
+          @keyframes sosSelectedPulse {
+            0% { transform:scale(0.8); opacity:0.4; }
+            70% { transform:scale(1.3); opacity:0; }
+            100% { transform:scale(1.3); opacity:0; }
+          }
+          @keyframes sosSelectedRotate {
+            from { transform:rotate(0deg); }
+            to { transform:rotate(360deg); }
+          }
+        </style>
       `,
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
@@ -1407,6 +1495,7 @@ function SOSRequestMarker({
     size,
     sos.priority,
     sos.status,
+    sos.sosType,
     isSelected,
     shouldRise,
   ]);
@@ -1417,6 +1506,7 @@ function SOSRequestMarker({
     <Marker
       position={[sos.location.lat, sos.location.lng]}
       icon={icon}
+      zIndexOffset={isSelected ? 1000 : 0}
       eventHandlers={{ click: onClick }}
     />
   );

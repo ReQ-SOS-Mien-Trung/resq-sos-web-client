@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
+import { Icon as IconifyIcon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 import { formatSupplyBufferPercent } from "@/lib/supply-buffer";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/sos";
 import type {
   ClusterRescueSuggestionResponse,
+  ClusterSupplyCollection,
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
   ClusterTargetVictim,
@@ -26,7 +28,6 @@ import type {
 import type { StreamLogEntry } from "@/services/sos_cluster/hooks";
 import {
   X,
-  Lightning,
   Rocket,
   Warning,
   CheckCircle,
@@ -42,12 +43,15 @@ import {
   TreeStructure,
   Sparkle,
   Eye,
+  CaretDown,
+  CaretUp,
   Users,
   FirstAid,
   Truck,
   Anchor,
   User,
   Phone,
+  WarehouseIcon,
 } from "@phosphor-icons/react";
 
 /* ═══ Props ═══ */
@@ -71,6 +75,10 @@ interface AiStreamPanelProps {
   hidePlanAction?: boolean;
   inline?: boolean;
   size?: "default" | "expanded";
+  clusterSOSRequestCount?: number | null;
+  minimized?: boolean;
+  onMinimize?: () => void;
+  onRestore?: () => void;
 }
 
 /* ═══ Activity icon map ═══ */
@@ -81,7 +89,9 @@ const activityIconMap: Record<
 > = {
   COLLECT_SUPPLIES: Package,
   DELIVER_SUPPLIES: Truck,
-  RESCUE: Anchor,
+  RESCUE: (props) => (
+    <IconifyIcon icon="fluent-emoji-high-contrast:rescue-workers-helmet" {...props} />
+  ),
   MEDICAL_AID: FirstAid,
   EVACUATE: Users,
   ASSESS: Eye,
@@ -120,6 +130,113 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function toPositiveInteger(value: unknown): number | null {
+  const parsed = toFiniteNumber(value);
+  if (parsed == null || parsed <= 0) return null;
+  return Math.trunc(parsed);
+}
+
+function addPositiveSosId(ids: Set<number>, value: unknown) {
+  const id = toPositiveInteger(value);
+  if (id != null) {
+    ids.add(id);
+  }
+}
+
+function addSosIdsFromText(ids: Set<number>, text?: string | null) {
+  if (!text) return;
+
+  for (const match of text.matchAll(/\bSOS\s*#?\s*(\d+)\b/gi)) {
+    addPositiveSosId(ids, match[1]);
+  }
+}
+
+function getDisplaySosRequestCount(
+  result: ClusterRescueSuggestionResponse,
+  fallbackCount?: number | null,
+): number {
+  const explicitCount = toPositiveInteger(result.sosRequestCount);
+  if (explicitCount != null) return explicitCount;
+
+  const clusterCount = toPositiveInteger(fallbackCount);
+  if (clusterCount != null) return clusterCount;
+
+  const ids = new Set<number>();
+
+  if (Array.isArray(result.suggestedActivities)) {
+    for (const activity of result.suggestedActivities) {
+      addPositiveSosId(ids, activity.sosRequestId);
+
+      if (Array.isArray(activity.targetVictims)) {
+        for (const victim of activity.targetVictims) {
+          addPositiveSosId(ids, victim["sosRequestId"]);
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(result.supplyShortages)) {
+    for (const shortage of result.supplyShortages) {
+      addPositiveSosId(ids, shortage.sosRequestId);
+    }
+  }
+
+  addSosIdsFromText(ids, result.specialNotes);
+  addSosIdsFromText(ids, result.overallAssessment);
+  addSosIdsFromText(ids, result.lowConfidenceWarning);
+  addSosIdsFromText(ids, result.mixedRescueReliefWarning);
+
+  return ids.size;
+}
+
+function isReusableItemType(value: unknown): boolean {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    normalized === "reusable" ||
+    normalized.includes("tai su dung") ||
+    normalized.includes("tái sử dụng")
+  );
+}
+
+function hasReusableUnitMetadata(
+  supply: Pick<
+    ClusterSupplyCollection,
+    | "plannedPickupReusableUnits"
+    | "pickedReusableUnits"
+    | "availableDeliveryReusableUnits"
+    | "deliveredReusableUnits"
+    | "expectedReturnUnits"
+    | "returnedReusableUnits"
+  >,
+): boolean {
+  return (
+    Array.isArray(supply.plannedPickupReusableUnits) ||
+    Array.isArray(supply.pickedReusableUnits) ||
+    Array.isArray(supply.availableDeliveryReusableUnits) ||
+    Array.isArray(supply.deliveredReusableUnits) ||
+    Array.isArray(supply.expectedReturnUnits) ||
+    Array.isArray(supply.returnedReusableUnits)
+  );
+}
+
+function isReusableSupplyCollection(
+  supply: Pick<
+    ClusterSupplyCollection,
+    | "itemType"
+    | "plannedPickupReusableUnits"
+    | "pickedReusableUnits"
+    | "availableDeliveryReusableUnits"
+    | "deliveredReusableUnits"
+    | "expectedReturnUnits"
+    | "returnedReusableUnits"
+  >,
+): boolean {
+  return isReusableItemType(supply.itemType) || hasReusableUnitMetadata(supply);
+}
+
 function formatExecutionModeLabel(value?: string | null): string | null {
   const normalized = trimToNull(value)?.toUpperCase();
   if (!normalized) return null;
@@ -132,7 +249,9 @@ function formatExecutionModeLabel(value?: string | null): string | null {
     SEQUENTIAL: "Tuần tự",
   };
 
-  return labels[normalized] ?? labels[normalized.replace(/[\s_-]+/g, "")] ?? value!;
+  return (
+    labels[normalized] ?? labels[normalized.replace(/[\s_-]+/g, "")] ?? value!
+  );
 }
 
 function isSplitAcrossTeams(value?: string | null): boolean {
@@ -142,7 +261,9 @@ function isSplitAcrossTeams(value?: string | null): boolean {
   return normalized === "splitacrossteams" || normalized === "parallel";
 }
 
-function hasSuggestedTeam(activity: Pick<ClusterSuggestedActivity, "suggestedTeam">): boolean {
+function hasSuggestedTeam(
+  activity: Pick<ClusterSuggestedActivity, "suggestedTeam">,
+): boolean {
   const team = activity.suggestedTeam;
   if (!team) return false;
 
@@ -170,9 +291,9 @@ function getVictimDisplayName(victim: ClusterTargetVictim): string {
 function getVictimMedicalIssues(victim: ClusterTargetVictim): string[] {
   return Array.isArray(victim.medicalIssues)
     ? victim.medicalIssues.filter(
-        (issue): issue is string =>
-          typeof issue === "string" && issue.trim().length > 0,
-      )
+      (issue): issue is string =>
+        typeof issue === "string" && issue.trim().length > 0,
+    )
     : [];
 }
 
@@ -230,22 +351,22 @@ function ActivityExecutionMeta({
   return (
     <div className="ml-9 mb-2 flex flex-wrap gap-1.5">
       {activity.coordinationGroupKey ? (
-        <Badge variant="outline" className="h-5 px-1.5 text-sm">
+        <Badge variant="outline" className="h-6 px-2 text-sm">
           Nhóm: {activity.coordinationGroupKey}
         </Badge>
       ) : null}
       {executionModeLabel ? (
-        <Badge className="h-5 border border-indigo-200 bg-indigo-50 px-1.5 text-sm text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300">
+        <Badge className="h-6 border border-indigo-200 bg-indigo-50 px-2 text-sm text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300">
           {executionModeLabel}
         </Badge>
       ) : null}
       {requiredTeamCount > 0 ? (
-        <Badge className="h-5 border border-emerald-200 bg-emerald-50 px-1.5 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+        <Badge className="h-6 border border-emerald-200 bg-emerald-50 px-2 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
           {requiredTeamCount} đội cần
         </Badge>
       ) : null}
       {hasMissingTeam ? (
-        <Badge className="h-5 border border-amber-300 bg-amber-50 px-1.5 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+        <Badge className="h-6 border border-amber-300 bg-amber-50 px-2 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
           Chưa gán đội
         </Badge>
       ) : null}
@@ -270,8 +391,8 @@ function TargetVictimsBlock({
 
   return (
     <div className="ml-9 mb-2 rounded-lg border border-rose-200/70 bg-rose-50/60 p-2 dark:border-rose-800/40 dark:bg-rose-950/20">
-      <p className="flex items-center gap-1 text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-        <Users className="h-3 w-3" weight="fill" />
+      <p className="flex items-center gap-1 text-sm font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+        <Users className="h-4 w-4" weight="fill" />
         Đối tượng cần hỗ trợ
       </p>
       {victims.length === 0 ? (
@@ -318,8 +439,14 @@ function TargetVictimsBlock({
                 {medicalIssues.length > 0 || diet || victim.clothingNeeded ? (
                   <div className="mt-1 flex flex-wrap gap-1 text-muted-foreground">
                     {medicalIssues.slice(0, 3).map((issue) => (
-                      <span key={issue} className="rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-900/25 dark:text-red-300">
-                        <FirstAid className="mr-1 inline h-3 w-3" weight="fill" />
+                      <span
+                        key={issue}
+                        className="rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-900/25 dark:text-red-300"
+                      >
+                        <FirstAid
+                          className="mr-1 inline h-3 w-3"
+                          weight="fill"
+                        />
                         {getMedicalIssueLabel(issue)}
                       </span>
                     ))}
@@ -403,6 +530,99 @@ function buildAiErrorStatusLabel(error: string): string {
   return `LỖI: ${compact.trim()}`;
 }
 
+function getLatestStatusMessage(statusLog: StreamLogEntry[]): string | null {
+  for (let index = statusLog.length - 1; index >= 0; index -= 1) {
+    const entry = statusLog[index];
+    if (
+      (entry.type === "status" || entry.type === "result") &&
+      entry.message.trim()
+    ) {
+      return entry.message.trim();
+    }
+  }
+
+  return null;
+}
+
+const AI_STEP_TRANSLATIONS: Record<string, string> = {
+  COLLECT_SUPPLIES: "Tiếp nhận vật phẩm",
+  DELIVER_SUPPLIES: "Phân phát vật phẩm",
+  RESCUE: "Cứu hộ",
+  EVACUATE: "Sơ tán",
+  RETURN_SUPPLIES: "Hoàn trả vật phẩm",
+  MOVE_TO_LOCATION: "Di chuyển",
+  SOS_SUPPORT: "Hỗ trợ SOS",
+};
+
+function translateAIText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(
+      /Activity step (\d+) \(([^)]+)\)/g,
+      (match, step, type) =>
+        `Bước ${step} (${AI_STEP_TRANSLATIONS[type] || type})`,
+    )
+    .replace(/team_id=(\d+)/g, "đội ID $1")
+    .replace(
+      /pool nearby teams/g,
+      "danh sách đội cứu hộ được quét xung quanh khu vực",
+    );
+}
+
+function FormattedAINotes({
+  text,
+  textClassName,
+}: {
+  text: string;
+  textClassName?: string;
+}) {
+  if (!text) return null;
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-3">
+      {lines.map((line, idx) => {
+        if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
+          const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
+          const items = content
+            .split("|")
+            .map((i) => i.trim())
+            .filter(Boolean);
+          return (
+            <div
+              key={idx}
+              className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-md p-3"
+            >
+              <h5 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2.5 flex items-center gap-1.5">
+                <Warning className="w-4 h-4" weight="fill" />
+                CẦN XEM LẠI THỦ CÔNG
+              </h5>
+              <ul className="list-disc list-inside space-y-1 text-sm font-medium text-red-600/90 dark:text-red-400/90 leading-relaxed">
+                {items.map((item, i) => (
+                  <li key={i}>{translateAIText(item)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return (
+          <p
+            key={idx}
+            className={
+              textClassName || "text-sm text-foreground/80 leading-relaxed"
+            }
+          >
+            {translateAIText(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ═══ Main Component ═══ */
 
 export default function AiStreamPanel({
@@ -424,13 +644,24 @@ export default function AiStreamPanel({
   hidePlanAction = false,
   inline = false,
   size = "default",
+  clusterSOSRequestCount,
+  minimized = false,
+  onMinimize,
+  onRestore,
 }: AiStreamPanelProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isExpanded = size === "expanded";
   const canClose = !loading;
+  const canMinimize = !inline && typeof onMinimize === "function";
+  const handleMinimize = () => {
+    if (canMinimize) {
+      onMinimize();
+    }
+  };
   const handleClose = () => {
     if (!canClose) {
+      handleMinimize();
       return;
     }
 
@@ -459,7 +690,7 @@ export default function AiStreamPanel({
       );
     });
     return () => ctx.revert();
-  }, [open]);
+  }, [minimized, open]);
 
   if (!open) return null;
 
@@ -467,11 +698,26 @@ export default function AiStreamPanel({
   const showActionMap = result !== null;
   const showError = error !== null && !result;
 
+  if (minimized && !inline) {
+    return (
+      <FloatingAiStreamButton
+        clusterId={clusterId}
+        status={status}
+        statusLog={statusLog}
+        result={result}
+        error={error}
+        loading={loading}
+        phase={phase}
+        onRestore={onRestore ?? (() => undefined)}
+      />
+    );
+  }
+
   const panelShell = (
     <div
       ref={panelRef}
       className={cn(
-        "relative w-full overflow-hidden flex flex-col bg-background border shadow-2xl",
+        "relative w-full overflow-hidden flex flex-col bg-background border shadow-2xl tracking-tighter [&_*]:tracking-tighter",
         isExpanded ? "text-[15px]" : "text-[14px]",
         inline
           ? isExpanded
@@ -489,11 +735,12 @@ export default function AiStreamPanel({
         error={error}
         phase={phase}
         onStop={onStop}
+        onMinimize={canMinimize ? handleMinimize : undefined}
         onClose={handleClose}
         inline={inline}
         expanded={isExpanded}
       />
-      <div className="relative flex-1 min-h-0 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_34%),linear-gradient(180deg,_rgba(255,255,255,0.82)_0%,_rgba(255,255,255,0.96)_24%,_rgba(255,255,255,1)_100%)]">
+      <div className="relative flex-1 min-h-0 overflow-auto bg-background">
         {showProgress && (
           <LoadingStreamView
             status={status}
@@ -504,7 +751,11 @@ export default function AiStreamPanel({
           />
         )}
         {showActionMap && (
-          <ActionMapView result={result} expanded={isExpanded} />
+          <ActionMapView
+            result={result}
+            expanded={isExpanded}
+            clusterSOSRequestCount={clusterSOSRequestCount}
+          />
         )}
         {showError && (
           <ErrorView error={error} onRetry={onRetry} expanded={isExpanded} />
@@ -536,7 +787,7 @@ export default function AiStreamPanel({
       <div
         className={cn(
           "absolute inset-0 bg-black/50 backdrop-blur-sm",
-          canClose ? "cursor-pointer" : "cursor-not-allowed",
+          canClose || canMinimize ? "cursor-pointer" : "cursor-not-allowed",
         )}
         onClick={handleClose}
       />
@@ -555,6 +806,7 @@ function TopBar({
   error,
   phase,
   onStop,
+  onMinimize,
   onClose,
   inline = false,
   expanded = false,
@@ -566,6 +818,7 @@ function TopBar({
   error: string | null;
   phase: string;
   onStop: () => void;
+  onMinimize?: () => void;
   onClose: () => void;
   inline?: boolean;
   expanded?: boolean;
@@ -610,8 +863,8 @@ function TopBar({
         <div>
           <h3
             className={cn(
-              "font-bold text-foreground flex items-center gap-2",
-              expanded ? "text-base" : "text-sm",
+              "font-semibold text-foreground tracking-tighter flex items-center gap-2",
+              expanded ? "text-base" : "text-base",
             )}
           >
             Gợi ý nhiệm vụ AI
@@ -629,7 +882,7 @@ function TopBar({
           </h3>
           <p
             className={cn(
-              "max-w-xl truncate text-muted-foreground",
+              "max-w-xl truncate text-muted-foreground tracking-tighter",
               expanded ? "text-base" : "text-sm",
             )}
             title={error ? normalizeAiErrorText(error) : undefined}
@@ -639,6 +892,22 @@ function TopBar({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {loading && !inline && onMinimize ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(expanded ? "h-9 px-3 text-sm" : "h-7 text-sm")}
+            onClick={onMinimize}
+            title="Thu nhỏ"
+            aria-label="Thu nhỏ tiến trình AI"
+          >
+            <CaretDown
+              className={cn(expanded ? "h-4 w-4 mr-1.5" : "h-3 w-3 mr-1")}
+              weight="bold"
+            />
+            Thu nhỏ
+          </Button>
+        ) : null}
         {loading && (
           <Button
             variant="destructive"
@@ -669,6 +938,151 @@ function TopBar({
             <X className="h-4 w-4" />
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FloatingAiStreamButton({
+  clusterId,
+  status,
+  statusLog,
+  result,
+  error,
+  loading,
+  phase,
+  onRestore,
+}: {
+  clusterId: number | null;
+  status: string;
+  statusLog: StreamLogEntry[];
+  result: ClusterRescueSuggestionResponse | null;
+  error: string | null;
+  loading: boolean;
+  phase: string;
+  onRestore: () => void;
+}) {
+  const floatingRef = useRef<HTMLDivElement>(null);
+  const latestStatus = getLatestStatusMessage(statusLog);
+  const progressValue = result || error ? 100 : phaseProgressValue(phase);
+  const title = result
+    ? "AI đã hoàn tất"
+    : error
+      ? "AI gặp lỗi"
+      : loading
+        ? "AI đang phân tích"
+        : "Gợi ý nhiệm vụ AI";
+  const description = result
+    ? result.suggestedMissionTitle || "Kế hoạch AI đã sẵn sàng"
+    : error
+      ? normalizeAiErrorText(error)
+      : latestStatus || status || phaseDescription(phase);
+  const toneClasses = error
+    ? {
+      icon: "from-rose-500 to-red-500",
+      dot: "bg-rose-500",
+      progress: "from-rose-500 to-red-400",
+      badge: "border-rose-200 bg-rose-50 text-rose-700",
+    }
+    : result
+      ? {
+        icon: "from-emerald-500 to-teal-500",
+        dot: "bg-emerald-500",
+        progress: "from-emerald-500 to-teal-400",
+        badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      }
+      : {
+        icon: "from-primary to-orange-500",
+        dot: "bg-primary",
+        progress: "from-primary via-orange-500 to-amber-400",
+        badge: "border-primary/20 bg-primary/10 text-primary",
+      };
+  const StatusIcon = error ? Warning : result ? CheckCircle : Brain;
+
+  useEffect(() => {
+    if (!floatingRef.current) return;
+    gsap.fromTo(
+      floatingRef.current,
+      { opacity: 0, y: 18, scale: 0.98 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "power2.out" },
+    );
+  }, []);
+
+  return (
+    <div className="pointer-events-none absolute inset-x-4 bottom-20 z-[60] flex justify-end sm:inset-x-auto sm:right-6 sm:bottom-6">
+      <div
+        ref={floatingRef}
+        className="pointer-events-auto w-full sm:w-[25rem]"
+      >
+        <button
+          type="button"
+          onClick={onRestore}
+          className="group w-full overflow-hidden rounded-lg border border-border/70 bg-background/96 text-left shadow-2xl shadow-black/18 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-label="Mở tiến trình phân tích AI"
+          title="Mở tiến trình phân tích AI"
+        >
+          <div className="flex items-center gap-3 px-3.5 py-3">
+            <div
+              className={cn(
+                "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-md",
+                toneClasses.icon,
+              )}
+            >
+              <StatusIcon className="h-5 w-5" weight="fill" />
+              {loading ? (
+                <span
+                  className={cn(
+                    "absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background shadow-[0_0_14px]",
+                    toneClasses.dot,
+                  )}
+                />
+              ) : null}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate text-sm font-bold tracking-tighter text-foreground">
+                  {title}
+                </p>
+                {clusterId ? (
+                  <Badge
+                    variant="outline"
+                    className="h-5 shrink-0 px-1.5 text-sm font-mono"
+                  >
+                    #{clusterId}
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="mt-0.5 line-clamp-1 text-sm tracking-tighter text-muted-foreground">
+                {description}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-1 text-xs font-bold tabular-nums",
+                  toneClasses.badge,
+                )}
+              >
+                {progressValue}%
+              </span>
+              <CaretUp
+                className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:text-primary"
+                weight="bold"
+              />
+            </div>
+          </div>
+          <div className="h-1 overflow-hidden bg-muted">
+            <div
+              className={cn(
+                "h-full rounded-r-full bg-gradient-to-r transition-[width] duration-700 ease-out",
+                toneClasses.progress,
+              )}
+              style={{ width: `${progressValue}%` }}
+            />
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -793,7 +1207,7 @@ function LoadingStreamView({
       ref={wrapperRef}
       className={cn(
         "h-full",
-        expanded ? "px-5 py-8 md:px-7 md:py-10" : "px-4 py-6 md:px-6 md:py-8",
+        expanded ? "px-5 py-2 md:px-7 md:py-4" : "px-4 py-2 md:px-6 md:py-4",
       )}
       style={{ contentVisibility: "auto" }}
     >
@@ -950,7 +1364,7 @@ function SonarRadar({
                 <Badge
                   variant="outline"
                   className={cn(
-                    "rounded-full font-semibold uppercase tracking-[0.18em]",
+                    "rounded-full font-semibold tracking-tighter",
                     expanded ? "px-3 py-1.5 text-sm" : "px-2.5 py-1 text-sm",
                     phaseTone.pill,
                   )}
@@ -1160,7 +1574,7 @@ function SonarRadar({
               </p>
               <p
                 className={cn(
-                  "mt-1 text-center text-muted-foreground",
+                  "mt-1 text-center text-muted-foreground tracking-tighter",
                   expanded ? "text-base" : "text-sm",
                 )}
               >
@@ -1312,9 +1726,11 @@ function SonarRadar({
 function ActionMapView({
   result,
   expanded = false,
+  clusterSOSRequestCount,
 }: {
   result: ClusterRescueSuggestionResponse;
   expanded?: boolean;
+  clusterSOSRequestCount?: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activities = result.suggestedActivities;
@@ -1329,7 +1745,11 @@ function ActionMapView({
         ref={containerRef}
       >
         <MissionBanner result={result} />
-        <StatsRow result={result} />
+        <StatsRow
+          result={result}
+          clusterSOSRequestCount={clusterSOSRequestCount}
+        />
+        <WarningsBlock result={result} />
         <ActionFlowTimeline key={activitiesKey} activities={activities} />
         {result.overallAssessment && (
           <AssessmentBlock text={result.overallAssessment} />
@@ -1337,7 +1757,6 @@ function ActionMapView({
         {result.suggestedResources && result.suggestedResources.length > 0 && (
           <ResourcesBlock resources={result.suggestedResources} />
         )}
-        <WarningsBlock result={result} />
       </div>
     </ScrollArea>
   );
@@ -1404,36 +1823,24 @@ function MissionBanner({
   }, []);
 
   return (
-    <div
-      ref={ref}
-      className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg width='40' height='46' viewBox='0 0 40 46' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0L40 11.5V34.5L20 46L0 34.5V11.5L20 0Z' fill='none' stroke='%23f97316' stroke-width='1'/%3E%3C/svg%3E\")",
-          backgroundSize: "40px 46px",
-        }}
-      />
+    <div ref={ref} className="relative overflow-hidden rounded-xl border p-4">
       <div className="relative flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
-          <CheckCircle className="h-5 w-5 text-white" weight="fill" />
-        </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-foreground truncate mb-1">
-            {result.suggestedMissionTitle || "Kế hoạch AI chưa có tiêu đề"}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge className="text-sm bg-primary text-white border-primary hover:bg-primary/90">
+          <div className="flex min-w-0 items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="text-[18px] font-semibold text-foreground tracking-tighter leading-tight">
+                {result.suggestedMissionTitle || "Kế hoạch AI chưa có tiêu đề"}
+              </h1>
+              <span className="shrink-0 text-xs font-medium text-foreground/80">
+                ({result.modelName || "AI"})
+              </span>
+            </div>
+            <Badge className="shrink-0 text-sm bg-primary text-white border-primary hover:bg-primary/90">
               {result.suggestedSeverityLevel
-                ? (severityConfig[result.suggestedSeverityLevel]?.label ||
-                  result.suggestedSeverityLevel)
+                ? severityConfig[result.suggestedSeverityLevel]?.label ||
+                result.suggestedSeverityLevel
                 : "Chưa rõ mức độ"}
             </Badge>
-            <span className="text-sm font-mono text-muted-foreground">
-              {(result.modelName || "AI")} • {result.responseTimeMs}ms
-            </span>
           </div>
         </div>
       </div>
@@ -1443,8 +1850,19 @@ function MissionBanner({
 
 /* ═══ Stats Row ═══ */
 
-function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
+function StatsRow({
+  result,
+  clusterSOSRequestCount,
+}: {
+  result: ClusterRescueSuggestionResponse;
+  clusterSOSRequestCount?: number | null;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const sosRequestCount = getDisplaySosRequestCount(
+    result,
+    clusterSOSRequestCount,
+  );
+
   useEffect(() => {
     if (!ref.current) return;
     const ctx = gsap.context(() => {
@@ -1467,54 +1885,57 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
 
   const stats = [
     {
-      icon: ShieldCheck,
-      label: "Độ tin cậy",
-      value: `${(result.confidenceScore * 100).toFixed(0)}%`,
-      color: "text-emerald-400",
-    },
-    {
-      icon: Lightning,
+      icon: "streamline-ultimate:flag-plain",
       label: "Ưu tiên",
       value:
         typeof result.suggestedPriorityScore === "number"
           ? result.suggestedPriorityScore.toFixed(1)
           : "N/A",
-      color: "text-orange-400",
+      color: "text-emerald-500",
     },
     {
-      icon: Clock,
+      icon: "carbon:time-filled",
       label: "Thời gian",
       value: result.estimatedDuration || "Chưa rõ",
       color: "text-blue-400",
     },
     {
-      icon: TreeStructure,
+      icon: "fluent-emoji-high-contrast:sos-button",
       label: "SOS",
-      value: `${result.sosRequestCount || 0}`,
-      color: "text-cyan-400",
+      value: `${sosRequestCount}`,
+      color: "text-primary",
     },
     {
-      icon: Rocket,
-      label: "Hoạt động",
+      icon: "bi:list-ol",
+      label: "Số hoạt động được đề xuất",
       value: `${result.suggestedActivities.length}`,
-      color: "text-primary",
+      color: "text-cyan-600",
     },
   ];
 
   return (
-    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-5">
+    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-4">
       {stats.map((s) => {
-        const Icon = s.icon;
+        const PhosphorIcon = typeof s.icon === "string" ? null : s.icon;
         return (
           <div
             key={s.label}
             className="stat-hex flex flex-col items-center gap-1 p-3 rounded-xl bg-card border hover:border-primary/20 transition-colors"
           >
-            <Icon className={cn("h-4 w-4", s.color)} weight="fill" />
-            <span className={cn("text-sm font-bold font-mono", s.color)}>
+            {typeof s.icon === "string" ? (
+              <IconifyIcon
+                icon={s.icon}
+                width="24"
+                height="24"
+                className={s.color}
+              />
+            ) : PhosphorIcon ? (
+              <PhosphorIcon className={cn("h-4 w-4", s.color)} weight="fill" />
+            ) : null}
+            <span className={cn("text-base font-bold font-mono", s.color)}>
               {s.value}
             </span>
-            <span className="text-sm text-muted-foreground uppercase tracking-wider">
+            <span className="text-sm font-medium uppercase tracking-wider">
               {s.label}
             </span>
           </div>
@@ -1543,10 +1964,8 @@ function AiOriginNode() {
         <Brain className="h-4 w-4 text-primary" weight="fill" />
       </div>
       <div>
-        <span className="text-sm font-bold text-primary">AI Engine</span>
-        <p className="text-sm text-muted-foreground font-mono">
-          Bắt đầu thực thi kế hoạch
-        </p>
+        <span className="text-base font-bold text-primary">AI Engine</span>
+        <p className="text-sm font-medium mb-0.5">Bắt đầu thực thi kế hoạch</p>
       </div>
     </div>
   );
@@ -1567,10 +1986,10 @@ function ActivityFlowNode({
 
   const config = activityTypeConfig[activity.activityType] ||
     activityTypeConfig[normalizedActivityType] || {
-      label: normalizedActivityType || activity.activityType,
-      color: "text-zinc-400",
-      bgColor: "bg-zinc-800",
-    };
+    label: normalizedActivityType || activity.activityType,
+    color: "text-zinc-400",
+    bgColor: "bg-zinc-800",
+  };
   const Icon =
     activityIconMap[activity.activityType] ||
     activityIconMap[normalizedActivityType] ||
@@ -1659,7 +2078,7 @@ function ActivityFlowNode({
         className={cn(
           "relative border rounded-xl p-3 mb-3 transition-all",
           isDepotStep &&
-            "border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/[0.04]",
+          "border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/[0.04]",
           isSosStep && "border-red-500/20 bg-red-50/50 dark:bg-red-500/[0.03]",
           !isDepotStep && !isSosStep && "border bg-card",
         )}
@@ -1692,26 +2111,26 @@ function ActivityFlowNode({
           </div>
           <Badge
             className={cn(
-              "text-sm px-1.5 h-5 border",
+              "text-sm px-2 h-7 border",
               config.bgColor,
               config.color,
               "border-current/20",
             )}
           >
-            <Icon className="h-3 w-3 mr-0.5" weight="fill" />
+            <Icon className="h-4 w-4 mr-1" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-sm px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+          <Badge className="text-sm px-2 h-7 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
             {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
-            <span className="text-sm font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
-              <Clock className="h-3 w-3" />
+            <span className="text-sm font-medium flex items-center gap-0.5 ml-auto">
+              <Clock className="h-4 w-4" />
               {activity.estimatedTime}
             </span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-muted-foreground mb-2 pl-9">
+        <p className="text-sm leading-relaxed font-medium mb-2 pl-9">
           {activity.description}
         </p>
 
@@ -1719,10 +2138,10 @@ function ActivityFlowNode({
         <TargetVictimsBlock activity={activity} />
         {activity.coordinationNotes ? (
           <div className="ml-9 mb-2 rounded-lg border border-indigo-300/40 bg-indigo-50/50 p-2 dark:border-indigo-700/40 dark:bg-indigo-900/15">
-            <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+            <p className="text-sm font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
               Ghi chú phối hợp
             </p>
-            <p className="mt-0.5 text-sm leading-relaxed text-indigo-700/80 dark:text-indigo-300/80">
+            <p className="mt-0.5 text-sm leading-relaxed">
               {activity.coordinationNotes}
             </p>
           </div>
@@ -1730,7 +2149,7 @@ function ActivityFlowNode({
 
         {activity.suggestedTeam && (
           <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
-            <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+            <p className="text-base font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" weight="fill" />
               Đội đề xuất
             </p>
@@ -1740,7 +2159,7 @@ function ActivityFlowNode({
                   ? `Đội #${activity.suggestedTeam.teamId}`
                   : "Đội chưa đặt tên")}
             </p>
-            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+            <p className="text-sm mt-0.5">
               {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
               {activity.suggestedTeam.contactPhone
                 ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
@@ -1750,12 +2169,12 @@ function ActivityFlowNode({
                 : ""}
             </p>
             {activity.suggestedTeam.reason && (
-              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+              <p className="text-sm mt-1 leading-relaxed">
                 Lý do: {activity.suggestedTeam.reason}
               </p>
             )}
             {activity.suggestedTeam.assemblyPointName && (
-              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+              <p className="text-sm mt-0.5 leading-relaxed">
                 Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
               </p>
             )}
@@ -1765,59 +2184,45 @@ function ActivityFlowNode({
         {(activity.assemblyPointName ||
           (activity.assemblyPointLatitude != null &&
             activity.assemblyPointLongitude != null)) && (
-          <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
-            <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
-              <MapPin className="h-3 w-3" weight="fill" />
-              Điểm tập kết hoạt động
-            </p>
-            {activity.assemblyPointName && (
-              <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
-                {activity.assemblyPointName}
+            <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                <MapPin className="h-3 w-3" weight="fill" />
+                Điểm tập kết hoạt động
               </p>
-            )}
-            {activity.assemblyPointLatitude != null &&
-              activity.assemblyPointLongitude != null && (
-                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                  Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
-                  {activity.assemblyPointLongitude.toFixed(4)}
+              {activity.assemblyPointName && (
+                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+                  {activity.assemblyPointName}
                 </p>
               )}
-          </div>
-        )}
+              {activity.assemblyPointLatitude != null &&
+                activity.assemblyPointLongitude != null && (
+                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                    Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
+                    {activity.assemblyPointLongitude.toFixed(4)}
+                  </p>
+                )}
+            </div>
+          )}
 
         {activity.depotName && (
-          <div className="ml-9 flex items-center gap-2 p-2 rounded-lg bg-amber-50/50 dark:bg-amber-500/[0.06] border border-amber-500/15 mb-2">
+          <div className="ml-9 flex items-center gap-2 p-2 rounded-lg bg-blue-50/50 dark:bg-blue-500/[0.06] border border-blue-500/15 mb-2">
             <div className="relative w-6 h-6 shrink-0">
-              <svg viewBox="0 0 24 24" className="w-full h-full">
-                <polygon
-                  points="12,1 22,6.5 22,17.5 12,23 2,17.5 2,6.5"
-                  fill="rgba(245,158,11,0.2)"
-                  stroke="rgba(245,158,11,0.5)"
-                  strokeWidth="1"
-                />
-              </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Storefront className="h-3 w-3 text-amber-500" weight="fill" />
+                <WarehouseIcon
+                  className="h-4 w-4 text-blue-500"
+                  weight="fill"
+                />
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-amber-600 dark:text-amber-400 truncate">
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">
                 {activity.depotName}
               </p>
-              {activity.depotAddress && (
-                <p className="text-sm text-amber-600/50 dark:text-amber-500/50 truncate">
-                  {activity.depotAddress}
-                </p>
-              )}
             </div>
             <div className="ml-auto flex items-center gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-1 h-1 rounded-full bg-amber-500/40 animate-pulse"
-                  style={{ animationDelay: `${i * 200}ms` }}
-                />
-              ))}
+              {activity.depotAddress && (
+                <p className="text-sm truncate">{activity.depotAddress}</p>
+              )}
             </div>
           </div>
         )}
@@ -1828,8 +2233,8 @@ function ActivityFlowNode({
               className="h-3.5 w-3.5 text-red-500 shrink-0"
               weight="fill"
             />
-            <span className="text-sm font-mono text-red-500/70">
-              SOS #{activity.sosRequestId}
+            <span className="text-sm font-medium text-red-500">
+              Yêu cầu SOS #{activity.sosRequestId}
             </span>
           </div>
         )}
@@ -1840,16 +2245,17 @@ function ActivityFlowNode({
               {activity.suppliesToCollect.map((supply) => (
                 <div
                   key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-sm"
+                  className="supply-tag flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/15 text-sm"
                 >
-                  <Package className="h-2.5 w-2.5 text-primary" weight="fill" />
-                  <span className="text-primary">{supply.itemName}</span>
+                  <Package className="h-4 w-4 text-primary" weight="fill" />
+                  <span className="">{supply.itemName}</span>
                   <span className="text-primary font-bold">
                     ×{supply.quantity}
                   </span>
-                  <span className="text-primary/40">{supply.unit}</span>
-                  {normalizedActivityType === "COLLECT_SUPPLIES" ? (
-                    <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                  <span className="">{supply.unit}</span>
+                  {normalizedActivityType === "COLLECT_SUPPLIES" &&
+                    !isReusableSupplyCollection(supply) ? (
+                    <span className="rounded bg-amber-50 px-2 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                       Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
                     </span>
                   ) : null}
@@ -1882,12 +2288,12 @@ function AssessmentBlock({ text }: { text: string }) {
     >
       <div className="px-3 py-2 bg-primary/6 dark:bg-primary/12 border-b border-primary/10 flex items-center gap-2">
         <Brain className="h-3.5 w-3.5 text-primary" weight="fill" />
-        <span className="text-sm font-bold text-primary uppercase tracking-wider">
+        <span className="text-sm font-semibold text-primary uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>
       <div className="p-3">
-        <p className="text-sm leading-relaxed text-muted-foreground">{text}</p>
+        <p className="text-sm leading-relaxed">{text}</p>
       </div>
     </div>
   );
@@ -1930,7 +2336,7 @@ function ResourcesBlock({
           className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
           weight="fill"
         />
-        <span className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+        <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
           Tài nguyên cần thiết
         </span>
       </div>
@@ -1976,7 +2382,6 @@ function WarningsBlock({
     !result.needsManualReview &&
     !result.multiDepotRecommended &&
     !result.specialNotes &&
-    !(result.mixedRescueReliefWarning || "").trim() &&
     !result.needsAdditionalDepot &&
     (result.supplyShortages?.length ?? 0) === 0
   )
@@ -1984,72 +2389,59 @@ function WarningsBlock({
 
   return (
     <div className="space-y-2">
-      {(result.mixedRescueReliefWarning || "").trim() ? (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/[0.06] border border-rose-500/15">
-          <Warning className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" weight="fill" />
-          <div>
-            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-0.5">
-              Cảnh báo tách nhiệm vụ
-            </p>
-            <p className="text-sm text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
-              {result.mixedRescueReliefWarning}
-            </p>
-          </div>
-        </div>
-      ) : null}
       {result.needsManualReview && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/6 border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
-          <p className="text-sm text-yellow-600 dark:text-yellow-400/80">
+          <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400/80">
             {result.lowConfidenceWarning ||
               "Cần kiểm tra thủ công trước khi phê duyệt."}
           </p>
         </div>
       )}
       {result.multiDepotRecommended && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-500/[0.06] border border-blue-500/15">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-500/6 border border-blue-500/15">
           <Storefront
             className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0"
             weight="fill"
           />
-          <p className="text-sm text-blue-600 dark:text-blue-400/80">
+          <p className="text-sm font-medium text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
         </div>
       )}
       {(result.needsAdditionalDepot ||
         (result.supplyShortages?.length ?? 0) > 0) && (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/[0.06] border border-sky-500/15">
-          <Storefront
-            className="h-4 w-4 text-sky-500 dark:text-sky-400 shrink-0 mt-0.5"
-            weight="fill"
-          />
-          <div>
-            <p className="text-sm font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-0.5">
-              Thiếu vật phẩm / cần thêm kho
-            </p>
-            {result.supplyShortages?.length ? (
-              <div className="space-y-0.5">
-                {result.supplyShortages.map((shortage, index) => (
-                  <p
-                    key={`warning-shortage-${index}`}
-                    className="text-sm text-sky-600/80 dark:text-sky-400/80 leading-relaxed"
-                  >
-                    {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
-                    {shortage.selectedDepotName
-                      ? ` • Kho chính: ${shortage.selectedDepotName}`
-                      : ""}
-                  </p>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-sky-600/80 dark:text-sky-400/80 leading-relaxed">
-                Kho hiện tại chưa đủ vật phẩm để đáp ứng toàn bộ kế hoạch.
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/6 border border-sky-500/15">
+            <Storefront
+              className="h-4 w-4 text-sky-500 dark:text-sky-400 shrink-0 mt-0.5"
+              weight="fill"
+            />
+            <div>
+              <p className="text-sm font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-0.5">
+                Thiếu vật phẩm / cần thêm kho
               </p>
-            )}
+              {result.supplyShortages?.length ? (
+                <div className="space-y-0.5">
+                  {result.supplyShortages.map((shortage, index) => (
+                    <p
+                      key={`warning-shortage-${index}`}
+                      className="text-sm font-medium text-sky-600/80 dark:text-sky-400/80 leading-relaxed"
+                    >
+                      {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
+                      {shortage.selectedDepotName
+                        ? ` • Kho chính: ${shortage.selectedDepotName}`
+                        : ""}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm font-medium text-sky-600/80 dark:text-sky-400/80 leading-relaxed">
+                  Kho hiện tại chưa đủ vật phẩm để đáp ứng toàn bộ kế hoạch.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {result.specialNotes && (
         <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/[0.06] border border-amber-500/15">
           <Warning
@@ -2060,9 +2452,10 @@ function WarningsBlock({
             <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
-              {result.specialNotes}
-            </p>
+            <FormattedAINotes
+              text={result.specialNotes}
+              textClassName="text-sm font-medium leading-relaxed"
+            />
           </div>
         </div>
       )}
@@ -2194,7 +2587,7 @@ function FooterBar({
           <Button
             size="sm"
             className={cn(
-              "text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25",
+              "text-sm bg-primary hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25",
               expanded ? "h-10 px-4" : "h-9",
             )}
             onClick={onPrimaryAction}

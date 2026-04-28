@@ -7,6 +7,7 @@ import {
   getSOSRequestById,
   getSOSRequestAnalysis,
   createSOSRequest,
+  getSOSRequestStatusCounts,
 } from "./api";
 import {
   GetSOSRequestsResponse,
@@ -17,6 +18,7 @@ import {
   GetSOSRequestAnalysisResponse,
   CreateSOSRequestPayload,
   SOSRequestEntity,
+  GetSOSRequestStatusCountsResponse,
 } from "./type";
 import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 
@@ -28,11 +30,13 @@ export const SOS_PRIORITY_LEVELS_QUERY_KEY = [
 
 export interface UseSOSRequestsOptions {
   params?: GetSOSRequestsParams;
+  refetchInterval?: number | false;
 }
 
 export interface UseSOSRequestsInBoundsOptions {
   params?: GetSOSRequestsInBoundsParams;
   enabled?: boolean;
+  refetchInterval?: number | false;
 }
 
 export interface UseSOSRequestByIdOptions {
@@ -66,10 +70,17 @@ export function useSOSRequests(options?: UseSOSRequestsOptions) {
   );
   const normalizedPriorityLevels = useMemo(
     () =>
-      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+      Array.from(new Set((params?.Priorities ?? []).filter(Boolean))).sort(
         (left, right) => left.localeCompare(right),
       ),
-    [params?.PriorityLevels],
+    [params?.Priorities],
+  );
+  const normalizedSosTypes = useMemo(
+    () =>
+      Array.from(new Set((params?.SosTypes ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.SosTypes],
   );
 
   return useQuery<GetSOSRequestsResponse>({
@@ -79,8 +90,11 @@ export function useSOSRequests(options?: UseSOSRequestsOptions) {
       params?.pageSize ?? 10,
       normalizedStatuses.join(","),
       normalizedPriorityLevels.join(","),
+      normalizedSosTypes.join(","),
+      params?.Sort ?? "time:desc",
     ],
     queryFn: () => getSOSRequests(params),
+    refetchInterval: options?.refetchInterval,
   });
 }
 
@@ -107,10 +121,17 @@ export function useSOSRequestsInBounds(
   );
   const normalizedPriorityLevels = useMemo(
     () =>
-      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+      Array.from(new Set((params?.Priorities ?? []).filter(Boolean))).sort(
         (left, right) => left.localeCompare(right),
       ),
-    [params?.PriorityLevels],
+    [params?.Priorities],
+  );
+  const normalizedSosTypes = useMemo(
+    () =>
+      Array.from(new Set((params?.SosTypes ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.SosTypes],
   );
 
   return useQuery<SOSRequestEntity[]>({
@@ -120,6 +141,8 @@ export function useSOSRequestsInBounds(
       boundsKey,
       normalizedStatuses.join(","),
       normalizedPriorityLevels.join(","),
+      normalizedSosTypes.join(","),
+      params?.Sort ?? "time:desc",
     ],
     queryFn: () => getSOSRequestsInBounds(params!),
     enabled:
@@ -130,6 +153,7 @@ export function useSOSRequestsInBounds(
       Number.isFinite(params?.MaxLng),
     placeholderData: (previousData) => previousData,
     staleTime: 60_000,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
@@ -241,5 +265,20 @@ export function useCreateSOSRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SOS_REQUESTS_QUERY_KEY });
     },
+  });
+}
+
+/**
+ * Hook to fetch SOS request status counts
+ */
+export function useSOSRequestStatusCounts(options?: {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+}) {
+  return useQuery<GetSOSRequestStatusCountsResponse>({
+    queryKey: [...SOS_REQUESTS_QUERY_KEY, "status-counts"],
+    queryFn: getSOSRequestStatusCounts,
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval,
   });
 }

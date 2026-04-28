@@ -396,11 +396,15 @@ export interface MarkDepotClosureExternalResponse {
 
 export interface DepotExternalResolutionItem {
   rowNumber: number;
+  itemModelId: number;
   itemName: string;
   categoryName: string;
   targetGroup: string;
   itemType: string;
   unit: string;
+  lotId?: number | null;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
   receivedDate?: string | null;
   expiredDate?: string | null;
   quantity: number;
@@ -447,6 +451,10 @@ export interface DepotExternalResolutionState {
 
 export interface DepotClosureRemainingInventoryItem {
   itemModelId: number;
+  lotId?: number | null;
+  supplyInventoryLotId?: number | null;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
   itemName: string;
   categoryName?: string | null;
   itemType: string;
@@ -630,6 +638,7 @@ export type GetDepotClosuresListByDepotIdResponse = Array<{
 
 export interface DepotTransferListItem {
   transferId: number;
+  id?: number;
   closureId: number;
   sourceDepotId: number;
   sourceDepotName: string;
@@ -647,12 +656,17 @@ export interface DepotTransferListItem {
   shippedAt: string | null;
   receivedAt: string | null;
   cancelledAt: string | null;
+  items?: DepotClosureDetailTransferItem[];
 }
 
 export type GetMyDepotTransfersResponse = DepotTransferListItem[];
 
 export interface DepotExternalResolvedItem {
   id: number;
+  itemModelId?: number | null;
+  lotId?: number | null;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
   itemName: string;
   categoryName: string;
   itemType: string;
@@ -673,6 +687,8 @@ export interface DepotExternalResolvedItem {
 
 export interface DepotClosureDetailTransferItem {
   itemModelId: number;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
   itemName: string;
   itemType: string;
   unit: string | null;
@@ -939,6 +955,22 @@ export interface DepotFundMovementChartResponse {
 export interface GetDepotFundMovementParams {
   from?: string;
   to?: string;
+}
+
+// GET /finance/depot-funds/{depotId}/chart/fund-movement/multi-line
+export interface DepotFundMovementSeries {
+  fundId: number;
+  fundSourceName: string;
+  currentBalance: number;
+  dataPoints: FundMovementDataPoint[];
+}
+
+export interface DepotFundMovementMultiLineChartResponse {
+  depotId: number;
+  depotName: string;
+  from: string;
+  to: string;
+  series: DepotFundMovementSeries[];
 }
 
 // ─── Fund Transactions by FundId ─────────────────────────────────────────────

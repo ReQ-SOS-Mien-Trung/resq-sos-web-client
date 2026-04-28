@@ -8,6 +8,7 @@ import {
   CreateSOSRequestPayload,
   SOSPriorityLevelOption,
   SOSRequestEntity,
+  GetSOSRequestStatusCountsResponse,
 } from "./type";
 import { mapBoundsToSOSRequestParams } from "@/lib/coordinator-map-utils";
 
@@ -23,7 +24,9 @@ export async function getSOSRequests(
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
       Statuses: params?.Statuses,
-      PriorityLevels: params?.PriorityLevels,
+      Priorities: params?.Priorities,
+      SosTypes: params?.SosTypes,
+      Sort: params?.Sort,
     },
     paramsSerializer: {
       indexes: null,
@@ -50,7 +53,9 @@ export async function getSOSRequestsInBounds(
     params: {
       ...boundsParams,
       Statuses: params.Statuses,
-      PriorityLevels: params.PriorityLevels,
+      Priorities: params.Priorities,
+      SosTypes: params.SosTypes,
+      Sort: params.Sort,
     },
     paramsSerializer: {
       indexes: null, // ?Statuses=Pending&Statuses=Assigned
@@ -103,5 +108,14 @@ export async function createSOSRequest(
   payload: CreateSOSRequestPayload,
 ): Promise<SOSRequestEntity> {
   const { data } = await api.post("/emergency/sos-requests", payload);
+  return data;
+}
+
+/**
+ * Get SOS request status counts
+ * GET /emergency/sos-requests/status-counts
+ */
+export async function getSOSRequestStatusCounts(): Promise<GetSOSRequestStatusCountsResponse> {
+  const { data } = await api.get("/emergency/sos-requests/status-counts");
   return data;
 }

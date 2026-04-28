@@ -46,6 +46,10 @@ const MISSION_STATUS_META: Record<
     label: "Đã hủy",
     className: "border-rose-300 bg-rose-100 text-rose-700",
   },
+  Incompleted: {
+    label: "Chưa hoàn thành",
+    className: "border-slate-300 bg-slate-100 text-slate-700",
+  },
 };
 
 const ACTIVITY_STATUS_META: Record<
@@ -87,7 +91,8 @@ const MISSION_STATUS_RANK: Record<string, number> = {
   InProgress: 1,
   Pending: 2,
   Planned: 3,
-  Cancelled: 4,
+  Incompleted: 4,
+  Cancelled: 5,
 };
 
 function formatMissionTypeLabel(value?: string | null): string {
@@ -296,12 +301,21 @@ const AdminMissionSheet = ({
                           <p className="text-sm font-semibold text-foreground">
                             Mission #{mission.id}
                           </p>
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs", statusMeta.className)}
+                          <span
+                            className={cn(
+                              "text-xs font-bold uppercase tracking-wider",
+                              statusMeta.className
+                                .split(" ")
+                                .filter(
+                                  (c) =>
+                                    c.startsWith("text-") ||
+                                    c.startsWith("dark:text-"),
+                                )
+                                .join(" "),
+                            )}
                           >
                             {statusMeta.label}
-                          </Badge>
+                          </span>
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-1.5">

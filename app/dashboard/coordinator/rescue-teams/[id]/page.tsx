@@ -54,19 +54,19 @@ const teamTypeMap: Record<
 > = {
   Rescue: {
     label: "Cứu hộ",
-    className: "border-orange-300 bg-orange-50 text-orange-800",
+    className: "border-orange-200/50 bg-orange-100/50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20",
   },
   Medical: {
     label: "Y tế",
-    className: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    className: "border-emerald-200/50 bg-emerald-100/50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
   },
   Transportation: {
     label: "Vận chuyển",
-    className: "border-sky-300 bg-sky-50 text-sky-800",
+    className: "border-sky-200/50 bg-sky-100/50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20",
   },
   Mixed: {
     label: "Hỗn hợp",
-    className: "border-slate-300 bg-slate-100 text-slate-700",
+    className: "border-slate-200/50 bg-slate-100/50 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20",
   },
 };
 
@@ -80,47 +80,47 @@ const statusMap: Record<
 > = {
   AwaitingAcceptance: {
     label: "Chờ xác nhận",
-    className: "border-amber-300 bg-amber-50 text-amber-800",
+    className: "border-amber-200/50 bg-amber-100/50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
     tone: "neutral",
   },
   Ready: {
     label: "Sẵn sàng",
-    className: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    className: "border-emerald-200/50 bg-emerald-100/50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
     tone: "good",
   },
   Gathering: {
     label: "Đang tập hợp",
-    className: "border-sky-300 bg-sky-50 text-sky-800",
+    className: "border-sky-200/50 bg-sky-100/50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20",
     tone: "warn",
   },
   Available: {
     label: "Sẵn sàng",
-    className: "border-teal-300 bg-teal-50 text-teal-800",
+    className: "border-teal-200/50 bg-teal-100/50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400 dark:border-teal-500/20",
     tone: "good",
   },
   Assigned: {
     label: "Đã phân công",
-    className: "border-indigo-300 bg-indigo-50 text-indigo-800",
+    className: "border-indigo-200/50 bg-indigo-100/50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20",
     tone: "warn",
   },
   OnMission: {
     label: "Đang làm nhiệm vụ",
-    className: "border-violet-300 bg-violet-50 text-violet-800",
+    className: "border-violet-200/50 bg-violet-100/50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20",
     tone: "warn",
   },
   Stuck: {
     label: "Mắc kẹt",
-    className: "border-rose-300 bg-rose-50 text-rose-800",
+    className: "border-rose-200/50 bg-rose-100/50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20",
     tone: "danger",
   },
   Unavailable: {
     label: "Không khả dụng",
-    className: "border-zinc-300 bg-zinc-100 text-zinc-700",
+    className: "border-zinc-200/50 bg-zinc-100/50 text-zinc-700 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/20",
     tone: "danger",
   },
   Disbanded: {
     label: "Đã giải tán",
-    className: "border-slate-300 bg-slate-100 text-slate-700",
+    className: "border-slate-200/50 bg-slate-100/50 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20",
     tone: "neutral",
   },
 };
@@ -128,15 +128,15 @@ const statusMap: Record<
 const memberStatusMap: Record<string, { label: string; className: string }> = {
   Accepted: {
     label: "Đã xác nhận",
-    className: "border-black bg-white text-black",
+    className: "bg-emerald-100/50 text-emerald-700 border-emerald-200/50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
   },
   Pending: {
     label: "Đang chờ",
-    className: "border-black bg-white text-black",
+    className: "bg-amber-100/50 text-amber-700 border-amber-200/50 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
   },
   Rejected: {
     label: "Từ chối",
-    className: "border-black bg-white text-black",
+    className: "bg-rose-100/50 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20",
   },
 };
 
@@ -201,33 +201,33 @@ function MemberCard({
     member.rescuerType === "Core"
       ? {
           label: "Nhân viên nòng cốt",
-          className: "border-sky-500 bg-sky-100 text-sky-900",
+          className: "bg-blue-100/50 text-blue-700 border-blue-200/50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
         }
       : {
           label: "Tình nguyện",
-          className: "border-[#FF5722] bg-[#FFF2EB] text-[#C2410C]",
+          className: "bg-orange-100/50 text-orange-700 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20",
         };
 
   return (
-    <Card className="border-black bg-white transition hover:-translate-y-0.5">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10 border border-black/20 shadow-sm">
-            <AvatarImage src={member.avatarUrl || DEFAULT_RESCUER_AVATAR} />
-            <AvatarFallback className="bg-black text-xs font-bold text-white">
+    <Card className="border-border/40 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-sm transition-all hover:shadow-md hover:-translate-y-1 rounded-3xl overflow-hidden group">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-4">
+          <Avatar className="h-14 w-14 border-2 border-primary/10 shadow-sm transition-transform group-hover:scale-105">
+            <AvatarImage src={member.avatarUrl || DEFAULT_RESCUER_AVATAR} className="object-cover" />
+            <AvatarFallback className="bg-gradient-to-br from-slate-100 to-slate-200 dark:from-zinc-800 dark:to-zinc-900 text-sm font-bold text-foreground">
               {initials}
             </AvatarFallback>
           </Avatar>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 justify-between">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <p className="text-sm font-semibold truncate">
+            <div className="flex flex-wrap items-center gap-2 justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-bold text-foreground truncate">
                   {member.lastName} {member.firstName}
                 </p>
                 {member.isLeader && (
-                  <Badge className="h-5 rounded-none bg-[#FF5722] px-1.5 text-[10px] text-white hover:bg-[#e64a19]">
-                    <Crown className="mr-1 h-3 w-3" />
+                  <Badge className="h-6 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 px-2.5 text-[10px] font-bold text-white border-0 shadow-sm">
+                    <Crown className="mr-1 h-3.5 w-3.5" />
                     Đội trưởng
                   </Badge>
                 )}
@@ -237,7 +237,7 @@ function MemberCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 rounded-none border border-black/30 px-2 text-black hover:bg-black/5 hover:text-black"
+                  className="h-8 rounded-full border border-border/50 bg-white/50 dark:bg-zinc-800/50 px-3 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-500/10 transition-colors"
                   onClick={() => onRemove(member)}
                   disabled={isRemoving}
                 >
@@ -246,35 +246,41 @@ function MemberCard({
                   ) : (
                     <Trash2 className="h-3.5 w-3.5" />
                   )}
-                  <span className="ml-1 text-[11px]">Xóa</span>
+                  <span className="ml-1.5 text-xs font-medium">Xóa</span>
                 </Button>
               )}
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-black/70">
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
               <Badge
                 variant="outline"
-                className={`h-5 rounded-none px-1.5 text-[10px] ${rescuerTypeBadge.className}`}
+                className={`h-6 rounded-full px-2.5 font-medium ${rescuerTypeBadge.className}`}
               >
                 {rescuerTypeBadge.label}
               </Badge>
               <Badge
                 variant="outline"
-                className={`h-5 rounded-none px-1.5 text-[10px] ${status.className}`}
+                className={`h-6 rounded-full px-2.5 font-medium ${status.className}`}
               >
                 {status.label}
               </Badge>
             </div>
 
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-black/70">
-              <Phone className="h-3.5 w-3.5" />
-              <span>{member.phone || "Không có số điện thoại"}</span>
-            </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-black/70">
-              <Mail className="h-3.5 w-3.5" />
-              <span className="min-w-0 truncate">
-                {member.email || "Không có email"}
-              </span>
+            <div className="mt-3.5 space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                  <Phone className="h-3 w-3" />
+                </div>
+                <span>{member.phone || "Không có số điện thoại"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                  <Mail className="h-3 w-3" />
+                </div>
+                <span className="min-w-0 truncate">
+                  {member.email || "Không có email"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -432,9 +438,9 @@ export default function RescueTeamDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-330 space-y-6 p-4 tracking-tighter md:p-6">
+      <div className="w-full space-y-6 p-4 md:p-6 lg:p-8 tracking-tight">
         <Skeleton className="h-10 w-64" />
-        <Card className="border-black shadow-none">
+        <Card className="border-border/40 bg-white/60 dark:bg-zinc-900/60 shadow-sm rounded-3xl">
           <CardContent className="p-6 space-y-4">
             <Skeleton className="h-8 w-1/2" />
             <Skeleton className="h-6 w-40" />
@@ -457,8 +463,8 @@ export default function RescueTeamDetailPage() {
 
   if (isError || !data) {
     return (
-      <div className="mx-auto w-full max-w-230 p-6 tracking-tighter">
-        <Card className="border-black bg-white">
+      <div className="w-full p-4 md:p-6 lg:p-8 tracking-tight flex justify-center items-center min-h-[60vh]">
+        <Card className="border-border/40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm rounded-3xl">
           <CardContent className="p-8 text-center">
             <p className="text-base font-semibold text-black">
               Không tải được chi tiết đội cứu hộ.
@@ -470,7 +476,7 @@ export default function RescueTeamDetailPage() {
               <Link href="/dashboard/coordinator/rescue-teams">
                 <Button
                   variant="outline"
-                  className="gap-1.5 rounded-none border-black"
+                  className="gap-1.5 rounded-full border-border/50"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Quay lại danh sách
@@ -499,7 +505,7 @@ export default function RescueTeamDetailPage() {
   const isTeamFull = remainingSlots <= 0;
 
   return (
-    <div className="mx-auto w-full max-w-330 space-y-5 bg-[linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] bg-size-[30px_30px] bg-white p-4 tracking-tighter md:p-6">
+    <div className="w-full min-h-screen bg-slate-50/30 dark:bg-zinc-950/30 p-4 md:p-6 lg:p-8 space-y-6 tracking-tight">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -549,40 +555,45 @@ export default function RescueTeamDetailPage() {
         </div>
       </div>
 
-      <Card className="border-black bg-white shadow-none">
-        <CardContent className="p-4 md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs uppercase text-black/60">{data.code}</p>
-              <h2 className="text-xl md:text-2xl font-bold mt-1">
+      <Card className="border-border/50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm rounded-[2rem] overflow-hidden">
+        <CardContent className="p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center justify-center rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-primary shadow-sm border border-primary/20">
+                {data.code}
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-foreground">
                 {data.name}
               </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-black/70 md:text-base">
-                <span className="inline-flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4" />
-                  {data.assemblyPointName}
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground pt-1">
+                <span className="inline-flex items-center gap-2 bg-slate-100 dark:bg-zinc-800/50 px-3.5 py-2 rounded-xl font-medium shadow-sm border border-border/50">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">{data.assemblyPointName}</span>
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <UserRound className="h-4 w-4" />
-                  Quản lý bởi: {data.managedBy}
+                <span className="inline-flex items-center gap-2 bg-slate-100 dark:bg-zinc-800/50 px-3.5 py-2 rounded-xl font-medium shadow-sm border border-border/50">
+                  <UserRound className="h-4 w-4 text-primary" />
+                  Quản lý bởi: <span className="text-foreground ml-1">{data.managedBy}</span>
                 </span>
               </div>
             </div>
 
-            <div className="grid min-w-55 grid-cols-2 gap-1.5">
-              <div className="border border-black p-2.5">
-                <p className="text-xs text-black/60">Quân số</p>
-                <p className="mt-1 text-lg font-bold">
-                  {memberStats.total}/{data.maxMembers}
+            <div className="flex flex-wrap sm:flex-nowrap gap-4">
+              <div className="flex-1 sm:flex-none flex flex-col justify-center rounded-[1.5rem] bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 border border-blue-500/20 px-6 py-5 shadow-sm min-w-[140px]">
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Quân số</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-blue-700 dark:text-blue-300">{memberStats.total}</span>
+                  <span className="text-base font-bold text-blue-600/70 dark:text-blue-400/70">/{data.maxMembers}</span>
                 </p>
               </div>
-              <div className="border border-black p-2.5">
-                <p className="text-xs text-black/60">Còn trống</p>
-                <p className="mt-1 text-lg font-bold">{remainingSlots}</p>
+              <div className="flex-1 sm:flex-none flex flex-col justify-center rounded-[1.5rem] bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 border border-emerald-500/20 px-6 py-5 shadow-sm min-w-[140px]">
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Còn trống</p>
+                <p className="mt-2 text-4xl font-black text-emerald-700 dark:text-emerald-300">
+                  {remainingSlots}
+                </p>
               </div>
-              <div className="col-span-2 border border-black p-2.5">
-                <p className="text-xs text-black/60">Ngày lập</p>
-                <p className="mt-1 text-xs font-semibold leading-tight">
+              <div className="w-full sm:w-auto flex flex-col justify-center rounded-[1.5rem] bg-gradient-to-br from-slate-500/5 to-zinc-500/5 border border-border/50 px-6 py-5 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ngày lập</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
                   {formatDate(data.createdAt)}
                 </p>
               </div>
@@ -592,63 +603,66 @@ export default function RescueTeamDetailPage() {
       </Card>
 
       <section>
-        <Card className="border-black bg-white shadow-none overflow-hidden">
-          <CardHeader className="border-b border-black/10 bg-[linear-gradient(90deg,rgba(255,87,34,0.08),rgba(255,87,34,0.02))] px-4 py-3 md:px-5 md:py-3.5">
-            <CardTitle className="text-base md:text-lg flex items-center gap-2">
-              <UserPlus className="h-4 w-4 text-[#FF5722]" />
+        <Card className="border-border/50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm rounded-[2rem] overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-rose-500"></div>
+          <CardHeader className="border-b border-border/30 bg-accent/30 px-6 py-5 md:px-8 md:py-6">
+            <CardTitle className="text-lg md:text-xl font-bold flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 shadow-sm border border-orange-200/50">
+                <UserPlus className="h-5 w-5" />
+              </div>
               Bổ sung thành viên
             </CardTitle>
-            <p className="text-sm text-black/65">
-              Theo dõi chỗ trống và thêm người cứu hộ ngay trong một luồng thao
-              tác.
+            <p className="text-sm text-muted-foreground ml-14 mt-1">
+              Theo dõi chỗ trống và thêm người cứu hộ ngay trong một luồng thao tác.
             </p>
           </CardHeader>
 
-          <CardContent className="p-3.5 md:p-4">
-            <div className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="border border-black/20 bg-white px-3 py-2">
-                  <p className="text-xs text-black/60">Quân số hiện tại</p>
-                  <p className="mt-1 text-xl font-bold text-black">
-                    {memberStats.total}/{data.maxMembers}
+          <CardContent className="p-6 md:p-8">
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="border border-border/50 bg-slate-50/50 dark:bg-zinc-800/50 px-5 py-4 rounded-2xl shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Quân số hiện tại</p>
+                  <p className="mt-1.5 flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-foreground">{memberStats.total}</span>
+                    <span className="text-sm font-bold text-muted-foreground">/{data.maxMembers}</span>
                   </p>
                 </div>
-                <div className="border border-black/20 bg-white px-3 py-2">
-                  <p className="text-xs text-black/60">Chỗ trống còn lại</p>
-                  <p className="mt-1 text-xl font-bold text-black">
+                <div className="border border-border/50 bg-slate-50/50 dark:bg-zinc-800/50 px-5 py-4 rounded-2xl shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chỗ trống còn lại</p>
+                  <p className="mt-1.5 text-2xl font-black text-foreground">
                     {remainingSlots}
                   </p>
                 </div>
-                <div className="border border-black/20 bg-white px-3 py-2">
-                  <p className="text-xs text-black/60">Ứng viên khả dụng</p>
-                  <p className="mt-1 text-xl font-bold text-black">
-                    {availableRescuers.length}
-                  </p>
-                </div>
               </div>
 
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10">
-                <div
-                  className="h-full bg-[#FF5722] transition-all"
-                  style={{ width: `${occupancyPercent}%` }}
-                />
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                  <span>Mức độ lấp đầy</span>
+                  <span>{occupancyPercent.toFixed(0)}%</span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800 shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-orange-500 to-rose-500 transition-all duration-1000 ease-out"
+                    style={{ width: `${occupancyPercent}%` }}
+                  />
+                </div>
               </div>
 
               {isTeamFull ? (
-                <div className="border border-[#FF5722] bg-[#FF5722]/10 px-3 py-2 text-sm text-[#c2410c]">
-                  Đội đã đủ quân số tối đa. Hãy xóa bớt thành viên trước khi bổ
-                  sung người mới.
+                <div className="rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-500/10 px-5 py-4 text-sm font-medium text-rose-700 dark:text-rose-400 shadow-sm flex items-center gap-3">
+                  <Shield className="h-5 w-5 shrink-0" />
+                  Đội đã đủ quân số tối đa. Hãy xóa bớt thành viên trước khi bổ sung người mới.
                 </div>
               ) : (
-                <>
-                  <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_240px] lg:items-start">
+                <div className="space-y-4">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-start">
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/50" />
+                      <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={rescuerSearch}
                         onChange={(e) => setRescuerSearch(e.target.value)}
                         placeholder="Tìm theo tên, email, số điện thoại"
-                        className="h-9 border-black/50 pl-8"
+                        className="h-12 border-border/50 pl-10 rounded-xl bg-white dark:bg-zinc-900 shadow-sm focus-visible:ring-primary/20"
                       />
                     </div>
 
@@ -656,7 +670,7 @@ export default function RescueTeamDetailPage() {
                       value={selectedRescuerId}
                       onValueChange={setSelectedRescuerId}
                     >
-                      <SelectTrigger className="h-9 rounded-none border-black/50">
+                      <SelectTrigger className="h-12 rounded-xl border-border/50 bg-white dark:bg-zinc-900 shadow-sm focus:ring-primary/20">
                         <SelectValue
                           placeholder={
                             isLoadingFreeRescuers
@@ -665,14 +679,14 @@ export default function RescueTeamDetailPage() {
                           }
                         />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="rounded-xl shadow-xl">
                         {availableRescuers.length === 0 ? (
-                          <div className="px-2 py-2 text-xs text-muted-foreground">
+                          <div className="px-3 py-4 text-sm text-muted-foreground text-center">
                             Không có người cứu hộ phù hợp để thêm.
                           </div>
                         ) : (
                           availableRescuers.map((rescuer) => (
-                            <SelectItem key={rescuer.id} value={rescuer.id}>
+                            <SelectItem key={rescuer.id} value={rescuer.id} className="rounded-lg my-1">
                               {rescuer.lastName} {rescuer.firstName}
                             </SelectItem>
                           ))
@@ -680,11 +694,11 @@ export default function RescueTeamDetailPage() {
                       </SelectContent>
                     </Select>
 
-                    <div className="grid gap-2">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5">
                       <Button
                         type="button"
                         variant={addAsLeader ? "default" : "outline"}
-                        className={`h-9 rounded-none border-black ${addAsLeader ? "bg-[#FF5722] text-white hover:bg-[#e64a19]" : ""}`}
+                        className={`h-12 rounded-xl border-border/50 font-semibold px-6 shadow-sm transition-all ${addAsLeader ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white border-0 hover:from-orange-600 hover:to-rose-600" : ""}`}
                         onClick={() => setAddAsLeader((prev) => !prev)}
                         disabled={!selectedRescuerId}
                       >
@@ -696,11 +710,11 @@ export default function RescueTeamDetailPage() {
                         type="button"
                         onClick={handleAddMember}
                         disabled={isAddingMember || !selectedRescuerId}
-                        className="h-9 rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
+                        className="h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-8 shadow-sm transition-all"
                       >
                         {isAddingMember ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Đang thêm...
                           </>
                         ) : (
@@ -711,21 +725,22 @@ export default function RescueTeamDetailPage() {
                   </div>
 
                   {selectedCandidate ? (
-                    <div className="border border-[#FF5722]/30 bg-[#FFF8F4] px-3 py-2 text-sm text-black/80">
-                      <span className="font-semibold text-black">
-                        Đã chọn: {selectedCandidate.lastName}{" "}
-                        {selectedCandidate.firstName}
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm flex items-center gap-2 text-foreground shadow-sm">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                      <span className="font-medium text-foreground">
+                        Đã chọn: <span className="font-bold">{selectedCandidate.lastName} {selectedCandidate.firstName}</span>
                       </span>
-                      {selectedCandidate.phone
-                        ? ` - ${selectedCandidate.phone}`
-                        : ""}
+                      {selectedCandidate.phone && (
+                        <span className="text-muted-foreground"> • {selectedCandidate.phone}</span>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-sm text-black/65">
+                    <p className="text-sm text-muted-foreground ml-1 flex items-center gap-2">
+                      <Search className="h-3.5 w-3.5" />
                       Chọn người cứu hộ từ danh sách để thêm vào đội.
                     </p>
                   )}
-                </>
+                </div>
               )}
             </div>
           </CardContent>
@@ -733,40 +748,40 @@ export default function RescueTeamDetailPage() {
       </section>
 
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base md:text-lg font-semibold">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-xl md:text-2xl font-extrabold tracking-tight">
             Thống kê thành viên
           </h3>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-emerald-300 bg-emerald-50/50 shadow-none">
-            <CardContent className="p-3">
-              <p className="text-[11px] text-emerald-800/80">Đã xác nhận</p>
-              <p className="mt-0.5 text-xl font-bold text-emerald-900">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-500/10 dark:to-emerald-500/5 shadow-sm rounded-2xl transition-transform hover:-translate-y-1">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Đã xác nhận</p>
+              <p className="mt-2 text-3xl font-black text-emerald-800 dark:text-emerald-300">
                 {memberStats.accepted}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-amber-300 bg-amber-50/50 shadow-none">
-            <CardContent className="p-3">
-              <p className="text-[11px] text-amber-800/80">Đang chờ</p>
-              <p className="mt-0.5 text-xl font-bold text-amber-900">
+          <Card className="border-amber-200/50 bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-500/10 dark:to-amber-500/5 shadow-sm rounded-2xl transition-transform hover:-translate-y-1">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Đang chờ</p>
+              <p className="mt-2 text-3xl font-black text-amber-800 dark:text-amber-300">
                 {memberStats.pending}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-rose-300 bg-rose-50/50 shadow-none">
-            <CardContent className="p-3">
-              <p className="text-[11px] text-rose-800/80">Từ chối</p>
-              <p className="mt-0.5 text-xl font-bold text-rose-900">
+          <Card className="border-rose-200/50 bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-500/10 dark:to-rose-500/5 shadow-sm rounded-2xl transition-transform hover:-translate-y-1">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Từ chối</p>
+              <p className="mt-2 text-3xl font-black text-rose-800 dark:text-rose-300">
                 {memberStats.rejected}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-sky-300 bg-sky-50/50 shadow-none">
-            <CardContent className="p-3">
-              <p className="text-[11px] text-sky-800/80">Còn trống</p>
-              <p className="mt-0.5 text-xl font-bold text-sky-900">
+          <Card className="border-sky-200/50 bg-gradient-to-br from-sky-50 to-sky-100/50 dark:from-sky-500/10 dark:to-sky-500/5 shadow-sm rounded-2xl transition-transform hover:-translate-y-1">
+            <CardContent className="p-5 flex flex-col justify-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">Còn trống</p>
+              <p className="mt-2 text-3xl font-black text-sky-800 dark:text-sky-300">
                 {Math.max(0, data.maxMembers - memberStats.total)}
               </p>
             </CardContent>
@@ -775,30 +790,36 @@ export default function RescueTeamDetailPage() {
       </section>
 
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base md:text-lg font-semibold">
-            Danh sách thành viên ({memberStats.total})
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h3 className="text-xl md:text-2xl font-extrabold tracking-tight flex items-center gap-3">
+            Danh sách thành viên
+            <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-0 rounded-full px-3 text-sm">
+              {memberStats.total}
+            </Badge>
           </h3>
         </div>
 
         {!canRemoveMembers && (
-          <p className="mb-3 border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Nút xóa chỉ hiển thị khi đội ở trạng thái Gathering hoặc
-            Unavailable.
-          </p>
+          <div className="mb-6 rounded-2xl border border-amber-200/50 bg-amber-50 dark:bg-amber-500/10 px-5 py-4 text-sm font-medium text-amber-800 dark:text-amber-400 shadow-sm flex items-start gap-3">
+            <Shield className="h-5 w-5 shrink-0 mt-0.5" />
+            <p>Nút xóa thành viên được thiết kế để chỉ hiển thị khi đội ở trạng thái <span className="font-bold">Gathering</span> hoặc <span className="font-bold">Unavailable</span> nhằm đảm bảo an toàn dữ liệu.</p>
+          </div>
         )}
 
         {data.members.length === 0 ? (
-          <Card className="border-dashed border-black bg-white">
-            <CardContent className="p-10 text-center">
-              <UserRoundPlus className="mx-auto h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-3 text-sm text-black/70">
-                Đội này chưa có thành viên.
+          <Card className="border-2 border-dashed border-border bg-white/50 dark:bg-zinc-900/50 rounded-3xl">
+            <CardContent className="p-16 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center mb-6">
+                <UserRoundPlus className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h4 className="text-xl font-bold text-foreground">Chưa có thành viên nào</h4>
+              <p className="mt-2 text-sm text-muted-foreground max-w-md">
+                Đội cứu hộ này hiện tại chưa có thành viên. Bạn có thể sử dụng bảng bên trên để tìm và thêm người cứu hộ vào đội.
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {data.members.map((member) => (
               <MemberCard
                 key={member.userId}
@@ -815,45 +836,48 @@ export default function RescueTeamDetailPage() {
       </section>
 
       {memberPendingRemove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/45 backdrop-blur-[1px]"
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             onClick={() => setMemberPendingRemove(null)}
             aria-label="Đóng hộp thoại xác nhận"
           />
-          <div className="relative w-full max-w-md border border-black bg-white shadow-2xl">
-            <div className="p-5">
-              <h4 className="text-base font-semibold text-black">
+          <div className="relative w-full max-w-md rounded-3xl border border-border/50 bg-background shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 md:p-8">
+              <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-5">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h4 className="text-xl font-bold text-foreground">
                 Xác nhận xóa thành viên
               </h4>
-              <p className="mt-2 text-sm leading-relaxed text-black/70">
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                 Bạn có chắc muốn xóa
-                <span className="font-semibold text-black">
+                <span className="font-bold text-foreground">
                   {` ${memberPendingRemove.lastName} ${memberPendingRemove.firstName} `}
                 </span>
-                khỏi đội cứu hộ này không?
+                khỏi đội cứu hộ này không? Hành động này không thể hoàn tác trực tiếp.
               </p>
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-black/20 bg-white px-5 py-3">
+            <div className="flex items-center justify-end gap-3 bg-muted/30 px-6 py-4 md:px-8 border-t border-border/50">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setMemberPendingRemove(null)}
                 disabled={isRemovingMember}
-                className="rounded-none border-black"
+                className="rounded-xl border-border/50 font-semibold shadow-sm px-6 h-11"
               >
                 Hủy
               </Button>
               <Button
                 type="button"
-                className="rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
+                className="rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-bold shadow-sm px-6 h-11 transition-colors"
                 onClick={confirmRemoveMember}
                 disabled={isRemovingMember}
               >
                 {isRemovingMember ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Đang xóa...
                   </>
                 ) : (

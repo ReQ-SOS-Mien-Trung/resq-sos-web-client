@@ -24,7 +24,11 @@ import {
   useSOSRequests,
   useSOSRequestsInBounds,
 } from "@/services/sos_request/hooks";
-import type { SOSRequestStatus } from "@/services/sos_request/type";
+import type {
+  SOSPriorityLevel,
+  SOSRequestStatus,
+  SOSRequestTypeFilter,
+} from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -33,7 +37,10 @@ import {
 } from "@/services/sos_cluster/hooks";
 import { useTeamIncidents } from "@/services/team_incidents/hooks";
 import type {
+  ClusterLifecycleStatus,
+  ClusterPriorityLevel,
   ClusterRescueSuggestionResponse,
+  ClusterSOSType,
   SOSClusterEntity,
 } from "@/services/sos_cluster/type";
 import { useDepots } from "@/services/depot/hooks";
@@ -49,8 +56,10 @@ import type {
 } from "@/services/rescue_teams/type";
 import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
+import { SOS_CLUSTER_MAX_SIZE_BY_PRIORITY } from "@/lib/sos-cluster-capacity";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -82,6 +91,8 @@ import {
   UsersThree,
   ChatCircleDots,
   Warning,
+  Info,
+  X,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
@@ -96,9 +107,11 @@ import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
+import { useUserMe } from "@/services/user/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
+import { useSosRequestRealtime } from "@/hooks/useSosRequestRealtime";
 import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
@@ -150,8 +163,28 @@ function haversine(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const AUTO_CLUSTER_MAX_SIZE = 3;
+function normalizeSOSRequestTypeFilterValue(
+  value?: string | null,
+): SOSRequestTypeFilter | null {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+
+  if (normalized === "rescue") return "Rescue";
+  if (normalized === "relief") return "Relief";
+  if (normalized === "both") return "Both";
+
+  return null;
+}
+
 const AUTO_CLUSTER_RADIUS_STEP_KM = 1;
+const DEFAULT_COORDINATOR_SOS_STATUSES: SOSRequestStatus[] = [
+  "Pending",
+  "Assigned",
+  "InProgress",
+  "Incident",
+];
 const SOS_PRIORITY_ORDER: Record<SOSRequest["priority"], number> = {
   P1: 0,
   P2: 1,
@@ -287,6 +320,16 @@ function buildAutoClusters(
       continue;
     }
 
+    const maxClusterSize =
+      SOS_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
+
+    // P1: không gom thêm, chỉ tạo cụm 1 mình
+    if (maxClusterSize <= 1) {
+      clusteredIds.add(seed.id);
+      clusters.push([seed]);
+      continue;
+    }
+
     let selectedNeighbors: AutoClusterCandidate[] = [];
     let hasFoundNeighbor = false;
 
@@ -307,7 +350,7 @@ function buildAutoClusters(
         }))
         .filter((candidate) => candidate.distanceKm <= radiusKm)
         .sort(compareAutoClusterCandidates)
-        .slice(0, AUTO_CLUSTER_MAX_SIZE - 1);
+        .slice(0, maxClusterSize - 1);
 
       if (neighborsWithinRadius.length > 0) {
         hasFoundNeighbor = true;
@@ -316,7 +359,7 @@ function buildAutoClusters(
 
       if (
         hasFoundNeighbor &&
-        selectedNeighbors.length >= AUTO_CLUSTER_MAX_SIZE - 1
+        selectedNeighbors.length >= maxClusterSize - 1
       ) {
         break;
       }
@@ -408,6 +451,187 @@ function mapRescueTeamToRescuer(
 
 const SIDEBAR_SOS_PAGE_SIZE = 8;
 
+// ── Legend Component ──
+
+const MapLegend = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="absolute bottom-6 left-6 z-[40] pointer-events-auto select-none flex flex-col items-start gap-3">
+      {/* Legend Panel */}
+      {isOpen && (
+        <div className="bg-background/90 backdrop-blur-md border border-border/60 shadow-2xl rounded-2xl p-3.5 flex flex-col gap-3.5 min-w-[180px] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
+              Chú thích
+            </p>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+            >
+              <X size={12} weight="bold" />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
+              Mức độ SOS
+            </p>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                { label: "P1: Rất nghiêm trọng", color: "bg-[#ef4444]" },
+                { label: "P2: Nghiêm trọng", color: "bg-[#f97316]" },
+                { label: "P3: Trung bình", color: "bg-[#eab308]" },
+                { label: "P4: Thấp", color: "bg-[#14b8a6]" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors"
+                >
+                  <div
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full shadow-sm shrink-0",
+                      item.color,
+                    )}
+                  />
+                  <span className="text-[11px] font-medium text-foreground/90">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-px bg-border/30" />
+
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
+              Loại SOS
+            </p>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                {
+                  label: "Tam giác: Cứu hộ",
+                  icon: (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 100 100"
+                      className="shrink-0"
+                    >
+                      <polygon
+                        points="50,5 95,90 5,90"
+                        fill="#94a3b8"
+                        stroke="white"
+                        strokeWidth="8"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  label: "Hình tròn: Cứu trợ",
+                  icon: (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 100 100"
+                      className="shrink-0"
+                    >
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="#94a3b8"
+                        stroke="white"
+                        strokeWidth="8"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  label: "Lục giác: Cả hai",
+                  icon: (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 100 100"
+                      className="shrink-0"
+                    >
+                      <polygon
+                        points="25,5 75,5 100,50 75,95 25,95 0,50"
+                        fill="#94a3b8"
+                        stroke="white"
+                        strokeWidth="8"
+                      />
+                    </svg>
+                  ),
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors"
+                >
+                  {item.icon}
+                  <span className="text-[11px] font-medium text-foreground/90">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-px bg-border/30" />
+
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
+              Địa điểm
+            </p>
+            <div className="grid grid-cols-1 gap-1">
+              <div className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors">
+                <div className="w-5 h-5 rounded-md bg-purple-100 border border-purple-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
+                  📍
+                </div>
+                <span className="text-[11px] font-medium text-foreground/90">
+                  Điểm tập kết
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-accent/40 transition-colors">
+                <div className="w-5 h-5 rounded-md bg-blue-100 border border-blue-300 flex items-center justify-center shrink-0 shadow-sm text-[10px]">
+                  📦
+                </div>
+                <span className="text-[11px] font-medium text-foreground/90">
+                  Kho vật phẩm
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toggle Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-10 h-10 rounded-full flex items-center justify-center shadow-xl border transition-all duration-300 hover:scale-105 active:scale-95 group",
+          isOpen
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background/95 backdrop-blur-md text-foreground border-border/60",
+        )}
+        title={isOpen ? "Đóng chú thích" : "Xem chú thích bản đồ"}
+      >
+        <Info
+          size={20}
+          weight={isOpen ? "fill" : "bold"}
+          className={cn(
+            "transition-transform duration-300",
+            isOpen ? "rotate-0" : "group-hover:rotate-12",
+          )}
+        />
+      </button>
+    </div>
+  );
+};
+
 // ── Main Dashboard Content ──
 
 const CoordinatorDashboardContent = () => {
@@ -441,6 +665,23 @@ const CoordinatorDashboardContent = () => {
   const [selectedSOSStatuses, setSelectedSOSStatuses] = useState<
     SOSRequestStatus[]
   >([]);
+  const [selectedSOSPriorities, setSelectedSOSPriorities] = useState<
+    SOSPriorityLevel[]
+  >([]);
+  const [selectedSosTypes, setSelectedSosTypes] = useState<
+    SOSRequestTypeFilter[]
+  >([]);
+  const [selectedClusterStatuses, setSelectedClusterStatuses] = useState<
+    ClusterLifecycleStatus[]
+  >([]);
+  const [selectedClusterPriorities, setSelectedClusterPriorities] = useState<
+    ClusterPriorityLevel[]
+  >([]);
+  const [selectedClusterSosTypes, setSelectedClusterSosTypes] = useState<
+    ClusterSOSType[]
+  >([]);
+  const [sosSort, setSosSort] = useState<string>("time:desc");
+  const [clusterSort, setClusterSort] = useState<string>("time:desc");
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -515,8 +756,58 @@ const CoordinatorDashboardContent = () => {
   );
 
   const statusQueryFilter = useMemo(
-    () => (selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined),
+    () =>
+      selectedSOSStatuses.length > 0
+        ? selectedSOSStatuses
+        : DEFAULT_COORDINATOR_SOS_STATUSES,
     [selectedSOSStatuses],
+  );
+  const priorityQueryFilter = useMemo(
+    () =>
+      selectedSOSPriorities.length > 0 ? selectedSOSPriorities : undefined,
+    [selectedSOSPriorities],
+  );
+  const sosTypeQueryFilter = useMemo(
+    () => (selectedSosTypes.length > 0 ? selectedSosTypes : undefined),
+    [selectedSosTypes],
+  );
+  const hasSidebarClusterBackendFilters = useMemo(
+    () =>
+      selectedClusterStatuses.length > 0 ||
+      selectedClusterPriorities.length > 0 ||
+      selectedClusterSosTypes.length > 0,
+    [
+      selectedClusterPriorities.length,
+      selectedClusterSosTypes.length,
+      selectedClusterStatuses.length,
+    ],
+  );
+  const sidebarClusterQueryParams = useMemo(
+    () =>
+      hasSidebarClusterBackendFilters
+        ? {
+            statuses:
+              selectedClusterStatuses.length > 0
+                ? selectedClusterStatuses
+                : undefined,
+            priorities:
+              selectedClusterPriorities.length > 0
+                ? selectedClusterPriorities
+                : undefined,
+            sosTypes:
+              selectedClusterSosTypes.length > 0
+                ? selectedClusterSosTypes
+                : undefined,
+            Sort: clusterSort,
+          }
+        : { Sort: clusterSort },
+    [
+      hasSidebarClusterBackendFilters,
+      selectedClusterPriorities,
+      selectedClusterSosTypes,
+      selectedClusterStatuses,
+      clusterSort,
+    ],
   );
 
   // ─── Data Fetching ───
@@ -526,6 +817,9 @@ const CoordinatorDashboardContent = () => {
         pageNumber: sidebarSOSPage,
         pageSize: SIDEBAR_SOS_PAGE_SIZE,
         Statuses: statusQueryFilter,
+        Priorities: priorityQueryFilter,
+        SosTypes: sosTypeQueryFilter,
+        Sort: sosSort,
       },
     });
   const { data: mapSosData } = useSOSRequestsInBounds({
@@ -536,6 +830,8 @@ const CoordinatorDashboardContent = () => {
           MinLng: mapFetchBounds.west,
           MaxLng: mapFetchBounds.east,
           Statuses: statusQueryFilter,
+          Priorities: priorityQueryFilter,
+          SosTypes: sosTypeQueryFilter,
         }
       : undefined,
     enabled: !isWeatherMode && !!mapFetchBounds,
@@ -548,7 +844,13 @@ const CoordinatorDashboardContent = () => {
   const { data: rescueTeamsData } = useRescueTeams({
     params: { pageSize: 200 },
   });
-  const { data: clustersData } = useSOSClusters();
+  const { data: clustersData } = useSOSClusters({
+    params: { Sort: clusterSort },
+  });
+  const { data: sidebarFilteredClustersData } = useSOSClusters({
+    params: sidebarClusterQueryParams,
+    enabled: hasSidebarClusterBackendFilters,
+  });
   const sosClusterGroupingConfigQuery = useSosClusterGroupingConfig();
   const { data: serviceZonesData } = useAllServiceZones({
     enabled: !isWeatherMode,
@@ -618,23 +920,43 @@ const CoordinatorDashboardContent = () => {
       return;
     }
 
-    if (selectedSOSStatuses.length === 0) {
+    if (
+      selectedSOSStatuses.length === 0 &&
+      selectedSOSPriorities.length === 0 &&
+      selectedSosTypes.length === 0
+    ) {
       return;
     }
 
     const matchesStatus =
-      selectedSOS.rawStatus != null &&
-      selectedSOSStatuses.includes(selectedSOS.rawStatus);
+      selectedSOSStatuses.length === 0 ||
+      (selectedSOS.rawStatus != null &&
+        selectedSOSStatuses.includes(selectedSOS.rawStatus));
+    const matchesPriority =
+      selectedSOSPriorities.length === 0 ||
+      (selectedSOS.rawPriorityLevel != null &&
+        selectedSOSPriorities.includes(selectedSOS.rawPriorityLevel));
+    const selectedSosType = normalizeSOSRequestTypeFilterValue(
+      selectedSOS.sosType,
+    );
+    const matchesSosType =
+      selectedSosTypes.length === 0 ||
+      (selectedSosType != null && selectedSosTypes.includes(selectedSosType));
 
-    if (!matchesStatus) {
+    if (!matchesStatus || !matchesPriority || !matchesSosType) {
       setSelectedSOS(null);
       setSOSDetailOpen(false);
     }
-  }, [selectedSOS, selectedSOSStatuses]);
+  }, [
+    selectedSOS,
+    selectedSOSPriorities,
+    selectedSOSStatuses,
+    selectedSosTypes,
+  ]);
 
   useEffect(() => {
     setSidebarSOSPage(1);
-  }, [selectedSOSStatuses]);
+  }, [selectedSOSPriorities, selectedSOSStatuses, selectedSosTypes]);
   const depots = useMemo<DepotEntity[]>(
     () => depotsData?.items ?? [],
     [depotsData],
@@ -662,6 +984,13 @@ const CoordinatorDashboardContent = () => {
   const clusters = useMemo<SOSClusterEntity[]>(
     () => clustersData?.clusters ?? [],
     [clustersData],
+  );
+  const filteredSidebarClusters = useMemo<SOSClusterEntity[] | undefined>(
+    () =>
+      hasSidebarClusterBackendFilters
+        ? (sidebarFilteredClustersData?.clusters ?? clusters)
+        : undefined,
+    [clusters, hasSidebarClusterBackendFilters, sidebarFilteredClustersData],
   );
   useEffect(() => {
     if (recentlyClusteredSOSIds.size === 0) {
@@ -728,6 +1057,10 @@ const CoordinatorDashboardContent = () => {
     assemblyPointId: activeRealtimeAssemblyPointId,
     clusterIds: activeRealtimeClusterIds,
   });
+  useSosRequestRealtime({
+    subscribeUnclustered: true,
+    clusterIds: activeRealtimeClusterIds,
+  });
   const isConnected = operationalConnectionState === "connected";
   const isConnecting = operationalConnectionState === "connecting";
   const isReconnecting = operationalConnectionState === "reconnecting";
@@ -743,31 +1076,28 @@ const CoordinatorDashboardContent = () => {
   const maximumAutoClusterDistanceKm =
     sosClusterGroupingConfigQuery.data?.maximumDistanceKm ?? 0;
 
-  const autoClusters = useMemo(
-    () => {
-      if (clusterGroupingStatus !== "success") {
-        return [];
-      }
+  const autoClusters = useMemo(() => {
+    if (clusterGroupingStatus !== "success") {
+      return [];
+    }
 
-      const clusterableSOSRequests =
-        recentlyClusteredSOSIds.size === 0
-          ? sosRequests
-          : sosRequests.filter((sos) => !recentlyClusteredSOSIds.has(sos.id));
+    const clusterableSOSRequests =
+      recentlyClusteredSOSIds.size === 0
+        ? sosRequests
+        : sosRequests.filter((sos) => !recentlyClusteredSOSIds.has(sos.id));
 
-      return buildAutoClusters(
-        clusterableSOSRequests,
-        clusters,
-        maximumAutoClusterDistanceKm,
-      );
-    },
-    [
-      clusterGroupingStatus,
+    return buildAutoClusters(
+      clusterableSOSRequests,
       clusters,
       maximumAutoClusterDistanceKm,
-      recentlyClusteredSOSIds,
-      sosRequests,
-    ],
-  );
+    );
+  }, [
+    clusterGroupingStatus,
+    clusters,
+    maximumAutoClusterDistanceKm,
+    recentlyClusteredSOSIds,
+    sosRequests,
+  ]);
 
   useEffect(() => {
     if (isWeatherMode) {
@@ -795,8 +1125,27 @@ const CoordinatorDashboardContent = () => {
   // ─── Auth ───
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
-  const userDisplayName = getUserDisplayName(user);
-  const userInitials = getUserAvatarInitials(user);
+  const { data: userMe } = useUserMe();
+  const userDisplayName = userMe
+    ? getUserDisplayName(
+        {
+          firstName: userMe.firstName,
+          lastName: userMe.lastName,
+          username: userMe.username,
+        },
+        getUserDisplayName(user),
+      )
+    : getUserDisplayName(user);
+  const userInitials = userMe
+    ? getUserAvatarInitials(
+        {
+          firstName: userMe.firstName,
+          lastName: userMe.lastName,
+          username: userMe.username,
+        },
+        getUserAvatarInitials(user),
+      )
+    : getUserAvatarInitials(user);
 
   // ─── Mutations ───
   const { mutate: createCluster, isPending: isCreatingCluster } =
@@ -807,6 +1156,7 @@ const CoordinatorDashboardContent = () => {
   // ─── AI Stream ───
   const aiStream = useAiMissionStream();
   const [aiStreamOpen, setAiStreamOpen] = useState(false);
+  const [aiStreamMinimized, setAiStreamMinimized] = useState(false);
   const [aiStreamClusterId, setAiStreamClusterId] = useState<number | null>(
     null,
   );
@@ -841,9 +1191,7 @@ const CoordinatorDashboardContent = () => {
   useEffect(() => {
     setSelectedRescuer((prev) => {
       if (!prev) return prev;
-      const nextSelected = rescuers.find(
-        (rescuer) => rescuer.id === prev.id,
-      );
+      const nextSelected = rescuers.find((rescuer) => rescuer.id === prev.id);
       return nextSelected ?? null;
     });
   }, [rescuers]);
@@ -1050,6 +1398,7 @@ const CoordinatorDashboardContent = () => {
 
       setMixedWarningDialogOpen(false);
       setAiStreamOpen(false);
+      setAiStreamMinimized(false);
       if (latestSuggestion) {
         setRescueSuggestion(latestSuggestion);
         suggestionCacheRef.current.set(targetClusterId, latestSuggestion);
@@ -1215,7 +1564,7 @@ const CoordinatorDashboardContent = () => {
                 toast.success(`Đã gom thành công ${created} cụm SOS`);
               }
             },
-            onError: (error) => {
+            onError: (error: any) => {
               failed++;
               console.error("Failed to create cluster:", error);
               if (created + failed === total) {
@@ -1224,7 +1573,10 @@ const CoordinatorDashboardContent = () => {
                     `Gom được ${created}/${total} cụm. ${failed} cụm thất bại.`,
                   );
                 } else {
-                  toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
+                  const errorMessage =
+                    error.response?.data?.message ||
+                    "Không thể gom cụm SOS. Vui lòng thử lại.";
+                  toast.error(errorMessage);
                 }
               }
             },
@@ -1263,13 +1615,17 @@ const CoordinatorDashboardContent = () => {
             setAiStreamClusterId(clusterData.clusterId);
             setRescuePlanPreferSplitSuggestion(false);
             setAiStreamOpen(true);
+            setAiStreamMinimized(false);
             aiStream.startStream(clusterData.clusterId);
             setProcessingClusterIndex(null);
             setProcessingSosId(null);
           },
-          onError: (error) => {
+          onError: (error: any) => {
             console.error("Failed to create cluster:", error);
-            toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
+            const errorMessage =
+              error.response?.data?.message ||
+              "Không thể gom cụm SOS. Vui lòng thử lại.";
+            toast.error(errorMessage);
             setProcessingClusterIndex(null);
             setProcessingSosId(null);
           },
@@ -1289,9 +1645,7 @@ const CoordinatorDashboardContent = () => {
     (clusterId: number) => {
       const cluster = clusters.find((item) => item.id === clusterId);
       if (isClusterMissionLocked(cluster)) {
-        toast.info(
-          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
-        );
+        toast.info("Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.");
         return;
       }
 
@@ -1300,6 +1654,7 @@ const CoordinatorDashboardContent = () => {
       setAiStreamClusterId(clusterId);
       setRescuePlanPreferSplitSuggestion(false);
       setAiStreamOpen(true);
+      setAiStreamMinimized(false);
       aiStream.startStream(clusterId);
     },
     [aiStream, clusters],
@@ -1342,9 +1697,7 @@ const CoordinatorDashboardContent = () => {
     (clusterId: number) => {
       const cluster = clusters.find((item) => item.id === clusterId);
       if (isClusterMissionLocked(cluster)) {
-        toast.info(
-          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
-        );
+        toast.info("Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.");
         return;
       }
 
@@ -1388,6 +1741,7 @@ const CoordinatorDashboardContent = () => {
 
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
+    setAiStreamMinimized(false);
     setRescuePlanOpen(false);
     setRescuePlanPreferSplitSuggestion(false);
     syncRescuePlanUrlState(false, activeClusterId);
@@ -1403,8 +1757,24 @@ const CoordinatorDashboardContent = () => {
         : null,
     [activeClusterId, clusters],
   );
-  const isActiveRescuePlanClusterLocked =
-    isClusterMissionLocked(activeRescuePlanCluster);
+  const aiStreamClusterSOSRequestCount = useMemo(() => {
+    if (!aiStreamClusterId) return null;
+
+    const cluster = clusters.find((item) => item.id === aiStreamClusterId);
+    if (!cluster) return null;
+
+    const count = Number(cluster.sosRequestCount);
+    if (Number.isFinite(count) && count > 0) {
+      return Math.trunc(count);
+    }
+
+    return Array.isArray(cluster.sosRequestIds)
+      ? cluster.sosRequestIds.length
+      : null;
+  }, [aiStreamClusterId, clusters]);
+  const isActiveRescuePlanClusterLocked = isClusterMissionLocked(
+    activeRescuePlanCluster,
+  );
 
   const rescuePlanSOSRequests = useMemo(
     () => getClusterSOSRequests(activeClusterId, sosRequests, clusters),
@@ -1495,7 +1865,7 @@ const CoordinatorDashboardContent = () => {
               className="dark:invert h-auto w-auto object-contain"
             />
             <Badge variant="secondary" className="text-xs">
-              Miền Trung
+              Trung Tâm Điều Phối
             </Badge>
           </div>
         </div>
@@ -1612,9 +1982,18 @@ const CoordinatorDashboardContent = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
-                  {userInitials}
-                </div>
+                <Avatar className="h-8 w-8 ring-2 ring-border">
+                  {userMe?.avatarUrl ? (
+                    <AvatarImage
+                      src={userMe.avatarUrl}
+                      alt={userDisplayName}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-br from-red-400 to-orange-500 text-sm font-semibold text-white">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 z-[1200]">
@@ -1667,16 +2046,25 @@ const CoordinatorDashboardContent = () => {
             sidebarOpen ? "w-88" : "w-0",
           )}
         >
-          {sidebarOpen && (
+          <div className={cn("h-full w-88", !sidebarOpen && "invisible")}>
             <SOSSidebar
               sosRequests={sosRequests}
               incomingRequests={sidebarSOSRequests}
-              incomingPagination={{
-                page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
-                pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
-                totalCount: sidebarSosData?.totalCount ?? 0,
-                onPageChange: setSidebarSOSPage,
-              }}
+              incomingPagination={useMemo(
+                () => ({
+                  page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
+                  pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
+                  totalCount: sidebarSosData?.totalCount ?? 0,
+                  onPageChange: setSidebarSOSPage,
+                }),
+                [
+                  sidebarSosData?.pageNumber,
+                  sidebarSOSPage,
+                  sidebarSosData?.pageSize,
+                  sidebarSosData?.totalCount,
+                  setSidebarSOSPage,
+                ],
+              )}
               isIncomingRequestsLoading={isSidebarSosLoading}
               rescuers={rescuers}
               teamIncidents={teamIncidents}
@@ -1693,6 +2081,7 @@ const CoordinatorDashboardContent = () => {
               processingClusterIndex={processingClusterIndex}
               processingSosId={processingSosId}
               backendClusters={clusters}
+              filteredBackendClusters={filteredSidebarClusters}
               onAnalyzeCluster={handleAnalyzeCluster}
               isAnalyzingCluster={aiStream.loading || isFetchingSuggestion}
               analyzingClusterId={analyzingClusterId}
@@ -1702,9 +2091,24 @@ const CoordinatorDashboardContent = () => {
               onViewMission={handleViewMission}
               selectedStatuses={selectedSOSStatuses}
               onSelectedStatusesChange={setSelectedSOSStatuses}
+              selectedPriorities={selectedSOSPriorities}
+              onSelectedPrioritiesChange={setSelectedSOSPriorities}
+              selectedSosTypes={selectedSosTypes}
+              onSelectedSosTypesChange={setSelectedSosTypes}
+              selectedClusterStatuses={selectedClusterStatuses}
+              onSelectedClusterStatusesChange={setSelectedClusterStatuses}
+              selectedClusterPriorities={selectedClusterPriorities}
+              onSelectedClusterPrioritiesChange={setSelectedClusterPriorities}
+              selectedClusterSosTypes={selectedClusterSosTypes}
+              onSelectedClusterSosTypesChange={setSelectedClusterSosTypes}
+              sosSort={sosSort}
+              onSosSortChange={setSosSort}
+              clusterSort={clusterSort}
+              onClusterSortChange={setClusterSort}
             />
-          )}
+          </div>
         </aside>
+
 
         {/* Map Container */}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -1744,11 +2148,13 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
-                panelOpen={aiStreamOpen}
+                panelOpen={aiStreamOpen && !aiStreamMinimized}
                 onViewChange={handleCoordinatorMapViewChange}
                 routeOverlay={routeOverlay}
                 risingSOSMarkerIds={risingSOSMarkerIds}
               />
+
+              <MapLegend />
 
               {/* Floating Action Buttons */}
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40] flex items-center gap-3">
@@ -1769,7 +2175,12 @@ const CoordinatorDashboardContent = () => {
               {/* SOS Details Panel */}
               <SOSDetailsPanel
                 open={sosDetailOpen}
-                onOpenChange={setSOSDetailOpen}
+                onOpenChange={(open) => {
+                  setSOSDetailOpen(open);
+                  if (!open) {
+                    setSelectedSOS(null);
+                  }
+                }}
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
                 isProcessing={isProcessingSOS}
@@ -1807,12 +2218,20 @@ const CoordinatorDashboardContent = () => {
               {/* AI Stream Panel */}
               <AiStreamPanel
                 open={aiStreamOpen}
+                minimized={aiStreamMinimized}
+                onMinimize={() => setAiStreamMinimized(true)}
+                onRestore={() => {
+                  setAiStreamOpen(true);
+                  setAiStreamMinimized(false);
+                }}
                 onClose={() => {
                   if (aiStream.loading) {
+                    setAiStreamMinimized(true);
                     return;
                   }
 
                   setAiStreamOpen(false);
+                  setAiStreamMinimized(false);
                   aiStream.stopStream();
                 }}
                 clusterId={aiStreamClusterId}
@@ -1823,9 +2242,12 @@ const CoordinatorDashboardContent = () => {
                 error={aiStream.error}
                 loading={aiStream.loading}
                 phase={aiStream.phase}
+                clusterSOSRequestCount={aiStreamClusterSOSRequestCount}
                 onStop={() => aiStream.stopStream()}
                 onRetry={() => {
                   if (aiStreamClusterId) {
+                    setAiStreamOpen(true);
+                    setAiStreamMinimized(false);
                     aiStream.startStream(aiStreamClusterId);
                   }
                 }}
@@ -1864,7 +2286,12 @@ const CoordinatorDashboardContent = () => {
               {/* Location Details Panel */}
               <LocationDetailsPanel
                 open={locationPanelOpen}
-                onOpenChange={setLocationPanelOpen}
+                onOpenChange={(open) => {
+                  setLocationPanelOpen(open);
+                  if (!open) {
+                    setLocationPanelData(null);
+                  }
+                }}
                 location={locationPanelData}
               />
 

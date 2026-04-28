@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ import {
   Bank,
   CalendarBlank,
   FunnelSimple,
+  CaretDown,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -97,6 +98,8 @@ import type {
   FundingRequestStatus,
   CreateFundingRequestItem,
 } from "@/services/funding_request";
+import { useFundingRequestRealtime } from "@/hooks/useFundingRequestRealtime";
+import type { FundingRequestRealtimeUpdate } from "@/services/admin_finance_realtime/type";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Icon } from "@iconify/react";
 import { AxiosError } from "axios";
@@ -134,7 +137,7 @@ const COL = {
   GHICHU: "Mô tả vật phẩm",
   SOLUONG: "Số lượng (*)",
   DONGIA: "Đơn giá (VNĐ)",
-  THETICH: "Thể tích / đơn vị (dm3)",
+  THETICH: "Thể tích / đơn vị (dm³)",
   CANNANG: "Cân nặng / đơn vị (kg)",
 } as const;
 
@@ -505,6 +508,7 @@ type LedgerMode = "advance" | "repayment";
 
 interface ImportRow extends CreateFundingRequestItem {
   id: string;
+  targetGroups: string[];
   errors: Record<string, string>;
 }
 
@@ -525,6 +529,12 @@ function validateRow(row: Omit<ImportRow, "errors">): Record<string, string> {
   } else if (row.weightPerUnit < 0) {
     errors.weightPerUnit = "Không được âm";
   }
+  if (!row.targetGroups?.length) {
+    errors.targetGroups = "Đối tượng không được trống";
+  }
+  if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer")) {
+    errors.targetGroups = "Đồ tái sử dụng phải có Lực lượng cứu hộ";
+  }
   return errors;
 }
 
@@ -540,6 +550,7 @@ function createEmptyRow(rowNum: number): ImportRow {
     totalPrice: 0,
     itemType: "",
     targetGroup: "",
+    targetGroups: [],
     notes: "",
     volumePerUnit: undefined,
     weightPerUnit: undefined,
@@ -551,6 +562,7 @@ function createEmptyRow(rowNum: number): ImportRow {
       unitPrice: "Phải > 0",
       volumePerUnit: "Bắt buộc",
       weightPerUnit: "Bắt buộc",
+      targetGroups: "Đối tượng không được trống",
     },
   };
 }
@@ -728,7 +740,21 @@ export default function FundingRequestPage() {
   const selectedFundTxReferenceType =
     fundTxReferenceTypes.length === 1 ? fundTxReferenceTypes[0] : "all";
 
-  const [activeTab, setActiveTab] = useState<TabType>("create");
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") as TabType | null;
+  const validTabs: TabType[] = ["create", "history", "funds", "ledger"];
+  const [activeTab, setActiveTabState] = useState<TabType>(
+    tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "create",
+  );
+  const setActiveTab = useCallback(
+    (tab: TabType) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.set("tab", tab);
+      router.replace(`?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
   const [ledgerMode, setLedgerMode] = useState<LedgerMode>("advance");
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [selectedLedgerContributorKey, setSelectedLedgerContributorKey] =
@@ -1021,6 +1047,35 @@ export default function FundingRequestPage() {
     });
   }, [queryClient]);
 
+  const handleFundingRequestRealtimeUpdate = useCallback(
+    (payload: FundingRequestRealtimeUpdate) => {
+      if (payload.depotId !== depotId) return;
+
+      setDetailItem((current) => {
+        if (!current || current.id !== payload.requestId) return current;
+        if (!(payload.status in statusConfig)) return current;
+
+        return {
+          ...current,
+          status: payload.status as FundingRequestStatus,
+        };
+      });
+
+      if (payload.action === "Approved" || payload.action === "Rejected") {
+        handleRefreshFundLedger();
+      }
+    },
+    [depotId, handleRefreshFundLedger],
+  );
+
+  useFundingRequestRealtime({
+    enabled: Boolean(depotId),
+    requestId: detailItem?.id,
+    subscribeDetail: !!detailItem?.id,
+    subscribeList: Boolean(depotId),
+    onUpdate: handleFundingRequestRealtimeUpdate,
+  });
+
   const updateAdvanceRow = useCallback(
     (rowId: string, field: keyof InternalAdvanceRowState, value: string) => {
       setAdvanceRows((currentRows) =>
@@ -1276,10 +1331,30 @@ export default function FundingRequestPage() {
               const isReusable =
                 normalizeExcelText(itemType) === "reusable" ||
                 normalizeExcelText(rawItemType) === "tai su dung";
+
+              // Parse multi target groups (comma/semicolon separated)
               const rawTargetGroup = String(raw.DOITUONG ?? "").trim();
-              const targetGroup = isReusable
-                ? "Rescuer"
-                : matchMetadataKey(rawTargetGroup, targetGroups);
+              const targetGroupsParsed = rawTargetGroup
+                .split(/[,;،]/)
+                .map((seg) => {
+                  const seg2 = seg.trim();
+                  if (!seg2) return null;
+                  const parts = seg2
+                    .split(/\s*-\s*/)
+                    .map((p) => p.trim().toLowerCase());
+                  const matched = targetGroups.find((t) =>
+                    parts.some(
+                      (p) =>
+                        t.value.toLowerCase() === p ||
+                        t.key.toLowerCase() === p,
+                    ),
+                  );
+                  return matched?.key ?? seg2;
+                })
+                .filter((v): v is string => !!v);
+              const targetGroupsFinal = isReusable
+                ? ["Rescuer"]
+                : targetGroupsParsed;
 
               const rowData: Omit<ImportRow, "errors"> = {
                 id: `row-${offset + idx}-${Date.now()}`,
@@ -1291,7 +1366,8 @@ export default function FundingRequestPage() {
                 unitPrice: parseExcelNumber(raw.DONGIA),
                 totalPrice: 0,
                 itemType,
-                targetGroup,
+                targetGroup: targetGroupsFinal.join(", "),
+                targetGroups: targetGroupsFinal,
                 notes: String(raw.GHICHU ?? "").trim(),
                 volumePerUnit: parseOptionalExcelNumber(raw.THETICH),
                 weightPerUnit: parseOptionalExcelNumber(raw.CANNANG),
@@ -1346,15 +1422,29 @@ export default function FundingRequestPage() {
   const updateRow = useCallback(
     (
       rowId: string,
-      field: keyof CreateFundingRequestItem,
-      value: string | number | undefined,
+      field: keyof CreateFundingRequestItem | "targetGroups",
+      value: string | number | string[] | undefined,
     ) => {
       setRows((prev) =>
         prev.map((r) => {
           if (r.id !== rowId) return r;
-          const updated = { ...r, [field]: value };
+          let updated: ImportRow;
+          if (field === "targetGroups" && Array.isArray(value)) {
+            updated = {
+              ...r,
+              targetGroups: value as string[],
+              targetGroup: (value as string[]).join(", "),
+            };
+          } else {
+            updated = { ...r, [field]: value };
+          }
           if (field === "quantity" || field === "unitPrice") {
             updated.totalPrice = updated.quantity * updated.unitPrice;
+          }
+          // Auto-set targetGroups when itemType changes to Reusable
+          if (field === "itemType" && value === "Reusable") {
+            updated.targetGroups = ["Rescuer"];
+            updated.targetGroup = "Rescuer";
           }
           updated.errors = validateRow(updated);
           return updated;
@@ -1450,7 +1540,7 @@ export default function FundingRequestPage() {
       unitPrice: r.unitPrice,
       totalPrice: r.totalPrice,
       itemType: r.itemType,
-      targetGroup: r.targetGroup,
+      targetGroup: r.targetGroups.join(", "),
       notes: r.notes,
       description: r.notes,
       volumePerUnit: r.volumePerUnit,
@@ -1710,6 +1800,7 @@ export default function FundingRequestPage() {
             <Bank size={20} />
             Quỹ kho
           </button>
+          {/* HIDDEN TAB - Sổ quản lý quyết toán (ẩn tạm thời, không xóa code)
           <button
             onClick={() => setActiveTab("ledger")}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
@@ -1730,6 +1821,7 @@ export default function FundingRequestPage() {
               </Badge>
             )}
           </button>
+          */}
         </motion.div>
 
         {/* ─── CREATE TAB ────────────────────────────────── */}
@@ -2130,8 +2222,17 @@ export default function FundingRequestPage() {
                               <TableHead className="min-w-36 text-sm">
                                 Danh mục *
                               </TableHead>
+                              <TableHead className="min-w-32 text-sm">
+                                Đối tượng
+                              </TableHead>
+                              <TableHead className="min-w-32 text-sm">
+                                Loại vật phẩm
+                              </TableHead>
                               <TableHead className="min-w-24 text-sm">
                                 Đơn vị *
+                              </TableHead>
+                              <TableHead className="min-w-32 text-sm">
+                                Mô tả vật phẩm
                               </TableHead>
                               <TableHead className="min-w-24 text-sm">
                                 Số lượng *
@@ -2140,22 +2241,13 @@ export default function FundingRequestPage() {
                                 Đơn giá *
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
-                                Thể tích / đơn vị
+                                Thể tích / dm³
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
-                                Cân nặng / đơn vị
+                                Cân nặng / kg
                               </TableHead>
                               <TableHead className="min-w-28 text-sm">
                                 Thành tiền
-                              </TableHead>
-                              <TableHead className="min-w-32 text-sm">
-                                Loại vật phẩm
-                              </TableHead>
-                              <TableHead className="min-w-32 text-sm">
-                                Đối tượng
-                              </TableHead>
-                              <TableHead className="min-w-32 text-sm">
-                                Ghi chú
                               </TableHead>
                               <TableHead className="w-10" />
                             </TableRow>
@@ -2175,6 +2267,7 @@ export default function FundingRequestPage() {
                                   <TableCell className="text-center text-sm text-muted-foreground font-mono">
                                     {row.row}
                                   </TableCell>
+                                  {/* B: Tên vật phẩm */}
                                   <TableCell>
                                     {renderInputCell(
                                       row,
@@ -2182,6 +2275,7 @@ export default function FundingRequestPage() {
                                       "Tên vật phẩm",
                                     )}
                                   </TableCell>
+                                  {/* C: Danh mục */}
                                   <TableCell>
                                     {renderSelectCell(
                                       row,
@@ -2190,43 +2284,122 @@ export default function FundingRequestPage() {
                                       "Chọn danh mục",
                                     )}
                                   </TableCell>
+                                  {/* D: Đối tượng (multi-select) */}
                                   <TableCell>
-                                    {renderInputCell(
-                                      row,
-                                      "unit",
-                                      "kg, thùng...",
-                                    )}
+                                    {(() => {
+                                      const isReusable =
+                                        row.itemType === "Reusable";
+                                      const error = row.errors.targetGroups;
+                                      const selected = row.targetGroups ?? [];
+                                      const labelText =
+                                        selected.length === 0
+                                          ? "Chọn đối tượng"
+                                          : selected
+                                              .map(
+                                                (v) =>
+                                                  targetGroupOptions.find(
+                                                    (o) => o.value === v,
+                                                  )?.label ?? v,
+                                              )
+                                              .join(", ");
+
+                                      if (isReusable) {
+                                        return (
+                                          <div className="space-y-0.5">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              disabled
+                                              className="h-8 w-full min-w-[160px] justify-between text-sm font-normal px-3 opacity-60 cursor-not-allowed"
+                                            >
+                                              <span className="truncate text-left">
+                                                Lực lượng cứu hộ
+                                              </span>
+                                              <CaretDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
+                                            </Button>
+                                          </div>
+                                        );
+                                      }
+
+                                      return (
+                                        <div className="space-y-0.5">
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className={cn(
+                                                  "h-8 w-full min-w-[160px] justify-between text-sm font-normal px-3",
+                                                  error &&
+                                                    "border-red-400 focus-visible:ring-red-400",
+                                                  selected.length === 0 &&
+                                                    "text-muted-foreground",
+                                                )}
+                                              >
+                                                <span className="truncate text-left">
+                                                  {labelText}
+                                                </span>
+                                                <CaretDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
+                                              </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent
+                                              className="p-1 w-48"
+                                              align="start"
+                                              onOpenAutoFocus={(e) =>
+                                                e.preventDefault()
+                                              }
+                                            >
+                                              {targetGroupOptions.map((opt) => {
+                                                const checked =
+                                                  selected.includes(opt.value);
+                                                return (
+                                                  <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const next = checked
+                                                        ? selected.filter(
+                                                            (v) =>
+                                                              v !== opt.value,
+                                                          )
+                                                        : [
+                                                            ...selected,
+                                                            opt.value,
+                                                          ];
+                                                      updateRow(
+                                                        row.id,
+                                                        "targetGroups",
+                                                        next,
+                                                      );
+                                                    }}
+                                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md w-full hover:bg-muted text-sm cursor-pointer"
+                                                  >
+                                                    <div
+                                                      className={cn(
+                                                        "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px] font-bold",
+                                                        checked
+                                                          ? "bg-primary border-primary text-primary-foreground"
+                                                          : "border-muted-foreground/40",
+                                                      )}
+                                                    >
+                                                      {checked && "✓"}
+                                                    </div>
+                                                    {opt.label}
+                                                  </button>
+                                                );
+                                              })}
+                                            </PopoverContent>
+                                          </Popover>
+                                          {error && (
+                                            <p className="text-[10px] text-red-500 leading-tight">
+                                              {error}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </TableCell>
-                                  <TableCell>
-                                    {renderInputCell(
-                                      row,
-                                      "quantity",
-                                      "0",
-                                      "number",
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {renderCurrencyCell(row, "unitPrice")}
-                                  </TableCell>
-                                  <TableCell>
-                                    {renderOptionalDecimalCell(
-                                      row,
-                                      "volumePerUnit",
-                                      "dm3",
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {renderOptionalDecimalCell(
-                                      row,
-                                      "weightPerUnit",
-                                      "kg",
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className="text-sm font-semibold text-emerald-600 tracking-tight whitespace-nowrap">
-                                      {formatMoney(row.totalPrice)}
-                                    </span>
-                                  </TableCell>
+                                  {/* E: Loại vật phẩm */}
                                   <TableCell>
                                     {itemTypeOptions.length > 0
                                       ? renderSelectCell(
@@ -2241,20 +2414,15 @@ export default function FundingRequestPage() {
                                           "Hàng khô...",
                                         )}
                                   </TableCell>
+                                  {/* F: Đơn vị */}
                                   <TableCell>
-                                    {targetGroupOptions.length > 0
-                                      ? renderSelectCell(
-                                          row,
-                                          "targetGroup",
-                                          targetGroupOptions,
-                                          "Chọn đối tượng",
-                                        )
-                                      : renderInputCell(
-                                          row,
-                                          "targetGroup",
-                                          "Người dân...",
-                                        )}
+                                    {renderInputCell(
+                                      row,
+                                      "unit",
+                                      "kg, thùng...",
+                                    )}
                                   </TableCell>
+                                  {/* G: Mô tả vật phẩm */}
                                   <TableCell>
                                     <Input
                                       value={row.notes}
@@ -2265,10 +2433,46 @@ export default function FundingRequestPage() {
                                           e.target.value,
                                         )
                                       }
-                                      placeholder="Ghi chú..."
+                                      placeholder="Mô tả..."
                                       className="h-8 text-sm"
                                     />
                                   </TableCell>
+                                  {/* H: Số lượng */}
+                                  <TableCell>
+                                    {renderInputCell(
+                                      row,
+                                      "quantity",
+                                      "0",
+                                      "number",
+                                    )}
+                                  </TableCell>
+                                  {/* I: Đơn giá */}
+                                  <TableCell>
+                                    {renderCurrencyCell(row, "unitPrice")}
+                                  </TableCell>
+                                  {/* J: Thể tích */}
+                                  <TableCell>
+                                    {renderOptionalDecimalCell(
+                                      row,
+                                      "volumePerUnit",
+                                      "dm3",
+                                    )}
+                                  </TableCell>
+                                  {/* K: Cân nặng */}
+                                  <TableCell>
+                                    {renderOptionalDecimalCell(
+                                      row,
+                                      "weightPerUnit",
+                                      "kg",
+                                    )}
+                                  </TableCell>
+                                  {/* Thành tiền (computed) */}
+                                  <TableCell>
+                                    <span className="text-sm font-semibold text-emerald-600 tracking-tighter whitespace-nowrap">
+                                      {formatMoney(row.totalPrice)}
+                                    </span>
+                                  </TableCell>
+                                  {/* Xóa */}
                                   <TableCell>
                                     <Button
                                       variant="ghost"

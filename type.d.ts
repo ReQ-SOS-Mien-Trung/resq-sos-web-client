@@ -2,11 +2,14 @@ import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
   SOSPriorityLevel,
+  SOSRequestEvaluationSummary,
   SOSRequestStatus,
   SOSClothingPerson,
   SOSSpecialDietPerson,
   SOSStructuredData,
   SOSSupplyDetails,
+  SOSVictimProfile,
+  SOSIncidentHistoryEntry,
 } from "@/services/sos_request/type";
 
 interface Ticker {
@@ -115,9 +118,13 @@ export interface SOSRequest {
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
   isSentOnBehalf?: boolean;
+  latestIncidentNote?: string | null;
   reporterIsOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;
+  evaluation?: SOSRequestEvaluationSummary | null;
+  victims?: SOSVictimProfile[] | null;
+  incidentHistory?: SOSIncidentHistoryEntry[] | null;
 }
 
 export interface Rescuer {
@@ -971,6 +978,8 @@ export interface SOSSidebarProps {
   processingSosId?: string | null;
   /** Backend SOS clusters */
   backendClusters: import("@/services/sos_cluster/type").SOSClusterEntity[];
+  /** Backend SOS clusters after applying server-side sidebar filters */
+  filteredBackendClusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
   /** Trigger AI analysis for an existing backend cluster */
   onAnalyzeCluster: (clusterId: number) => void;
   isAnalyzingCluster?: boolean;
@@ -986,6 +995,30 @@ export interface SOSSidebarProps {
   onViewMission?: (clusterId: number, missionId: number) => void;
   selectedStatuses?: SOSRequestStatus[];
   onSelectedStatusesChange?: (statuses: SOSRequestStatus[]) => void;
+  selectedPriorities?: import("@/services/sos_request/type").SOSPriorityLevel[];
+  onSelectedPrioritiesChange?: (
+    priorities: import("@/services/sos_request/type").SOSPriorityLevel[],
+  ) => void;
+  selectedSosTypes?: import("@/services/sos_request/type").SOSRequestTypeFilter[];
+  onSelectedSosTypesChange?: (
+    sosTypes: import("@/services/sos_request/type").SOSRequestTypeFilter[],
+  ) => void;
+  selectedClusterStatuses?: import("@/services/sos_cluster/type").ClusterLifecycleStatus[];
+  onSelectedClusterStatusesChange?: (
+    statuses: import("@/services/sos_cluster/type").ClusterLifecycleStatus[],
+  ) => void;
+  selectedClusterPriorities?: import("@/services/sos_cluster/type").ClusterPriorityLevel[];
+  onSelectedClusterPrioritiesChange?: (
+    priorities: import("@/services/sos_cluster/type").ClusterPriorityLevel[],
+  ) => void;
+  selectedClusterSosTypes?: import("@/services/sos_cluster/type").ClusterSOSType[];
+  onSelectedClusterSosTypesChange?: (
+    sosTypes: import("@/services/sos_cluster/type").ClusterSOSType[],
+  ) => void;
+  sosSort?: string;
+  onSosSortChange?: (sort: string) => void;
+  clusterSort?: string;
+  onClusterSortChange?: (sort: string) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

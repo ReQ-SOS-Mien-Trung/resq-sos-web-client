@@ -15,10 +15,15 @@ import {
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
   StartAssemblyPointGatheringRequest,
+  CancelAssemblyPointEventRequest,
   GetAssemblyPointEventsParams,
   GetAssemblyPointEventsResponse,
   GetAssemblyPointCheckedInRescuersParams,
   GetAssemblyPointCheckedInRescuersResponse,
+  AssemblyPointCheckInRadiusConfig,
+  GetAllCheckInRadiusConfigsResponse,
+  SetCheckInRadiusRequest,
+  SetCheckInRadiusResponse,
 } from "./type";
 
 /**
@@ -197,6 +202,17 @@ export async function startAssemblyPointGathering(
 }
 
 /**
+ * Cancel an assembly point event
+ * POST /personnel/assembly-point/events/{eventId}/cancel
+ */
+export async function cancelAssemblyPointEvent(
+  payload: CancelAssemblyPointEventRequest,
+): Promise<void> {
+  const { eventId } = payload;
+  await api.post(`/personnel/assembly-point/events/${eventId}/cancel`);
+}
+
+/**
  * Get events by assembly point with pagination
  * GET /personnel/assembly-point/{id}/events
  */
@@ -235,4 +251,51 @@ export async function getAssemblyPointCheckedInRescuers(
     },
   );
   return data;
+}
+
+/**
+ * Get check-in radius config for a specific assembly point
+ * GET /personnel/assembly-point/{id}/check-in-radius
+ */
+export async function getAssemblyPointCheckInRadius(
+  id: number,
+): Promise<AssemblyPointCheckInRadiusConfig> {
+  const { data } = await api.get(
+    `/personnel/assembly-point/${id}/check-in-radius`,
+  );
+  return data;
+}
+
+/**
+ * Get all assembly points with custom check-in radius configured (excludes global fallback)
+ * GET /personnel/assembly-point/check-in-radius
+ */
+export async function getAllCheckInRadiusConfigs(): Promise<GetAllCheckInRadiusConfigsResponse> {
+  const { data } = await api.get(`/personnel/assembly-point/check-in-radius`);
+  return data;
+}
+
+/**
+ * Set or update check-in radius for a specific assembly point
+ * PUT /personnel/assembly-point/{id}/check-in-radius
+ */
+export async function setAssemblyPointCheckInRadius(
+  payload: SetCheckInRadiusRequest,
+): Promise<SetCheckInRadiusResponse> {
+  const { id, maxRadiusMeters } = payload;
+  const { data } = await api.put(
+    `/personnel/assembly-point/${id}/check-in-radius`,
+    { maxRadiusMeters },
+  );
+  return data;
+}
+
+/**
+ * Delete custom check-in radius for a specific assembly point (reverts to global fallback)
+ * DELETE /personnel/assembly-point/{id}/check-in-radius
+ */
+export async function deleteAssemblyPointCheckInRadius(
+  id: number,
+): Promise<void> {
+  await api.delete(`/personnel/assembly-point/${id}/check-in-radius`);
 }

@@ -366,9 +366,6 @@ function DepotTable({
                         cfg.color,
                       )}
                     >
-                      {depot.status === "Closing" && (
-                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
-                      )}
                       {cfg.label}
                     </Badge>
                   </td>
@@ -466,12 +463,12 @@ export default function DepotsPage() {
     statusMetadata?.length && statusMetadata.length > 0
       ? statusMetadata.map((status) => status.key)
       : ([
-          "Created",
-          "PendingAssignment",
-          "Available",
-          "Unavailable",
-          "Closed",
-        ] satisfies DepotStatus[]);
+        "Created",
+        "PendingAssignment",
+        "Available",
+        "Unavailable",
+        "Closed",
+      ] satisfies DepotStatus[]);
 
   const tableItems = tableData?.items ?? [];
   const totalCount = tableData?.totalCount ?? 0;
@@ -573,7 +570,7 @@ export default function DepotsPage() {
         ...prev,
         address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       }));
-      toast.error("Không đọc được địa chỉ từ OpenStreetMap.");
+      toast.error("Không đọc được địa chỉ từ bản đồ.");
     } finally {
       setIsResolvingAddress(false);
     }

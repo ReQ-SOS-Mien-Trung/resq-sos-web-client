@@ -2,6 +2,7 @@
 
 // Severity level
 export type ClusterSeverityLevel = "Low" | "Medium" | "High" | "Critical";
+export type ClusterPriorityLevel = ClusterSeverityLevel;
 
 // Cluster lifecycle status from backend
 export type ClusterLifecycleStatus =
@@ -9,6 +10,8 @@ export type ClusterLifecycleStatus =
   | "Suggested"
   | "InProgress"
   | "Completed";
+
+export type ClusterSOSType = "Rescue" | "Relief" | "Both";
 
 // SOS Cluster Entity
 export interface SOSClusterEntity {
@@ -48,6 +51,9 @@ export interface GetSOSClustersParams {
   pageSize?: number;
   sosRequestId?: number;
   statuses?: ClusterLifecycleStatus[];
+  priorities?: ClusterPriorityLevel[];
+  sosTypes?: ClusterSOSType[];
+  Sort?: string;
 }
 
 // POST /emergency/sos-clusters request
@@ -62,6 +68,11 @@ export interface CreateSOSClusterResponse {
   sosRequestIds: number[];
   severityLevel: ClusterSeverityLevel;
   createdAt: string;
+}
+
+// POST /emergency/sos-clusters/{clusterId}/sos-requests request body
+export interface AddSOSRequestsToClusterRequest {
+  sosRequestIds: number[];
 }
 
 // ---- Mission Suggestions ----

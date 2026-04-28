@@ -35,6 +35,7 @@ import {
   Search,
   Filter,
   CalendarIcon,
+  Check,
   X,
   FileText,
   Package,
@@ -45,6 +46,7 @@ import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 import {
+  useDepotInventoryItemModels,
   useDepotStockMovements,
   useInventoryActionTypes,
   useInventorySourceTypes,
@@ -53,8 +55,34 @@ import {
 import { type StockMovementEntity } from "@/services/inventory/type";
 import { StockMovementDetailSheet } from "./StockMovementDetailSheet";
 import { motion } from "framer-motion";
+import {
+  getInventoryActionFallback,
+  getInventorySourceLabelFallback,
+} from "@/lib/inventory-movement-taxonomy";
 
 const PAGE_SIZES = [10, 25, 50, 100];
+
+function MovementItemSummary({
+  item,
+}: {
+  item: StockMovementEntity["items"][number];
+}) {
+  const lotCount = item.lotDetails?.length ?? 0;
+  const reusableCount = item.reusableDetails?.length ?? 0;
+
+  return (
+    <div className="space-y-0.5">
+      <p className="text-xs text-muted-foreground">{item.categoryName}</p>
+      {(lotCount > 0 || reusableCount > 0) && (
+        <p className="text-xs text-muted-foreground">
+          {lotCount > 0 ? `${lotCount} lô` : null}
+          {lotCount > 0 && reusableCount > 0 ? " · " : null}
+          {reusableCount > 0 ? `${reusableCount} serial` : null}
+        </p>
+      )}
+    </div>
+  );
+}
 
 const StockMovementTable: React.FC = () => {
   const { selectedDepotId } = useManagerDepot();
@@ -65,10 +93,20 @@ const StockMovementTable: React.FC = () => {
   const [selectedActionTypes, setSelectedActionTypes] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
   const [selectedSourceNames, setSelectedSourceNames] = useState<string[]>([]);
+  const [selectedItemModelSelection, setSelectedItemModelSelection] = useState<{
+    depotId: number | null;
+    itemModelId: number;
+  } | null>(null);
+  const [itemModelSearch, setItemModelSearch] = useState("");
+  const [itemModelPopoverOpen, setItemModelPopoverOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedMovement, setSelectedMovement] =
     useState<StockMovementEntity | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const selectedItemModelId =
+    selectedItemModelSelection?.depotId === selectedDepotId
+      ? selectedItemModelSelection.itemModelId
+      : null;
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -90,6 +128,7 @@ const StockMovementTable: React.FC = () => {
     selectedActionTypes,
     selectedSourceTypes,
     selectedSourceNames,
+    selectedItemModelId,
     dateRange,
   ]);
 
@@ -103,6 +142,7 @@ const StockMovementTable: React.FC = () => {
         selectedActionTypes.length > 0 ? selectedActionTypes : undefined,
       sourceTypes:
         selectedSourceTypes.length > 0 ? selectedSourceTypes : undefined,
+      itemModelId: selectedItemModelId ?? undefined,
       fromDate: dateRange?.from
         ? format(dateRange.from, "yyyy-MM-dd")
         : undefined,
@@ -114,6 +154,7 @@ const StockMovementTable: React.FC = () => {
       pageSize,
       selectedActionTypes,
       selectedDepotId,
+      selectedItemModelId,
       selectedSourceTypes,
     ],
   );
@@ -130,6 +171,45 @@ const StockMovementTable: React.FC = () => {
   const { data: actionTypes = [] } = useInventoryActionTypes();
 
   const { data: sourceTypes = [] } = useInventorySourceTypes();
+  const { data: itemModelOptions = [], isLoading: loadingItemModels } =
+    useDepotInventoryItemModels(selectedDepotId ?? 0, {
+      enabled: Boolean(selectedDepotId),
+    });
+  const actionTypeLabelMap = useMemo(
+    () =>
+      new Map(
+        actionTypes.flatMap((actionType) => [
+          [actionType.key, actionType.value],
+          [actionType.value, actionType.value],
+        ]),
+      ),
+    [actionTypes],
+  );
+  const sourceTypeLabelMap = useMemo(
+    () =>
+      new Map(
+        sourceTypes.flatMap((sourceType) => [
+          [sourceType.key, sourceType.value],
+          [sourceType.value, sourceType.value],
+        ]),
+      ),
+    [sourceTypes],
+  );
+  const selectedItemModelLabel = useMemo(() => {
+    if (selectedItemModelId == null) return "";
+    return (
+      itemModelOptions.find((itemModel) => itemModel.key === selectedItemModelId)
+        ?.value ?? `#${selectedItemModelId}`
+    );
+  }, [itemModelOptions, selectedItemModelId]);
+  const filteredItemModelOptions = useMemo(() => {
+    const keyword = itemModelSearch.trim().toLowerCase();
+    if (!keyword) return itemModelOptions;
+
+    return itemModelOptions.filter((itemModel) =>
+      `${itemModel.value} ${itemModel.key}`.toLowerCase().includes(keyword),
+    );
+  }, [itemModelOptions, itemModelSearch]);
 
   // Transform data — one row per stock movement
   const stockMovements = useMemo(() => {
@@ -200,6 +280,8 @@ const StockMovementTable: React.FC = () => {
     setSelectedActionTypes([]);
     setSelectedSourceTypes([]);
     setSelectedSourceNames([]);
+    setSelectedItemModelSelection(null);
+    setItemModelSearch("");
     setDateRange(undefined);
   };
 
@@ -209,6 +291,7 @@ const StockMovementTable: React.FC = () => {
       selectedActionTypes.length > 0 ||
       selectedSourceTypes.length > 0 ||
       selectedSourceNames.length > 0 ||
+      selectedItemModelId != null ||
       dateRange?.from ||
       dateRange?.to
     );
@@ -217,45 +300,17 @@ const StockMovementTable: React.FC = () => {
     selectedActionTypes,
     selectedSourceTypes,
     selectedSourceNames,
+    selectedItemModelId,
     dateRange,
   ]);
 
-  const ACTION_TYPE_MAP: Record<string, { label: string; className: string }> =
-    {
-      Import: {
-        label: "Nhập kho",
-        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
-      },
-      Export: {
-        label: "Xuất kho",
-        className: "bg-red-100 text-red-700 border-red-200",
-      },
-      Adjust: {
-        label: "Điều chỉnh",
-        className: "bg-orange-100 text-orange-700 border-orange-200",
-      },
-      Return: {
-        label: "Hoàn trả",
-        className: "bg-blue-100 text-blue-700 border-blue-200",
-      },
-      TransferIn: {
-        label: "Chuyển nhập",
-        className: "bg-teal-100 text-teal-700 border-teal-200",
-      },
-      TransferOut: {
-        label: "Chuyển xuất",
-        className: "bg-purple-100 text-purple-700 border-purple-200",
-      },
-    };
+  const getActionTypeLabel = (actionType: string) =>
+    actionTypeLabelMap.get(actionType) ??
+    getInventoryActionFallback(actionType).label;
 
-  const SOURCE_TYPE_MAP: Record<string, string> = {
-    Donation: "Quyên góp",
-    Mission: "Nhiệm vụ",
-    Purchase: "Mua sắm",
-    Adjustment: "Điều chỉnh",
-    Transfer: "Chuyển kho",
-    Manual: "Thủ công",
-  };
+  const getSourceTypeLabel = (sourceType: string) =>
+    sourceTypeLabelMap.get(sourceType) ??
+    getInventorySourceLabelFallback(sourceType);
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -264,15 +319,12 @@ const StockMovementTable: React.FC = () => {
 
   // Get action type badge with Vietnamese label + proper color
   const getActionTypeBadge = (actionType: string) => {
-    const config = ACTION_TYPE_MAP[actionType];
-    if (config) {
-      return (
-        <Badge variant="outline" className={config.className}>
-          {config.label}
-        </Badge>
-      );
-    }
-    return <Badge variant="outline">{actionType}</Badge>;
+    const config = getInventoryActionFallback(actionType);
+    return (
+      <Badge variant="outline" className={config.className}>
+        {getActionTypeLabel(actionType)}
+      </Badge>
+    );
   };
 
   const displayStockMovements = filteredStockMovements || stockMovements;
@@ -290,14 +342,14 @@ const StockMovementTable: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
       >
-        <Card className="mx-6 mt-4 mb-4">
-          <CardHeader className="pb-0.5">
+        <Card className="mx-6 mt-0 mb-4 border-none shadow-none bg-transparent">
+          <CardHeader className="pb-0.5 px-0">
             <CardTitle className="text-lg flex items-center gap-2">
               <Filter className="h-5 w-5" />
               Bộ lọc
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 px-0">
             {/* Search and Clear */}
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
@@ -321,7 +373,7 @@ const StockMovementTable: React.FC = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
               {/* Action Types Filter */}
               <div className="space-y-2">
                 <Label className="text-sm tracking-tighter font-mono">
@@ -329,14 +381,21 @@ const StockMovementTable: React.FC = () => {
                 </Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start",
+                        selectedActionTypes.length === 0 &&
+                          "font-normal text-muted-foreground",
+                      )}
+                    >
                       {selectedActionTypes.length === 0
                         ? "Chọn loại hành động..."
                         : `${selectedActionTypes.length} đã chọn`}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-80" align="start">
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                    <div className="space-y-2 max-h-72 overflow-y-auto pb-1">
                       {actionTypes.map((actionType) => (
                         <div
                           key={actionType.key}
@@ -366,8 +425,7 @@ const StockMovementTable: React.FC = () => {
                             htmlFor={`action-${actionType.key}`}
                             className="text-sm tracking-tighter"
                           >
-                            {ACTION_TYPE_MAP[actionType.key]?.label ??
-                              actionType.value}
+                            {getActionTypeLabel(actionType.key)}
                           </Label>
                         </div>
                       ))}
@@ -383,7 +441,14 @@ const StockMovementTable: React.FC = () => {
                 </Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start",
+                        selectedSourceTypes.length === 0 &&
+                          "font-normal text-muted-foreground",
+                      )}
+                    >
                       {selectedSourceTypes.length === 0
                         ? "Chọn loại nguồn..."
                         : `${selectedSourceTypes.length} đã chọn`}
@@ -420,8 +485,7 @@ const StockMovementTable: React.FC = () => {
                             htmlFor={`source-${sourceType.key}`}
                             className="text-sm tracking-tighter"
                           >
-                            {SOURCE_TYPE_MAP[sourceType.key] ??
-                              sourceType.value}
+                            {getSourceTypeLabel(sourceType.key)}
                           </Label>
                         </div>
                       ))}
@@ -437,7 +501,14 @@ const StockMovementTable: React.FC = () => {
                 </Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start",
+                        selectedSourceNames.length === 0 &&
+                          "font-normal text-muted-foreground",
+                      )}
+                    >
                       {selectedSourceNames.length === 0
                         ? "Chọn tên nguồn..."
                         : `${selectedSourceNames.length} đã chọn`}
@@ -481,6 +552,103 @@ const StockMovementTable: React.FC = () => {
                 </Popover>
               </div>
 
+              {/* Item Model Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm tracking-tighter font-mono">
+                  Vật phẩm
+                </Label>
+                <Popover
+                  open={itemModelPopoverOpen}
+                  onOpenChange={setItemModelPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-between overflow-hidden",
+                        selectedItemModelId == null &&
+                          "font-normal text-muted-foreground",
+                      )}
+                    >
+                      <span className="truncate">
+                        {selectedItemModelId == null
+                          ? "Chọn vật phẩm..."
+                          : selectedItemModelLabel}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-2" align="start">
+                    <div className="relative mb-2">
+                      <Input
+                        value={itemModelSearch}
+                        onChange={(event) =>
+                          setItemModelSearch(event.target.value)
+                        }
+                        placeholder="Tìm theo tên hoặc mã vật phẩm..."
+                        className="h-9 pl-9"
+                      />
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    <div className="h-64 overflow-y-auto pr-1">
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm tracking-tighter hover:bg-muted",
+                          selectedItemModelId == null && "bg-muted",
+                        )}
+                        onClick={() => {
+                          setSelectedItemModelSelection(null);
+                          setItemModelPopoverOpen(false);
+                        }}
+                      >
+                        Tất cả vật phẩm
+                        {selectedItemModelId == null && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </button>
+                      {loadingItemModels ? (
+                        <div className="px-2 py-3 text-sm tracking-tighter text-muted-foreground">
+                          Đang tải vật phẩm...
+                        </div>
+                      ) : filteredItemModelOptions.length === 0 ? (
+                        <div className="px-2 py-3 text-sm tracking-tighter text-muted-foreground">
+                          Không tìm thấy vật phẩm.
+                        </div>
+                      ) : (
+                        filteredItemModelOptions.map((itemModel) => (
+                          <button
+                            key={itemModel.key}
+                            type="button"
+                            className={cn(
+                              "flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm tracking-tighter hover:bg-muted",
+                              selectedItemModelId === itemModel.key &&
+                              "bg-muted",
+                            )}
+                            onClick={() => {
+                              setSelectedItemModelSelection({
+                                depotId: selectedDepotId ?? null,
+                                itemModelId: itemModel.key,
+                              });
+                              setItemModelPopoverOpen(false);
+                            }}
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {itemModel.value}
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              #{itemModel.key}
+                            </span>
+                            {selectedItemModelId === itemModel.key && (
+                              <Check className="h-4 w-4 shrink-0 text-primary" />
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               {/* Date Range Filter */}
               <div className="space-y-2">
                 <Label className="text-sm tracking-tighter font-mono">
@@ -492,7 +660,7 @@ const StockMovementTable: React.FC = () => {
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !dateRange?.from && "font-medium",
+                        !dateRange?.from && "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -513,7 +681,7 @@ const StockMovementTable: React.FC = () => {
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                       initialFocus
                       mode="range"
@@ -655,58 +823,52 @@ const StockMovementTable: React.FC = () => {
                           <TableCell>
                             {getActionTypeBadge(movement.actionType)}
                           </TableCell>
-                          <TableCell>{movement.sourceName || "—"}</TableCell>
+                          <TableCell>
+                            {(movement.rawMovement as StockMovementEntity)
+                              .vatInvoiceId != null ? (
+                              <div>
+                                <p className="font-medium text-sm tracking-tighter truncate max-w-48">
+                                  {(movement.rawMovement as StockMovementEntity)
+                                    .supplierName ||
+                                    movement.sourceName ||
+                                    "—"}
+                                </p>
+                                <p className="text-xs text-muted-foreground tracking-tighter mt-0.5 flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  HĐ{" "}
+                                  {
+                                    (
+                                      movement.rawMovement as StockMovementEntity
+                                    ).invoiceSerial
+                                  }
+                                  {" - "}
+                                  {
+                                    (
+                                      movement.rawMovement as StockMovementEntity
+                                    ).invoiceNumber
+                                  }
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-sm tracking-tighter">
+                                {movement.sourceName || "—"}
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {movement.items.length === 1 ? (
                               <div>
                                 <p className="font-medium text-sm">
                                   {movement.items[0].itemName}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {movement.items[0].categoryName}
-                                </p>
-                                {movement.items[0].receivedDate && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    Nhập:{" "}
-                                    {format(
-                                      new Date(movement.items[0].receivedDate),
-                                      "dd/MM/yyyy",
-                                      { locale: vi },
-                                    )}
-                                    {movement.items[0].expiredDate && (
-                                      <>
-                                        {" "}
-                                        • Hết hạn:{" "}
-                                        <span
-                                          className={
-                                            new Date(
-                                              movement.items[0].expiredDate,
-                                            ) < new Date()
-                                              ? "text-red-500 font-medium"
-                                              : ""
-                                          }
-                                        >
-                                          {format(
-                                            new Date(
-                                              movement.items[0].expiredDate,
-                                            ),
-                                            "dd/MM/yyyy",
-                                            { locale: vi },
-                                          )}
-                                        </span>
-                                      </>
-                                    )}
-                                  </p>
-                                )}
+                                <MovementItemSummary item={movement.items[0]} />
                               </div>
                             ) : (
                               <div>
                                 <p className="font-medium text-sm">
                                   {movement.items[0].itemName}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {movement.items[0].categoryName}
-                                </p>
+                                <MovementItemSummary item={movement.items[0]} />
                                 <p className="text-xs text-muted-foreground mt-0.5 italic">
                                   +{movement.items.length - 1} vật phẩm khác
                                 </p>

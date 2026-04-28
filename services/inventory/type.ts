@@ -32,6 +32,11 @@ export type InventorySourceType = InventoryCategory;
 
 export type InventoryReliefItem = InventoryCategory;
 
+export interface InventoryItemModelMetadata {
+  key: number;
+  value: string;
+}
+
 export type ReusableItemCondition = InventoryCategory;
 
 export interface ReusableBreakdown {
@@ -59,6 +64,9 @@ interface InventoryItemEntityBase {
   categoryName: string;
   targetGroups: string[];
   lastStockedAt: string | null;
+  measurementUnit?: string | null;
+  weightPerUnit?: number | null;
+  volumePerUnit?: number | null;
 }
 
 export interface ConsumableItemEntity extends InventoryItemEntityBase {
@@ -201,6 +209,7 @@ export interface ImportPurchaseItem {
 
 export type ImportRegularRequest = {
   depotId: number;
+  depotFundId?: number;
   invoices: Array<{
     batchNote?: string;
     vatInvoice: VatInvoice;
@@ -208,6 +217,11 @@ export type ImportRegularRequest = {
     campaignDisbursementId?: number;
   }>;
 };
+
+export interface DepotFundMetadataItem {
+  key: string;
+  value: string;
+}
 
 export interface UpdateItemModelPayload {
   categoryId: number;
@@ -222,6 +236,19 @@ export interface UpdateItemModelPayload {
 }
 
 // ─── Stock Movement History ───
+
+export interface StockMovementLotDetail {
+  lotId: number;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+  quantityChange: number;
+}
+
+export interface StockMovementReusableDetail {
+  reusableItemId: number;
+  serialNumber?: string | null;
+  quantityChange: number;
+}
 
 export interface StockMovementItem {
   itemId: number;
@@ -238,6 +265,13 @@ export interface StockMovementItem {
   expiredDate?: string | null;
   /** ID lô hàng gắn kết */
   supplyInventoryLotId?: number | null;
+  itemModelId: number;
+  remainingQuantity: number;
+  lotId?: number | null;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
+  lotDetails?: StockMovementLotDetail[];
+  reusableDetails?: StockMovementReusableDetail[];
 }
 
 export interface StockMovementEntity {
@@ -247,13 +281,23 @@ export interface StockMovementEntity {
   sourceId: number | null;
   sourceName: string;
   performedByName: string;
-  note: string;
+  note: string | null;
   createdAt: string;
   items: StockMovementItem[];
+  /** VAT Invoice fields – only present for Purchase imports */
+  vatInvoiceId?: number | null;
+  invoiceSerial?: string | null;
+  invoiceNumber?: string | null;
+  supplierName?: string | null;
+  supplierTaxCode?: string | null;
+  invoiceDate?: string | null;
+  invoiceTotalAmount?: number | null;
+  invoiceFileUrl?: string | null;
 }
 
 export interface GetDepotStockMovementsParams {
   depotId: number;
+  itemModelId?: number;
   actionTypes?: string[];
   sourceTypes?: string[];
   fromDate?: string;
@@ -340,6 +384,7 @@ export interface SearchDepotItemEntity {
   categoryName: string;
   itemType: string;
   unit: string;
+  measurementUnit?: string | null;
   totalAvailableAcrossWarehouses: number;
   warehouses: SearchDepotWarehouseEntity[];
 }

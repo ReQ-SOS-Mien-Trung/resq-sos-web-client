@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Table,
   TableBody,
@@ -89,6 +90,7 @@ import {
   useUpdateCampaignTarget,
   useUpdateCampaignStatus,
   useCampaignFundFlowChart,
+  useCampaignMetadata,
 } from "@/services/campaign_disbursement";
 import type {
   CampaignStatus,
@@ -141,6 +143,14 @@ function formatDateToYmd(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function toDateTimeStart(value: string) {
+  return value ? `${value}T00:00:00.000Z` : undefined;
+}
+
+function toDateTimeEnd(value: string) {
+  return value ? `${value}T23:59:59.999Z` : undefined;
+}
+
 function formatAmountWithDot(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -156,14 +166,37 @@ function normalizeText(value: string): string {
 /* ── Campaign Fund Flow Chart ─────────────────────────────── */
 
 function CampaignFundFlowChart() {
-  const { data: campaignsData, isLoading: loadingCampaigns } = useCampaigns({
-    params: { pageSize: 6, statuses: ["Active"] },
-  });
-  const firstCampaign = campaignsData?.items?.[0];
-  const { data, isLoading } = useCampaignFundFlowChart(
-    firstCampaign?.id,
-    undefined,
-    { enabled: !!firstCampaign },
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [granularity, setGranularity] = useState<"month" | "week">("month");
+
+  const { data: campaignOptions = [], isLoading: loadingCampaigns } =
+    useCampaignMetadata();
+  const effectiveCampaignId = selectedCampaignId
+    ? Number(selectedCampaignId)
+    : campaignOptions[0]?.key;
+  const selectedCampaignName = useMemo(() => {
+    if (effectiveCampaignId === undefined) return "";
+    return (
+      campaignOptions.find((item) => item.key === effectiveCampaignId)?.value ??
+      ""
+    );
+  }, [campaignOptions, effectiveCampaignId]);
+
+  const chartParams = useMemo(
+    () => ({
+      from: toDateTimeStart(fromDate),
+      to: toDateTimeEnd(toDate),
+      granularity,
+    }),
+    [fromDate, granularity, toDate],
+  );
+
+  const { data, isLoading, isError } = useCampaignFundFlowChart(
+    effectiveCampaignId,
+    chartParams,
+    { enabled: effectiveCampaignId !== undefined },
   );
 
   const chartData = useMemo(() => {
@@ -188,7 +221,7 @@ function CampaignFundFlowChart() {
           borderRadius: 4,
         },
         {
-          label: "Số dư ròng (VND)",
+          label: "Còn lại (VND)",
           data: data.dataPoints.map((p) => p.netBalance),
           backgroundColor: "rgba(59,130,246,0.75)",
           borderColor: "rgb(59,130,246)",
@@ -199,23 +232,96 @@ function CampaignFundFlowChart() {
     };
   }, [data]);
 
-  const title = firstCampaign
-    ? `Quỹ chiến dịch: ${firstCampaign.name}`
+  const title = selectedCampaignName
+    ? `Quỹ chiến dịch: ${selectedCampaignName}`
     : "Biến động quỹ chiến dịch";
 
   return (
     <Card className="border border-border/50 py-0">
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-1.5 rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
-            <ChartBarHorizontal className="h-4 w-4" weight="fill" />
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="p-1.5 rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+              <ChartBarHorizontal className="h-4 w-4" weight="fill" />
+            </div>
+            <p className="min-w-0 truncate text-base font-semibold tracking-tighter">
+              {title}
+            </p>
           </div>
-          <p className="text-base font-semibold tracking-tighter">{title}</p>
+          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(260px,340px)_150px_150px_130px_36px]">
+            <Select
+              value={
+                effectiveCampaignId !== undefined
+                  ? String(effectiveCampaignId)
+                  : undefined
+              }
+              onValueChange={setSelectedCampaignId}
+              disabled={loadingCampaigns || campaignOptions.length === 0}
+            >
+              <SelectTrigger className="h-9 w-full min-w-0 overflow-hidden bg-background text-sm [&_[data-slot=select-value]]:truncate">
+                <SelectValue placeholder="Chọn chiến dịch" />
+              </SelectTrigger>
+              <SelectContent className="w-[min(380px,calc(100vw-2rem))]">
+                {campaignOptions.map((campaign) => (
+                  <SelectItem key={campaign.key} value={String(campaign.key)}>
+                    {campaign.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <DatePickerInput
+              value={fromDate}
+              onChange={setFromDate}
+              placeholder="Từ ngày"
+              maxDate={toDate || undefined}
+              className="h-9"
+            />
+            <DatePickerInput
+              value={toDate}
+              onChange={setToDate}
+              placeholder="Đến ngày"
+              minDate={fromDate || undefined}
+              className="h-9"
+            />
+            <Select
+              value={granularity}
+              onValueChange={(value) =>
+                setGranularity(value as "month" | "week")
+              }
+            >
+              <SelectTrigger className="h-9 w-full bg-background text-sm">
+                <SelectValue placeholder="Chu kỳ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Tháng</SelectItem>
+                <SelectItem value="week">Tuần</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-full sm:w-9"
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+                setGranularity("month");
+              }}
+              disabled={!fromDate && !toDate && granularity === "month"}
+              title="Xóa bộ lọc"
+            >
+              <ArrowClockwise size={16} />
+            </Button>
+          </div>
         </div>
         {isLoading || loadingCampaigns ? (
           <div className="h-52 flex items-center justify-center">
             <div className="h-4 w-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
           </div>
+        ) : isError ? (
+          <p className="text-sm text-muted-foreground tracking-tighter">
+            Không tải được dữ liệu
+          </p>
         ) : chartData ? (
           <Bar
             data={chartData}
@@ -247,9 +353,9 @@ function CampaignFundFlowChart() {
               },
             }}
           />
-        ) : !loadingCampaigns && !firstCampaign ? (
+        ) : !loadingCampaigns && effectiveCampaignId === undefined ? (
           <p className="text-sm text-muted-foreground tracking-tighter">
-            Không có chiến dịch đang hoạt động
+            Không có chiến dịch để hiển thị
           </p>
         ) : (
           <p className="text-sm text-muted-foreground tracking-tighter">
@@ -396,7 +502,10 @@ export default function CampaignsPage() {
     [txTypesMeta],
   );
   const campaignStatusMap = useMemo(
-    () => Object.fromEntries(campaignStatuses.map((status) => [status.key, status.value])),
+    () =>
+      Object.fromEntries(
+        campaignStatuses.map((status) => [status.key, status.value]),
+      ),
     [campaignStatuses],
   );
   const txRefTypeMap = useMemo(
@@ -616,10 +725,11 @@ export default function CampaignsPage() {
                           {stat.label}
                         </p>
                         <p
-                          className={`${"isText" in stat && stat.isText
-                            ? "text-lg"
-                            : "text-2xl"
-                            } tracking-tighter font-bold text-foreground`}
+                          className={`${
+                            "isText" in stat && stat.isText
+                              ? "text-lg"
+                              : "text-2xl"
+                          } tracking-tighter font-bold text-foreground`}
                         >
                           {isLoading && !("isText" in stat && stat.isText)
                             ? "—"
@@ -700,10 +810,11 @@ export default function CampaignsPage() {
                       className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                     >
                       <span
-                        className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-border bg-background"
-                          }`}
+                        className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
+                          checked
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-border bg-background"
+                        }`}
                       >
                         {checked && <Check size={11} weight="bold" />}
                       </span>
@@ -757,11 +868,12 @@ export default function CampaignsPage() {
                 const progress =
                   campaign.targetAmount > 0
                     ? Math.min(
-                      (campaign.totalAmount / campaign.targetAmount) * 100,
-                      100,
-                    )
+                        (campaign.totalAmount / campaign.targetAmount) * 100,
+                        100,
+                      )
                     : 0;
                 const isActive = campaign.status === "Active";
+                const isDraft = campaign.status === "Draft";
                 const campaignStatusLabel =
                   campaignStatusMap[campaign.status] ?? campaign.status;
                 return (
@@ -779,10 +891,13 @@ export default function CampaignsPage() {
                           </h3>
                         </div>
                         <Badge
-                          className={`shrink-0 border ${isActive
-                            ? "text-[13px] bg-emerald-500/8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                            : "text-[13px] bg-rose-500/8 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800"
-                            }`}
+                          className={`shrink-0 border ${
+                            isActive
+                              ? "text-[13px] bg-emerald-500/8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                              : isDraft
+                                ? "text-[13px] bg-slate-500/8 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                : "text-[13px] bg-rose-500/8 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800"
+                          }`}
                         >
                           {campaignStatusLabel}
                         </Badge>
@@ -800,8 +915,9 @@ export default function CampaignsPage() {
                         </div>
                         <div className="h-2 rounded-full bg-muted overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${isActive ? "bg-emerald-500" : "bg-rose-400"
-                              }`}
+                            className={`h-full rounded-full transition-all ${
+                              isActive ? "bg-emerald-500" : "bg-rose-400"
+                            }`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
@@ -911,7 +1027,7 @@ export default function CampaignsPage() {
           if (!open) resetCreateForm();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md overflow-visible">
           <DialogHeader>
             <DialogTitle className="text-2xl flex items-center gap-2">
               <Money size={24} weight="fill" className="text-blue-600" />
@@ -1017,8 +1133,8 @@ export default function CampaignsPage() {
                     >
                       {createForm.campaignStartDate
                         ? parseYmdToDate(
-                          createForm.campaignStartDate,
-                        )?.toLocaleDateString("vi-VN")
+                            createForm.campaignStartDate,
+                          )?.toLocaleDateString("vi-VN")
                         : "dd/mm/yyyy"}
                       <CalendarBlank
                         size={20}
@@ -1058,8 +1174,8 @@ export default function CampaignsPage() {
                     >
                       {createForm.campaignEndDate
                         ? parseYmdToDate(
-                          createForm.campaignEndDate,
-                        )?.toLocaleDateString("vi-VN")
+                            createForm.campaignEndDate,
+                          )?.toLocaleDateString("vi-VN")
                         : "dd/mm/yyyy"}
                       <CalendarBlank
                         size={20}
@@ -1296,39 +1412,39 @@ export default function CampaignsPage() {
                       {!["Archived", "Closed"].includes(
                         selectedCampaign.status,
                       ) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              ensureProvincesLoaded();
-                              setEditInfoForm({
-                                name: selectedCampaign.name,
-                                region: selectedCampaign.region,
-                              });
-                              setEditInfoOpen(true);
-                            }}
-                          >
-                            Sửa thông tin
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            ensureProvincesLoaded();
+                            setEditInfoForm({
+                              name: selectedCampaign.name,
+                              region: selectedCampaign.region,
+                            });
+                            setEditInfoOpen(true);
+                          }}
+                        >
+                          Sửa thông tin
+                        </Button>
+                      )}
                       {/* Gia hạn */}
                       {!["Archived", "Closed"].includes(
                         selectedCampaign.status,
                       ) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setExtendForm({
-                                endDate:
-                                  selectedCampaign.campaignEndDate.split("T")[0],
-                              });
-                              setExtendOpen(true);
-                            }}
-                          >
-                            Gia hạn thời gian
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setExtendForm({
+                              endDate:
+                                selectedCampaign.campaignEndDate.split("T")[0],
+                            });
+                            setExtendOpen(true);
+                          }}
+                        >
+                          Gia hạn thời gian
+                        </Button>
+                      )}
                       {/* Sửa mục tiêu */}
                       {selectedCampaign.status === "Draft" && (
                         <Button
@@ -1464,7 +1580,7 @@ export default function CampaignsPage() {
                         disabled={
                           !targetForm.targetAmount ||
                           Number(targetForm.targetAmount.replace(/\D/g, "")) <=
-                          0 ||
+                            0 ||
                           updateTargetMutation.isPending
                         }
                         onClick={() => {
@@ -1536,8 +1652,8 @@ export default function CampaignsPage() {
                           >
                             {extendForm.endDate
                               ? parseYmdToDate(
-                                extendForm.endDate,
-                              )?.toLocaleDateString("vi-VN")
+                                  extendForm.endDate,
+                                )?.toLocaleDateString("vi-VN")
                               : "dd/mm/yyyy"}
                             <CalendarBlank
                               size={14}
@@ -1589,9 +1705,9 @@ export default function CampaignsPage() {
                                 setSelectedCampaign((p) =>
                                   p
                                     ? {
-                                      ...p,
-                                      campaignEndDate: extendForm.endDate,
-                                    }
+                                        ...p,
+                                        campaignEndDate: extendForm.endDate,
+                                      }
                                     : null,
                                 );
                                 queryClient.invalidateQueries({
@@ -1768,8 +1884,9 @@ export default function CampaignsPage() {
                               </TableCell>
                               <TableCell className="text-sm font-medium">
                                 <span
-                                  className={`inline-flex items-center gap-1 ${isIn ? "text-emerald-600" : "text-rose-600"
-                                    }`}
+                                  className={`inline-flex items-center gap-1 ${
+                                    isIn ? "text-emerald-600" : "text-rose-600"
+                                  }`}
                                 >
                                   {isIn ? (
                                     <ArrowUp size={12} weight="bold" />
@@ -1785,8 +1902,9 @@ export default function CampaignsPage() {
                                   : "—"}
                               </TableCell>
                               <TableCell
-                                className={`text-sm font-bold text-right ${isIn ? "text-emerald-600" : "text-rose-600"
-                                  }`}
+                                className={`text-sm font-bold text-right ${
+                                  isIn ? "text-emerald-600" : "text-rose-600"
+                                }`}
                               >
                                 {formatMoney(tx.amount)}
                               </TableCell>

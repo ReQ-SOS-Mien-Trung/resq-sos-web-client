@@ -7,6 +7,7 @@ import {
   useAssemblyPointById,
   useAssemblyPointEvents,
   useScheduleAssemblyPointGathering,
+  useCancelAssemblyPointEvent,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
@@ -25,6 +26,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -1093,6 +1102,7 @@ function AssemblyPointDetails({
   const [expandedTeamIds, setExpandedTeamIds] = useState<
     Record<number, boolean>
   >({});
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const {
     data: assemblyPointDetail,
@@ -1117,6 +1127,11 @@ function AssemblyPointDetails({
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
+  const {
+    mutateAsync: cancelAssemblyPointEvent,
+    isPending: isCancelingEvent,
+  } = useCancelAssemblyPointEvent();
+
   const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
     assemblyPointDetail ?? assemblyPoint;
 
@@ -1215,6 +1230,23 @@ function AssemblyPointDetails({
     }
   };
 
+  const handleCancelEvent = async () => {
+    if (!selectedEvent) return;
+
+    try {
+      await cancelAssemblyPointEvent({
+        eventId: selectedEvent.eventId,
+        assemblyPointId: assemblyPoint.id,
+      });
+      toast.success("Hủy sự kiện tập trung thành công.");
+      setCancelConfirmOpen(false);
+      // The event list will automatically refresh due to query invalidation
+    } catch (error) {
+      const backendMessage = extractBackendErrorMessage(error);
+      toast.error(backendMessage || "Không thể hủy sự kiện. Vui lòng thử lại.");
+    }
+  };
+
   const selectedEventStatusLabel = selectedEvent
     ? (assemblyEventStatusLabel[selectedEvent.status] ?? selectedEvent.status)
     : "Chưa chọn sự kiện";
@@ -1225,7 +1257,7 @@ function AssemblyPointDetails({
     : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
 
   const shouldShowCreateTeam =
-    hasActiveEvent &&
+    !hasActiveEvent ||
     (selectedEvent?.status === "Scheduled" ||
       selectedEvent?.status === "Gathering");
   const isAssemblyPointAvailable = displayAssemblyPoint.status === "Available";
@@ -1247,9 +1279,7 @@ function AssemblyPointDetails({
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? effectiveSelectedEventId;
-    const query = eventId
-      ? `?assemblyPointId=${assemblyPoint.id}&eventId=${eventId}`
-      : "";
+    const query = `?assemblyPointId=${assemblyPoint.id}${eventId ? `&eventId=${eventId}` : ""}`;
     router.push(`/dashboard/coordinator/rescue-teams/create${query}`);
   };
 
@@ -1582,6 +1612,19 @@ function AssemblyPointDetails({
                       icon={<ChartBar className="h-3.5 w-3.5" />}
                     />
                   </div>
+
+                  {selectedEvent.status === "Gathering" && (
+                    <div className="pt-1">
+                      <Button
+                        variant="destructive"
+                        className="w-full text-xs h-8 bg-red-500 hover:bg-red-600 shadow-none border-0"
+                        onClick={() => setCancelConfirmOpen(true)}
+                        disabled={isCancelingEvent}
+                      >
+                        {isCancelingEvent ? "Đang xử lý..." : "Hủy sự kiện tập trung"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1736,6 +1779,43 @@ function AssemblyPointDetails({
         {/* Additional Info */}
         <div className="h-2 bg-muted/50" />
       </div>
+
+      <Dialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <WarningCircle className="h-5 w-5" weight="fill" />
+              Xác nhận hủy sự kiện
+            </DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn hủy sự kiện tập trung này không? Hành động
+              này không thể hoàn tác.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 text-sm text-muted-foreground">
+            Tất cả dữ liệu liên quan đến việc điểm danh và điều phối của sự kiện
+            này sẽ không còn khả dụng.
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelConfirmOpen(false)}
+              disabled={isCancelingEvent}
+            >
+              Quay lại
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelEvent}
+              disabled={isCancelingEvent}
+            >
+              {isCancelingEvent ? "Đang xử lý..." : "Xác nhận hủy"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -5,14 +5,19 @@ import {
   HubConnectionBuilder,
   HubConnectionState,
   HttpTransportType,
-  LogLevel,
 } from "@microsoft/signalr";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  applySignalRConnectionDefaults,
+  SIGNALR_CLIENT_LOG_LEVEL,
+} from "@/lib/signalr";
 import {
   CHAT_EVENTS,
   CHAT_METHODS,
   CoordinatorChatConnectionState,
 } from "./type";
+
+const STOP_DEBOUNCE_MS = 1200;
 
 function toConnectionLabel(
   state: HubConnectionState,
@@ -34,6 +39,32 @@ function toConnectionLabel(
 
 export class ChatTransportService {
   private connection: HubConnection | null = null;
+  private connectionRetainers = 0;
+  private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private startPromise: Promise<void> | null = null;
+
+  private clearPendingStop(): void {
+    if (!this.pendingStopTimer) {
+      return;
+    }
+
+    clearTimeout(this.pendingStopTimer);
+    this.pendingStopTimer = null;
+  }
+
+  private scheduleStop(): void {
+    this.clearPendingStop();
+
+    this.pendingStopTimer = setTimeout(() => {
+      this.pendingStopTimer = null;
+
+      if (this.connectionRetainers > 0) {
+        return;
+      }
+
+      void this.stop().catch(() => null);
+    }, STOP_DEBOUNCE_MS);
+  }
 
   private async waitForDisconnected(
     connection: HubConnection,
@@ -57,18 +88,20 @@ export class ChatTransportService {
       throw new Error("Missing NEXT_PUBLIC_BASE_URL for chat transport.");
     }
 
-    return new HubConnectionBuilder()
-      .withUrl(`${baseUrl}/hubs/chat`, {
-        accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
-        withCredentials: false,
-        transport:
-          HttpTransportType.WebSockets |
-          HttpTransportType.ServerSentEvents |
-          HttpTransportType.LongPolling,
-      })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
+    return applySignalRConnectionDefaults(
+      new HubConnectionBuilder()
+        .withUrl(`${baseUrl}/hubs/chat`, {
+          accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
+          withCredentials: false,
+          transport:
+            HttpTransportType.WebSockets |
+            HttpTransportType.ServerSentEvents |
+            HttpTransportType.LongPolling,
+        })
+        .withAutomaticReconnect()
+        .configureLogging(SIGNALR_CLIENT_LOG_LEVEL)
+        .build(),
+    );
   }
 
   private getOrCreateConnection(): HubConnection {
@@ -80,6 +113,13 @@ export class ChatTransportService {
   }
 
   async start(): Promise<void> {
+    this.clearPendingStop();
+
+    if (this.startPromise) {
+      await this.startPromise;
+      return;
+    }
+
     const connection = this.getOrCreateConnection();
 
     if (connection.state === HubConnectionState.Connected) {
@@ -94,19 +134,34 @@ export class ChatTransportService {
       return;
     }
 
-    if (connection.state === HubConnectionState.Disconnecting) {
-      await this.waitForDisconnected(connection);
+    const startTask = async () => {
+      if (connection.state === HubConnectionState.Disconnecting) {
+        await this.waitForDisconnected(connection);
+      }
+
       if (connection.state !== HubConnectionState.Disconnected) {
         return;
       }
-    }
 
-    await connection.start();
+      await connection.start();
+    };
+
+    this.startPromise = startTask().finally(() => {
+      this.startPromise = null;
+    });
+
+    await this.startPromise;
   }
 
   async stop(): Promise<void> {
+    this.clearPendingStop();
+
     if (!this.connection) {
       return;
+    }
+
+    if (this.startPromise) {
+      await this.startPromise.catch(() => null);
     }
 
     if (this.connection.state === HubConnectionState.Disconnected) {
@@ -114,6 +169,21 @@ export class ChatTransportService {
     }
 
     await this.connection.stop();
+  }
+
+  retainConnection(): void {
+    this.connectionRetainers += 1;
+    this.clearPendingStop();
+  }
+
+  async releaseConnection(): Promise<void> {
+    this.connectionRetainers = Math.max(0, this.connectionRetainers - 1);
+
+    if (this.connectionRetainers > 0) {
+      return;
+    }
+
+    this.scheduleStop();
   }
 
   on<T>(event: string, handler: (payload: T) => void): void {

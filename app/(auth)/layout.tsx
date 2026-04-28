@@ -10,7 +10,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         {/* Background Image - Full Screen */}
         <Image
-          src="/images/IMG_1301.JPG"
+          src="/images/IMG_1301.jpg"
           alt="ResQ SOS Branding"
           fill
           className="object-cover"
