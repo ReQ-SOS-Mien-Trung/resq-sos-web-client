@@ -14,6 +14,7 @@ import {
   updateMissionStatus,
   getActivityRoute,
   getMissionTeamRoute,
+  getMissionActivityStatuses,
   confirmReturnSupplies,
 } from "./api";
 import {
@@ -34,6 +35,7 @@ import {
   UpdateMissionStatusRequest,
   UpdateMissionStatusResponse,
   ActivityRouteResponse,
+  ActivityStatusMetadataOption,
   GetActivityRouteParams,
   GetMissionTeamRouteParams,
   MissionTeamRouteResponse,
@@ -44,6 +46,9 @@ import {
 export const MISSIONS_QUERY_KEY = ["missions"] as const;
 export const MISSION_ACTIVITIES_QUERY_KEY = ["mission-activities"] as const;
 export const MISSION_TEAM_REPORT_QUERY_KEY = ["mission-team-report"] as const;
+export const MISSION_ACTIVITY_STATUSES_QUERY_KEY = [
+  "mission-activity-statuses",
+] as const;
 
 export interface UseMissionsOptions {
   enabled?: boolean;
@@ -85,6 +90,15 @@ export function useMissionTeamReport(
       (options?.enabled ?? true) &&
       Number.isFinite(missionId) &&
       Number.isFinite(missionTeamId),
+  });
+}
+
+export function useMissionActivityStatuses(options?: { enabled?: boolean }) {
+  return useQuery<ActivityStatusMetadataOption[]>({
+    queryKey: MISSION_ACTIVITY_STATUSES_QUERY_KEY,
+    queryFn: getMissionActivityStatuses,
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
   });
 }
 
