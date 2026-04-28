@@ -560,6 +560,9 @@ function normalizeMissionTeamReportResponse(
 ): MissionTeamReportResponse {
   return {
     ...response,
+    canEdit: Boolean(response?.canEdit),
+    canSubmit: Boolean(response?.canSubmit),
+    canEvaluateMembers: Boolean(response?.canEvaluateMembers),
     reportStatus: toTrimmedStringOrNull(response?.reportStatus) ?? "NotStarted",
     executionStatus: toTrimmedStringOrNull(response?.executionStatus) ?? "",
     teamSummary: toTrimmedStringOrNull(response?.teamSummary),
