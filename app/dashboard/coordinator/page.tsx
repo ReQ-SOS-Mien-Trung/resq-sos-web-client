@@ -549,7 +549,7 @@ const MapLegend = () => {
                   ),
                 },
                 {
-                  label: "Lục giác: Cả hai",
+                  label: "Lục giác: Tổng hợp",
                   icon: (
                     <svg
                       width="12"

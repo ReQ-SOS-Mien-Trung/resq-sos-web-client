@@ -342,7 +342,6 @@ function ActivityExecutionMeta({
   if (
     !executionModeLabel &&
     requiredTeamCount <= 0 &&
-    !activity.coordinationGroupKey &&
     !hasMissingTeam
   ) {
     return null;
@@ -350,11 +349,6 @@ function ActivityExecutionMeta({
 
   return (
     <div className="ml-9 mb-2 flex flex-wrap gap-1.5">
-      {activity.coordinationGroupKey ? (
-        <Badge variant="outline" className="h-6 px-2 text-sm">
-          Nhóm: {activity.coordinationGroupKey}
-        </Badge>
-      ) : null}
       {executionModeLabel ? (
         <Badge className="h-6 border border-indigo-200 bg-indigo-50 px-2 text-sm text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300">
           {executionModeLabel}

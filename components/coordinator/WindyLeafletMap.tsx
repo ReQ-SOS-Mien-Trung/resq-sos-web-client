@@ -141,7 +141,7 @@ const WindyLeafletMap = ({
     if (isReady && mapRef.current && flyToLocation) {
       mapRef.current.flyTo(
         [flyToLocation.lat, flyToLocation.lng],
-        DEFAULT_ZOOM,
+        mapRef.current.getZoom(),
       );
     }
   }, [flyToLocation, isReady]);
