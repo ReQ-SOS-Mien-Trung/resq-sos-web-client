@@ -206,7 +206,23 @@ export interface SOSStructuredData {
   operation_support?: SOSOperationSupportContext | null;
   team_incident_context?: SOSTeamIncidentContext | null;
   // New API format fields
-  incident?: Record<string, unknown> | null;
+  incident?: {
+    situation?: SOSSituation | string;
+    other_situation_description?: string | null;
+    address?: string | null;
+    additional_description?: string | null;
+    people_count?: {
+      adult: number;
+      child: number;
+      elderly: number;
+    };
+    has_injured?: boolean;
+    others_are_stable?: boolean;
+    can_move?: boolean;
+    need_medical?: boolean;
+    has_pregnant_any?: boolean | null;
+    other_medical_description?: string | null;
+  } | null;
   group_needs?: Record<string, unknown> | null;
   victims?: SOSVictimProfile[] | null;
   prepared_profiles?: unknown[] | null;
@@ -306,6 +322,7 @@ export interface GetSOSRequestsParams {
   Statuses?: SOSRequestStatus[];
   Priorities?: SOSPriorityLevel[];
   SosTypes?: SOSRequestTypeFilter[];
+  SosRequestId?: number | string;
   Sort?: string;
 }
 
@@ -329,6 +346,7 @@ export interface GetSOSRequestsInBoundsParams {
   Statuses?: SOSRequestStatus[];
   Priorities?: SOSPriorityLevel[];
   SosTypes?: SOSRequestTypeFilter[];
+  SosRequestId?: number | string;
   Sort?: string;
 }
 

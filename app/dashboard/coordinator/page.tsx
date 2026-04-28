@@ -682,6 +682,7 @@ const CoordinatorDashboardContent = () => {
   >([]);
   const [sosSort, setSosSort] = useState<string>("time:desc");
   const [clusterSort, setClusterSort] = useState<string>("time:desc");
+  const [sosRequestIdSearch, setSosRequestIdSearch] = useState<string>("");
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -819,6 +820,7 @@ const CoordinatorDashboardContent = () => {
         Statuses: statusQueryFilter,
         Priorities: priorityQueryFilter,
         SosTypes: sosTypeQueryFilter,
+        SosRequestId: sosRequestIdSearch.trim() || undefined,
         Sort: sosSort,
       },
     });
@@ -832,6 +834,7 @@ const CoordinatorDashboardContent = () => {
           Statuses: statusQueryFilter,
           Priorities: priorityQueryFilter,
           SosTypes: sosTypeQueryFilter,
+          SosRequestId: sosRequestIdSearch.trim() || undefined,
         }
       : undefined,
     enabled: !isWeatherMode && !!mapFetchBounds,
@@ -956,7 +959,12 @@ const CoordinatorDashboardContent = () => {
 
   useEffect(() => {
     setSidebarSOSPage(1);
-  }, [selectedSOSPriorities, selectedSOSStatuses, selectedSosTypes]);
+  }, [
+    selectedSOSPriorities,
+    selectedSOSStatuses,
+    selectedSosTypes,
+    sosRequestIdSearch,
+  ]);
   const depots = useMemo<DepotEntity[]>(
     () => depotsData?.items ?? [],
     [depotsData],
@@ -2095,6 +2103,8 @@ const CoordinatorDashboardContent = () => {
               onSelectedPrioritiesChange={setSelectedSOSPriorities}
               selectedSosTypes={selectedSosTypes}
               onSelectedSosTypesChange={setSelectedSosTypes}
+              sosRequestId={sosRequestIdSearch}
+              onSosRequestIdChange={setSosRequestIdSearch}
               selectedClusterStatuses={selectedClusterStatuses}
               onSelectedClusterStatusesChange={setSelectedClusterStatuses}
               selectedClusterPriorities={selectedClusterPriorities}
