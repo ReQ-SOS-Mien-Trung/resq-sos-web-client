@@ -209,13 +209,17 @@ function normalizeSituationCode(value: string): string {
 }
 
 const SUPPLY_LABELS: Record<string, string> = {
+  // Mobile SupplyNeed enum (primary)
   WATER: "Nước uống",
-  FOOD: "Thực phẩm",
-  CLOTHING: "Quần áo",
+  FOOD: "Lương thực",
   CLOTHES: "Quần áo",
   BLANKET: "Chăn mền",
-  MEDICINE: "Y tế",
-  OTHER: "Khác",
+  MEDICINE: "Vật phẩm y tế",
+  OTHER: "Nhu cầu khác",
+  // Legacy aliases
+  CLOTHING: "Quần áo",
+  BLANKETS: "Chăn mền",
+  FOOD_RATIONS: "Lương thực",
   RESCUE_EQUIPMENT: "Thiết bị cứu hộ",
   TRANSPORTATION: "Phương tiện",
 };
