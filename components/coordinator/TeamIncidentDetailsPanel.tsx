@@ -99,8 +99,6 @@ const TeamIncidentDetailsPanel = ({
   onOpenChange,
   incident,
 }: TeamIncidentDetailsPanelProps) => {
-  if (!incident && !open) return null;
-
   const missionId = incident?.missionTeamId ?? 0;
 
   const {
@@ -120,6 +118,8 @@ const TeamIncidentDetailsPanel = ({
       return timeB - timeA;
     });
   }, [missionIncidentsData]);
+
+  if (!incident && !open) return null;
 
   const activeIncident =
     missionIncidents.find((item) => item.incidentId === incident?.incidentId) ||
@@ -156,12 +156,13 @@ const TeamIncidentDetailsPanel = ({
         <div className="p-5 pb-4 border-b shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+              <h3 className="text-2xl font-semibold tracking-tighter flex items-center gap-2">
                 <ShieldWarning className="h-5 w-5 text-red-500" weight="fill" />
                 Sự cố đội cứu hộ
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Chi tiết sự cố nhiệm vụ #{missionId}
+              <p className="text-sm tracking-tighter text-muted-foreground mt-1">
+                Chi tiết sự cố nhiệm vụ{" "}
+                <span className="font-semibold text-black">số {missionId}</span>
               </p>
             </div>
             <Button
@@ -174,22 +175,28 @@ const TeamIncidentDetailsPanel = ({
             </Button>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            <div className="bg-muted rounded-lg p-3 text-center">
-              <p className="text-xs text-muted-foreground">Mã sự cố</p>
-              <p className="text-sm font-semibold mt-1">
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="flex min-h-16 flex-col items-center justify-center rounded-md border border-red-200 bg-red-50 px-2 py-2 text-center dark:border-red-800/50 dark:bg-red-950/25">
+              <p className="whitespace-nowrap text-[11px] font-medium tracking-tighter text-red-600 dark:text-red-300">
+                Mã sự cố
+              </p>
+              <p className="mt-0.5 text-base font-bold tracking-tighter text-red-700 dark:text-red-200">
                 #{activeIncident.incidentId}
               </p>
             </div>
-            <div className="bg-muted rounded-lg p-3 text-center">
-              <p className="text-xs text-muted-foreground">Đội</p>
-              <p className="text-sm font-semibold mt-1">
+            <div className="flex min-h-16 flex-col items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-2 text-center dark:border-blue-800/50 dark:bg-blue-950/25">
+              <p className="whitespace-nowrap text-[11px] font-medium tracking-tighter text-blue-600 dark:text-blue-300">
+                Đội
+              </p>
+              <p className="mt-0.5 text-base font-bold tracking-tighter text-blue-700 dark:text-blue-200">
                 #{activeIncident.missionTeamId}
               </p>
             </div>
-            <div className="bg-muted rounded-lg p-3 text-center">
-              <p className="text-xs text-muted-foreground">Cùng nhiệm vụ</p>
-              <p className="text-sm font-semibold mt-1">
+            <div className="flex min-h-16 flex-col items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-2 py-2 text-center dark:border-violet-800/50 dark:bg-violet-950/25">
+              <p className="whitespace-nowrap text-[11px] font-medium tracking-tighter text-violet-600 dark:text-violet-300">
+                Cùng nhiệm vụ
+              </p>
+              <p className="mt-0.5 text-base font-bold tracking-tighter text-violet-700 dark:text-violet-200">
                 {missionIncidentsData?.incidents?.length ?? 0} sự cố
               </p>
             </div>
