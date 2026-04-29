@@ -31,6 +31,7 @@ import {
   useDepotFundMovementMultiLineChart,
   useDepotMetadata,
 } from "@/services/depot/hooks";
+import { useAdminFinanceDepotFundChartInvalidation } from "@/hooks/useChartInvalidationRealtime";
 
 ChartJS.register(
   CategoryScale,
@@ -107,6 +108,7 @@ export default function DepotFundMovementChart() {
 
   const { data: depots = [], isLoading: isLoadingDepots } = useDepotMetadata();
   const effectiveDepotId = selectedDepotId ?? depots[0]?.key;
+  useAdminFinanceDepotFundChartInvalidation(effectiveDepotId);
 
   const params = useMemo(
     () => ({

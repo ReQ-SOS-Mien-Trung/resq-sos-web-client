@@ -19,7 +19,11 @@ function isIgnorableSignalRErrorMessage(message: string): boolean {
     normalized.includes("connection disconnected with error") &&
     normalized.includes("websocket closed with status code: 1006");
 
-  return isServerCloseNoise || isWebSocket1006Noise;
+  const isServerTimeoutNoise =
+    normalized.includes("connection disconnected with error") &&
+    normalized.includes("server timeout elapsed without receiving a message");
+
+  return isServerCloseNoise || isWebSocket1006Noise || isServerTimeoutNoise;
 }
 
 class SignalRConsoleLogger implements ILogger {

@@ -21,7 +21,9 @@ import {
   ReceiveDepotInventoryUpdatePayload,
   ReceiveLogisticsUpdatePayload,
   ReceiveSupplyRequestUpdatePayload,
+  ReceiveUpcomingReturnsUpdatePayload,
 } from "./type";
+import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
 type ConnectionStateListener = (
   state: OperationalRealtimeConnectionState,
@@ -51,6 +53,12 @@ type DepotClosureUpdateListener = (
   payload: ReceiveDepotClosureUpdatePayload,
 ) => void;
 
+type UpcomingReturnsUpdateListener = (
+  payload: ReceiveUpcomingReturnsUpdatePayload,
+) => void;
+
+type ChartInvalidationListener = (payload: ChartInvalidation) => void;
+
 const START_RETRY_DELAY_MS = 2000;
 
 export class OperationalRealtimeClient {
@@ -70,6 +78,8 @@ export class OperationalRealtimeClient {
   private supplyRequestListeners = new Set<SupplyRequestUpdateListener>();
   private depotActivityListeners = new Set<DepotActivityUpdateListener>();
   private depotClosureListeners = new Set<DepotClosureUpdateListener>();
+  private upcomingReturnsListeners = new Set<UpcomingReturnsUpdateListener>();
+  private chartInvalidationListeners = new Set<ChartInvalidationListener>();
   private joinedDepots = new Map<number, number>();
   private joinedClusters = new Map<number, number>();
   private joinedSupplyRequestDepots = new Map<number, number>();
@@ -79,6 +89,8 @@ export class OperationalRealtimeClient {
   private joinedClosureDepots = new Map<number, number>();
   private joinedClosures = new Map<number, number>();
   private joinedTransfers = new Map<number, number>();
+  private joinedUpcomingReturns = new Map<number, number>();
+  private joinedDepotCharts = new Map<number, number>();
 
   private notifyConnectionState(): void {
     this.stateListeners.forEach((listener) => listener(this.connectionState));
@@ -262,6 +274,22 @@ export class OperationalRealtimeClient {
         },
       );
 
+      this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveUpcomingReturnsUpdate,
+        (payload: ReceiveUpcomingReturnsUpdatePayload) => {
+          this.upcomingReturnsListeners.forEach((listener) => listener(payload));
+        },
+      );
+
+      this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveChartInvalidation,
+        (payload: ChartInvalidation) => {
+          this.chartInvalidationListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
+
       this.isReceiveEventsBound = true;
     }
 
@@ -319,6 +347,16 @@ export class OperationalRealtimeClient {
       ...Array.from(this.joinedTransfers.keys()).map((transferId) =>
         connection
           .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeTransfer, transferId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedUpcomingReturns.keys()).map((depotId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeUpcomingReturns, depotId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedDepotCharts.keys()).map((depotId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotCharts, depotId)
           .catch(() => null),
       ),
     ]);
@@ -854,6 +892,96 @@ export class OperationalRealtimeClient {
 
     return () => {
       this.depotClosureListeners.delete(listener);
+    };
+  }
+
+  async subscribeUpcomingReturns(depotId: number): Promise<void> {
+    const existingCount = this.joinedUpcomingReturns.get(depotId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedUpcomingReturns.set(depotId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeUpcomingReturns,
+      depotId,
+    );
+    this.joinedUpcomingReturns.set(depotId, 1);
+  }
+
+  async unsubscribeUpcomingReturns(depotId: number): Promise<void> {
+    const existingCount = this.joinedUpcomingReturns.get(depotId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedUpcomingReturns.set(depotId, existingCount - 1);
+      return;
+    }
+
+    this.joinedUpcomingReturns.delete(depotId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeUpcomingReturns, depotId)
+      .catch(() => null);
+  }
+
+  onUpcomingReturnsUpdate(listener: UpcomingReturnsUpdateListener): () => void {
+    this.upcomingReturnsListeners.add(listener);
+
+    return () => {
+      this.upcomingReturnsListeners.delete(listener);
+    };
+  }
+
+  async subscribeDepotCharts(depotId: number): Promise<void> {
+    const existingCount = this.joinedDepotCharts.get(depotId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedDepotCharts.set(depotId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeDepotCharts,
+      depotId,
+    );
+    this.joinedDepotCharts.set(depotId, 1);
+  }
+
+  async unsubscribeDepotCharts(depotId: number): Promise<void> {
+    const existingCount = this.joinedDepotCharts.get(depotId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedDepotCharts.set(depotId, existingCount - 1);
+      return;
+    }
+
+    this.joinedDepotCharts.delete(depotId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeDepotCharts, depotId)
+      .catch(() => null);
+  }
+
+  onChartInvalidation(listener: ChartInvalidationListener): () => void {
+    this.chartInvalidationListeners.add(listener);
+
+    return () => {
+      this.chartInvalidationListeners.delete(listener);
     };
   }
 }

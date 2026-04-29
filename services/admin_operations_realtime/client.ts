@@ -15,9 +15,11 @@ import {
   ADMIN_OPERATIONS_REALTIME_EVENTS,
   ADMIN_OPERATIONS_REALTIME_METHODS,
 } from "./type";
+import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
 type RescueTeamUpdateHandler = () => void;
 type RescuerScoresUpdateHandler = () => void;
+type ChartInvalidationHandler = (payload: ChartInvalidation) => void;
 
 const STOP_DEBOUNCE_MS = 1200;
 
@@ -31,9 +33,11 @@ class AdminOperationsRealtimeClient {
   private rescueTeamListSubscribers = 0;
   private rescueTeamDetailSubscriptions = new Map<number, number>();
   private rescuerScoresSubscriptions = new Map<string, number>();
+  private depotChartSubscriptions = new Map<number, number>();
 
   private rescueTeamUpdateListeners = new Set<RescueTeamUpdateHandler>();
   private rescuerScoresUpdateListeners = new Set<RescuerScoresUpdateHandler>();
+  private chartInvalidationListeners = new Set<ChartInvalidationHandler>();
 
   private clearPendingStop(): void {
     if (!this.pendingStopTimer) return;
@@ -51,7 +55,8 @@ class AdminOperationsRealtimeClient {
         this.connectionRetainers > 0 ||
         this.rescueTeamListSubscribers > 0 ||
         this.rescueTeamDetailSubscriptions.size > 0 ||
-        this.rescuerScoresSubscriptions.size > 0
+        this.rescuerScoresSubscriptions.size > 0 ||
+        this.depotChartSubscriptions.size > 0
       ) {
         return;
       }
@@ -161,6 +166,15 @@ class AdminOperationsRealtimeClient {
         },
       );
 
+      this.connection.on(
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveChartInvalidation,
+        (payload: ChartInvalidation) => {
+          this.chartInvalidationListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
+
       this.isReceiveEventBound = true;
     }
 
@@ -216,6 +230,17 @@ class AdminOperationsRealtimeClient {
           connection.invoke(
             ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescuerScores,
             rescuerId,
+          ),
+        );
+      }
+    });
+
+    this.depotChartSubscriptions.forEach((count, depotId) => {
+      if (count > 0) {
+        tasks.push(
+          connection.invoke(
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeDepotCharts,
+            depotId,
           ),
         );
       }
@@ -366,6 +391,14 @@ class AdminOperationsRealtimeClient {
     };
   }
 
+  onChartInvalidation(handler: ChartInvalidationHandler): () => void {
+    this.chartInvalidationListeners.add(handler);
+    return () => {
+      this.chartInvalidationListeners.delete(handler);
+      this.scheduleStop();
+    };
+  }
+
   async subscribeRescuerScores(rescuerId: string): Promise<void> {
     const current = this.rescuerScoresSubscriptions.get(rescuerId) ?? 0;
     this.rescuerScoresSubscriptions.set(rescuerId, current + 1);
@@ -391,6 +424,37 @@ class AdminOperationsRealtimeClient {
     await this.invokeWhenConnected(
       ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeRescuerScores,
       rescuerId,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  // ─── Depot Charts ─────────────────────────────────────────────────
+
+  async subscribeDepotCharts(depotId: number): Promise<void> {
+    const current = this.depotChartSubscriptions.get(depotId) ?? 0;
+    this.depotChartSubscriptions.set(depotId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeDepotCharts,
+      depotId,
+    );
+  }
+
+  async unsubscribeDepotCharts(depotId: number): Promise<void> {
+    const current = this.depotChartSubscriptions.get(depotId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.depotChartSubscriptions.set(depotId, next);
+      return;
+    }
+
+    this.depotChartSubscriptions.delete(depotId);
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeDepotCharts,
+      depotId,
     ).catch(() => null);
     this.scheduleStop();
   }

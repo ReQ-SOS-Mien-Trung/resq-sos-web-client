@@ -29,7 +29,6 @@ import {
   CheckCircle,
   X,
   Package,
-  Users,
   CalendarBlank,
   Warning,
   Shield,
@@ -548,7 +547,6 @@ function buildConfirmReturnFormState(
     const itemModelId = resolveReturnItemModelId(item);
 
     if (isReusableReturnItem(item)) {
-      const inferredQuantity = reportedQuantity || unitsSource.length;
       const reusableDraft: ConfirmReturnReusableDraft = {
         itemId: item.itemId,
         itemModelId,
@@ -556,7 +554,7 @@ function buildConfirmReturnFormState(
         unit: item.unit,
         expectedQuantity,
         reportedQuantity,
-        quantity: formatDraftQuantityInput(inferredQuantity),
+        quantity: formatDraftQuantityInput(expectedQuantity),
         lockQuantityToUnits: false,
         units: unitsSource.map((unit) => ({
           reusableItemId: unit.reusableItemId,
@@ -578,7 +576,7 @@ function buildConfirmReturnFormState(
       unit: item.unit,
       expectedQuantity,
       reportedQuantity,
-      quantity: formatDraftQuantityInput(reportedQuantity),
+      quantity: formatDraftQuantityInput(expectedQuantity),
       expiredDate: getResolvedItemExpiredDate(item),
       lotAllocations: getExpectedReturnLotAllocations(item),
     };
@@ -1705,31 +1703,69 @@ function DetailPanel({
               {/* ── Scrollable Body ──────────────────────────────────────────── */}
               <div className="flex-1 overflow-y-auto min-h-0">
                 <div className="p-5 space-y-5">
-                  {/* 3-column info */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Mission and activity info */}
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <InfoCard
                       title="Thông tin nhiệm vụ"
                       color="blue"
                       icon={<Shield className="h-3.5 w-3.5" weight="fill" />}
                     >
-                      <InfoKV label="Loại nhiệm vụ" value={item.missionType} />
-                      <InfoKV
-                        label="Trạng thái"
-                        value={
-                          <StatusBadge
-                            status={item.missionStatus}
-                            map={MISSION_STATUS_MAP}
+                      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                        <div className="space-y-2">
+                          <InfoKV
+                            label="Loại nhiệm vụ"
+                            value={item.missionType}
                           />
-                        }
-                      />
-                      <InfoKV
-                        label="Bắt đầu"
-                        value={formatDate(item.missionStartTime)}
-                      />
-                      <InfoKV
-                        label="Dự kiến kết thúc"
-                        value={formatDate(item.missionExpectedEndTime)}
-                      />
+                          <InfoKV
+                            label="Trạng thái"
+                            value={
+                              <StatusBadge
+                                status={item.missionStatus}
+                                map={MISSION_STATUS_MAP}
+                              />
+                            }
+                          />
+                          <InfoKV
+                            label="Bắt đầu"
+                            value={formatDate(item.missionStartTime)}
+                          />
+                          <InfoKV
+                            label="Dự kiến kết thúc"
+                            value={formatDate(item.missionExpectedEndTime)}
+                          />
+                        </div>
+                        <div className="space-y-2 border-t border-blue-200/70 pt-3 dark:border-blue-800/40 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+                          <InfoKV
+                            label="Tên đội"
+                            value={
+                              <span className="font-semibold tracking-tighter">
+                                {item.rescueTeamName}
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}
+                                  ({item.teamType})
+                                </span>
+                              </span>
+                            }
+                          />
+                          <InfoKV
+                            label="Phân công lúc"
+                            value={formatDate(item.assignedAt)}
+                          />
+                          {isHistory && hist && (
+                            <>
+                              <InfoKV
+                                label="Hoàn thành lúc"
+                                value={formatDate(hist.completedAt)}
+                              />
+                              <InfoKV
+                                label="Thực hiện bởi"
+                                value={hist.completedByName || "—"}
+                                bold
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </InfoCard>
 
                     <InfoCard
@@ -1769,42 +1805,6 @@ function DetailPanel({
                             {item.description}
                           </p>
                         </div>
-                      )}
-                    </InfoCard>
-
-                    <InfoCard
-                      title="Đội cứu hộ"
-                      color="emerald"
-                      icon={<Users className="h-3.5 w-3.5" weight="fill" />}
-                    >
-                      <InfoKV
-                        label="Tên đội"
-                        value={
-                          <span className="font-semibold tracking-tighter">
-                            {item.rescueTeamName}
-                            <span className="text-muted-foreground font-normal">
-                              {" "}
-                              ({item.teamType})
-                            </span>
-                          </span>
-                        }
-                      />
-                      <InfoKV
-                        label="Phân công lúc"
-                        value={formatDate(item.assignedAt)}
-                      />
-                      {isHistory && hist && (
-                        <>
-                          <InfoKV
-                            label="Hoàn thành lúc"
-                            value={formatDate(hist.completedAt)}
-                          />
-                          <InfoKV
-                            label="Thực hiện bởi"
-                            value={hist.completedByName || "—"}
-                            bold
-                          />
-                        </>
                       )}
                     </InfoCard>
                   </div>
@@ -2817,6 +2817,9 @@ function ActivityOperationsPanel({
     depotActivities: {
       depotId: selectedDepotId,
       activityId: panelOpen ? selectedItem?.activityId ?? null : null,
+    },
+    upcomingReturns: {
+      depotId: selectedDepotId,
     },
     enabled: Boolean(selectedDepotId),
   });
