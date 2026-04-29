@@ -3,12 +3,16 @@ import {
   getRescueTeamsOverview,
   getRescueTeamDetail,
   getRescuerScores,
+  getTeamOverviewTeamTypes,
+  getTeamOverviewStatuses,
+  getTeamOverviewAssemblyPointNames,
 } from "./team-overview.api";
 import {
   GetRescueTeamsOverviewParams,
   GetRescueTeamsOverviewResponse,
   RescueTeamDetailResponse,
   RescuerScoresResponse,
+  TeamOverviewMetadataOption,
 } from "./team-overview.type";
 
 export const TEAM_OVERVIEW_KEYS = {
@@ -60,6 +64,48 @@ export function useRescuerScores(
     queryKey: TEAM_OVERVIEW_KEYS.rescuerScores(rescuerId),
     queryFn: () => getRescuerScores(rescuerId),
     enabled: !!rescuerId,
+    ...options,
+  });
+}
+
+export function useTeamOverviewTeamTypes(
+  options?: Omit<
+    UseQueryOptions<TeamOverviewMetadataOption[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<TeamOverviewMetadataOption[]>({
+    queryKey: [...TEAM_OVERVIEW_KEYS.all, "metadata", "team-types"] as const,
+    queryFn: getTeamOverviewTeamTypes,
+    staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useTeamOverviewStatuses(
+  options?: Omit<
+    UseQueryOptions<TeamOverviewMetadataOption[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<TeamOverviewMetadataOption[]>({
+    queryKey: [...TEAM_OVERVIEW_KEYS.all, "metadata", "statuses"] as const,
+    queryFn: getTeamOverviewStatuses,
+    staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useTeamOverviewAssemblyPointNames(
+  options?: Omit<
+    UseQueryOptions<TeamOverviewMetadataOption[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<TeamOverviewMetadataOption[]>({
+    queryKey: [...TEAM_OVERVIEW_KEYS.all, "metadata", "assembly-point-names"] as const,
+    queryFn: getTeamOverviewAssemblyPointNames,
+    staleTime: Infinity,
     ...options,
   });
 }

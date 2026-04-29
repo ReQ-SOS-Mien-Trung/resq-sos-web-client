@@ -3,6 +3,15 @@
 export interface GetRescueTeamsOverviewParams {
   pageNumber?: number;
   pageSize?: number;
+  teamType?: string;
+  status?: string;
+  assemblyPointName?: string;
+  search?: string;
+}
+
+export interface TeamOverviewMetadataOption {
+  key: string;
+  value: string;
 }
 
 export interface RescueTeamOverviewItem {

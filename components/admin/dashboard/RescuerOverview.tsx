@@ -2,8 +2,8 @@
 
 import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { useAdminRescuers } from "@/services/user/hooks";
-import type { UserEntity } from "@/services/user/type";
+import { useRescuerOverview } from "@/services/admin_dashboard/hooks";
+import type { RescuerOverviewMonthlyItem } from "@/services/admin_dashboard/type";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
@@ -39,81 +39,15 @@ ChartJS.register(
 
 // ─── Helpers ───
 
-const MONTH_SHORT = [
-  "Th1",
-  "Th2",
-  "Th3",
-  "Th4",
-  "Th5",
-  "Th6",
-  "Th7",
-  "Th8",
-  "Th9",
-  "Th10",
-  "Th11",
-  "Th12",
-];
-
-interface MonthlyData {
-  month: string;
-  monthIndex: number;
-  year: number;
-  total: number; // cumulative total at end of month
-  newCount: number; // joined this month
-  core: number; // new core this month
-  volunteer: number; // new volunteer this month
-}
-
-function buildMonthlyStats(rescuers: UserEntity[]): MonthlyData[] {
-  const now = new Date();
-  const months: MonthlyData[] = [];
-
-  // Build last 12 months
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      month: MONTH_SHORT[d.getMonth()],
-      monthIndex: d.getMonth(),
-      year: d.getFullYear(),
-      total: 0,
-      newCount: 0,
-      core: 0,
-      volunteer: 0,
-    });
-  }
-
-  // Count rescuers by month
-  rescuers.forEach((r) => {
-    const created = new Date(r.createdAt);
-    months.forEach((m) => {
-      const monthStart = new Date(m.year, m.monthIndex, 1);
-      const monthEnd = new Date(m.year, m.monthIndex + 1, 0, 23, 59, 59);
-
-      // Cumulative: created before or during this month
-      if (created <= monthEnd) {
-        m.total++;
-      }
-
-      // New this specific month
-      if (created >= monthStart && created <= monthEnd) {
-        m.newCount++;
-        if (r.rescuerType === "Core") {
-          m.core++;
-        } else {
-          m.volunteer++;
-        }
-      }
-    });
-  });
-
-  return months;
-}
-
 // ─── External Tooltip for Chart.js ───
 
 // ─── Area Chart Component ───
 
-function RescuerAreaChart({ monthlyData }: { monthlyData: MonthlyData[] }) {
+function RescuerAreaChart({
+  monthlyData,
+}: {
+  monthlyData: RescuerOverviewMonthlyItem[];
+}) {
   const chartRef = useRef<ChartJS<"line"> | null>(null);
 
   // ── tooltip handler closed over monthlyData ──
@@ -170,7 +104,7 @@ function RescuerAreaChart({ monthlyData }: { monthlyData: MonthlyData[] }) {
 
       el.innerHTML = `
         <p style="font-size:11px;font-weight:700;letter-spacing:-0.02em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:6px">
-          ${d.month} / ${d.year}
+          ${d.monthLabel} / ${d.year}
         </p>
         <div style="display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;letter-spacing:-0.02em">
@@ -236,7 +170,7 @@ function RescuerAreaChart({ monthlyData }: { monthlyData: MonthlyData[] }) {
     };
 
     return {
-      labels: monthlyData.map((d) => d.month),
+      labels: monthlyData.map((d) => d.monthLabel),
       datasets: [
         {
           label: "Tổng số",
@@ -341,7 +275,7 @@ function StatCell({
           {label}
         </span>
         <div className={cn("h-8 w-8 flex items-center justify-center", accent)}>
-          <Icon className="h-4 w-4" weight="bold" />
+          <Icon className="h-5 w-5" weight="bold" />
         </div>
       </div>
       <div>
@@ -361,58 +295,19 @@ function StatCell({
 // ─── Main Component ───
 
 export default function RescuerOverview() {
-  const { data: rescuersData, isLoading } = useAdminRescuers();
+  const { data, isLoading } = useRescuerOverview();
 
-  const rescuers = useMemo(
-    () => (rescuersData?.items ?? []) as UserEntity[],
-    [rescuersData],
-  );
-
-  const monthlyData = useMemo(() => buildMonthlyStats(rescuers), [rescuers]);
-
-  // Computed stats
-  const stats = useMemo(() => {
-    const total = rescuers.length;
-    const coreCount = rescuers.filter((r) => r.rescuerType === "Core").length;
-    const volunteerCount = total - coreCount;
-    const banned = rescuers.filter((r) => r.isBanned).length;
-
-    const currentMonth = monthlyData[monthlyData.length - 1];
-    const prevMonth = monthlyData[monthlyData.length - 2];
-    const newThisMonth = currentMonth?.newCount ?? 0;
-    const newPrevMonth = prevMonth?.newCount ?? 0;
-
-    let growthPercent = 0;
-    if (newPrevMonth > 0) {
-      growthPercent = Math.round(
-        ((newThisMonth - newPrevMonth) / newPrevMonth) * 100,
-      );
-    } else if (newThisMonth > 0) {
-      growthPercent = 100;
-    }
-
-    // Peak month
-    const peakMonth = [...monthlyData].sort(
-      (a, b) => b.newCount - a.newCount,
-    )[0];
-
-    return {
-      total,
-      coreCount,
-      volunteerCount,
-      banned,
-      newThisMonth,
-      newPrevMonth,
-      growthPercent,
-      peakMonth,
-    };
-  }, [rescuers, monthlyData]);
-
-  if (isLoading) {
+  if (isLoading || !data) {
     return <RescuerOverviewSkeleton />;
   }
 
-  const isGrowth = stats.growthPercent >= 0;
+  const { totals, thisMonth, peakMonth, monthly } = data;
+  const growthPercent = thisMonth.growthPercent;
+  const isGrowth = growthPercent >= 0;
+  const corePercent =
+    totals.total > 0 ? Math.round((totals.core / totals.total) * 100) : 0;
+  const volunteerPercent =
+    totals.total > 0 ? Math.round((totals.volunteer / totals.total) * 100) : 0;
 
   return (
     <div className="border border-border/50 bg-card overflow-hidden">
@@ -442,13 +337,13 @@ export default function RescuerOverview() {
           >
             {isGrowth ? (
               <TrendUp className="h-3.5 w-3.5" weight="bold" />
-            ) : stats.growthPercent === 0 ? (
+            ) : growthPercent === 0 ? (
               <Minus className="h-3.5 w-3.5" weight="bold" />
             ) : (
               <TrendDown className="h-3.5 w-3.5" weight="bold" />
             )}
             {isGrowth ? "+" : ""}
-            {stats.growthPercent}% so với tháng trước
+            {growthPercent}% so với tháng trước
           </div>
         </div>
       </div>
@@ -465,7 +360,7 @@ export default function RescuerOverview() {
               </p>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-4xl font-black tracking-tighter leading-none">
-                  {stats.total}
+                  {totals.total}
                 </span>
                 <span className="text-sm tracking-tighter text-muted-foreground">
                   cứu hộ viên
@@ -486,7 +381,7 @@ export default function RescuerOverview() {
 
           {/* Chart */}
           <div className="flex-1 min-h-44 -ml-2">
-            <RescuerAreaChart monthlyData={monthlyData} />
+            <RescuerAreaChart monthlyData={monthly} />
           </div>
         </div>
 
@@ -500,13 +395,13 @@ export default function RescuerOverview() {
                   Tháng này
                 </span>
                 <div className="h-8 w-8 bg-[#FF5722]/10 flex items-center justify-center">
-                  <UserPlus className="h-4 w-4 text-[#FF5722]" weight="bold" />
+                  <UserPlus className="h-5 w-5 text-[#FF5722]" weight="bold" />
                 </div>
               </div>
               <div>
                 <div className="flex items-baseline gap-2">
                   <p className="text-3xl font-black tracking-tighter leading-none">
-                    +{stats.newThisMonth}
+                    +{thisMonth.newCount}
                   </p>
                   <div
                     className={cn(
@@ -517,15 +412,15 @@ export default function RescuerOverview() {
                     )}
                   >
                     {isGrowth ? (
-                      <TrendUp className="h-3 w-3" weight="bold" />
+                      <TrendUp className="h-5 w-5" weight="bold" />
                     ) : (
-                      <TrendDown className="h-3 w-3" weight="bold" />
+                      <TrendDown className="h-5 w-5" weight="bold" />
                     )}
-                    {Math.abs(stats.growthPercent)}%
+                    {Math.abs(growthPercent)}%
                   </div>
                 </div>
                 <p className="text-sm tracking-tighter text-muted-foreground mt-1">
-                  vs {stats.newPrevMonth} tháng trước
+                  vs {thisMonth.previousNewCount} tháng trước
                 </p>
               </div>
             </div>
@@ -535,10 +430,10 @@ export default function RescuerOverview() {
           <div className="border-b border-border/40">
             <StatCell
               label="Hệ thống"
-              value={stats.coreCount}
+              value={totals.core}
               icon={ShieldCheck}
               accent="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"
-              sub={`${stats.total > 0 ? Math.round((stats.coreCount / stats.total) * 100) : 0}% tổng số`}
+              sub={`${corePercent}% tổng số`}
             />
           </div>
 
@@ -546,10 +441,10 @@ export default function RescuerOverview() {
           <div className="border-b border-r lg:border-r-0 border-border/40">
             <StatCell
               label="Tình nguyện"
-              value={stats.volunteerCount}
+              value={totals.volunteer}
               icon={Handshake}
               accent="bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400"
-              sub={`${stats.total > 0 ? Math.round((stats.volunteerCount / stats.total) * 100) : 0}% tổng số`}
+              sub={`${volunteerPercent}% tổng số`}
             />
           </div>
 
@@ -569,11 +464,10 @@ export default function RescuerOverview() {
               </div>
               <div>
                 <p className="text-3xl font-black tracking-tighter leading-none">
-                  {stats.peakMonth?.month}
+                  {peakMonth.monthLabel}
                 </p>
                 <p className="text-sm tracking-tighter text-muted-foreground mt-1">
-                  {stats.peakMonth?.newCount} người gia nhập ·{" "}
-                  {stats.peakMonth?.year}
+                  {peakMonth.newCount} người gia nhập · {peakMonth.year}
                 </p>
               </div>
             </div>
@@ -589,23 +483,21 @@ export default function RescuerOverview() {
             <div className="w-1.5 h-1.5 bg-emerald-500" />
             <span>
               Hoạt động:{" "}
-              <strong className="text-foreground">
-                {stats.total - stats.banned}
-              </strong>
+              <strong className="text-foreground">{totals.active}</strong>
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground">
             <div className="w-1.5 h-1.5 bg-rose-500" />
             <span>
               Bị cấm:{" "}
-              <strong className="text-foreground">{stats.banned}</strong>
+              <strong className="text-foreground">{totals.banned}</strong>
             </span>
           </div>
         </div>
-        <button className="flex items-center gap-1 text-sm tracking-tighter font-bold text-[#FF5722] hover:underline underline-offset-2 transition-all">
+        {/* <button className="flex items-center gap-1 text-sm tracking-tighter font-bold text-[#FF5722] hover:underline underline-offset-2 transition-all">
           Xem chi tiết
           <ArrowRight className="h-3 w-3" weight="bold" />
-        </button>
+        </button> */}
       </div>
     </div>
   );

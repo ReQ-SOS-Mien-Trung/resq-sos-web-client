@@ -6,6 +6,7 @@ import {
   getMissionSuccessRateSummary,
   getSosRequestsSummary,
   getMissionTeamReportsSummary,
+  getRescuerOverview,
 } from "./api";
 import {
   SosStatusOption,
@@ -15,6 +16,7 @@ import {
   MissionSuccessRateSummaryResponse,
   SosRequestsSummaryResponse,
   MissionTeamReportsSummaryResponse,
+  RescuerOverviewResponse,
 } from "./type";
 
 export const ADMIN_DASHBOARD_KEYS = {
@@ -30,6 +32,8 @@ export const ADMIN_DASHBOARD_KEYS = {
     [...ADMIN_DASHBOARD_KEYS.all, "sos-requests-summary"] as const,
   missionTeamReportsSummary: () =>
     [...ADMIN_DASHBOARD_KEYS.all, "mission-team-reports-summary"] as const,
+  rescuerOverview: (months?: number) =>
+    [...ADMIN_DASHBOARD_KEYS.all, "rescuer-overview", months] as const,
 };
 
 /**
@@ -128,6 +132,23 @@ export function useMissionTeamReportsSummary(
   return useQuery<MissionTeamReportsSummaryResponse>({
     queryKey: ADMIN_DASHBOARD_KEYS.missionTeamReportsSummary(),
     queryFn: getMissionTeamReportsSummary,
+    ...options,
+  });
+}
+
+/**
+ * Fetch rescuer overview (12-month stats).
+ */
+export function useRescuerOverview(
+  months?: number,
+  options?: Omit<
+    UseQueryOptions<RescuerOverviewResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<RescuerOverviewResponse>({
+    queryKey: ADMIN_DASHBOARD_KEYS.rescuerOverview(months),
+    queryFn: () => getRescuerOverview(months),
     ...options,
   });
 }

@@ -313,6 +313,8 @@ export type ExportPeriodType = "ByDateRange" | "ByMonth";
 export interface ExportMovementsParams {
   depotId: number;
   periodType: ExportPeriodType;
+  /** Optional item model filter */
+  itemModelId?: number;
   /** Required when periodType = ByMonth */
   month?: number;
   /** Required when periodType = ByMonth */

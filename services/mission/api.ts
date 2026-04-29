@@ -3,6 +3,7 @@ import { resolveSupplyBufferRatio } from "@/lib/supply-buffer";
 import {
   CreateActivityResponse,
   ActivityStatus,
+  ActivityStatusMetadataOption,
   CreateMissionActivityRequest,
   CreateMissionRequest,
   CreateMissionResponse,
@@ -595,6 +596,18 @@ export async function getMissions(
     params: { clusterId: params.clusterId },
   });
   return data;
+}
+
+export async function getMissionActivityStatuses(): Promise<
+  ActivityStatusMetadataOption[]
+> {
+  const { data } = await api.get(
+    "/operations/missions/metadata/activity-statuses",
+  );
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
 }
 
 export async function createMission(
