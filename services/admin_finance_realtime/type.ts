@@ -2,6 +2,7 @@
 
 export const ADMIN_FINANCE_REALTIME_EVENTS = {
   ReceiveFundingRequestUpdate: "ReceiveFundingRequestUpdate",
+  ReceiveChartInvalidation: "ReceiveChartInvalidation",
 } as const;
 
 export const ADMIN_FINANCE_REALTIME_METHODS = {
@@ -9,6 +10,10 @@ export const ADMIN_FINANCE_REALTIME_METHODS = {
   UnsubscribeFundingRequests: "UnsubscribeFundingRequests",
   SubscribeFundingRequest: "SubscribeFundingRequest",
   UnsubscribeFundingRequest: "UnsubscribeFundingRequest",
+  SubscribeDepotFundCharts: "SubscribeDepotFundCharts",
+  UnsubscribeDepotFundCharts: "UnsubscribeDepotFundCharts",
+  SubscribeCampaignFundFlow: "SubscribeCampaignFundFlow",
+  UnsubscribeCampaignFundFlow: "UnsubscribeCampaignFundFlow",
 } as const;
 
 export type FundingRequestRealtimeAction = "Created" | "Approved" | "Rejected";

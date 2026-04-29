@@ -191,19 +191,36 @@ function fmtScalar(v: string | number | boolean | null) {
   if (typeof v === "boolean") return v ? "Có" : "Không";
   return String(v);
 }
+function isJsonValueEmpty(value: JsonValue): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim().length === 0;
+  if (typeof value === "number" || typeof value === "boolean") return false;
+  if (Array.isArray(value)) {
+    return value.length === 0 || value.every(isJsonValueEmpty);
+  }
+
+  const entries = Object.values(value);
+  return entries.length === 0 || entries.every(isJsonValueEmpty);
+}
+function hasParsedJsonContent(value?: string | null): boolean {
+  const parsed = parseJson(value);
+  if (parsed.kind === "empty") return false;
+  if (parsed.kind === "text") return parsed.text.trim().length > 0;
+  return !isJsonValueEmpty(parsed.value);
+}
 function hasContent(r: MissionTeamReportResponse) {
   return Boolean(
     r.teamSummary?.trim() ||
     r.teamNote?.trim() ||
-    r.issuesJson?.trim() ||
-    r.resultJson?.trim() ||
-    r.evidenceJson?.trim() ||
+    hasParsedJsonContent(r.issuesJson) ||
+    hasParsedJsonContent(r.resultJson) ||
+    hasParsedJsonContent(r.evidenceJson) ||
     r.activities.some(
       (a) =>
         a.summary?.trim() ||
-        a.issuesJson?.trim() ||
-        a.resultJson?.trim() ||
-        a.evidenceJson?.trim(),
+        hasParsedJsonContent(a.issuesJson) ||
+        hasParsedJsonContent(a.resultJson) ||
+        hasParsedJsonContent(a.evidenceJson),
     ) ||
     r.memberEvaluations.some(
       (m) =>
@@ -231,14 +248,14 @@ function getRescuerTypeBadge(type?: string | null, label?: string) {
   if (normalizedType === "core") {
     return {
       label: label ?? "Nhân sự nòng cốt",
-      className: "bg-[#E8F8F2] text-[#047857] shadow-md shadow-emerald-950/10",
+      className: "bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-950/5",
     };
   }
 
   if (normalizedType === "volunteer") {
     return {
       label: label ?? "Tình nguyện viên",
-      className: "bg-[#F3E8FF] text-[#6D28D9] shadow-md shadow-violet-950/10",
+      className: "bg-violet-50 text-violet-500 shadow-sm shadow-violet-950/5",
     };
   }
 
@@ -396,6 +413,7 @@ function JsonSection({
 }) {
   const p = parseJson(value);
   if (p.kind === "empty") return null;
+  if (p.kind === "json" && isJsonValueEmpty(p.value)) return null;
   return (
     <section className="space-y-2">
       <SectionTitle title={title} />
@@ -432,25 +450,22 @@ function TextSection({
   );
 }
 const ACTIVITY_COLORS = [
-  { border: "border-l-blue-500", bg: "bg-blue-500/10", text: "text-blue-600" },
+  { bg: "bg-blue-500/10", text: "text-blue-600" },
   {
-    border: "border-l-violet-500",
     bg: "bg-violet-500/10",
     text: "text-violet-600",
   },
   {
-    border: "border-l-amber-500",
     bg: "bg-amber-500/10",
     text: "text-amber-600",
   },
-  { border: "border-l-rose-500", bg: "bg-rose-500/10", text: "text-rose-600" },
+  { bg: "bg-rose-500/10", text: "text-rose-600" },
   {
-    border: "border-l-emerald-500",
     bg: "bg-emerald-500/10",
     text: "text-emerald-600",
   },
-  { border: "border-l-cyan-500", bg: "bg-cyan-500/10", text: "text-cyan-600" },
-  { border: "border-l-pink-500", bg: "bg-pink-500/10", text: "text-pink-600" },
+  { bg: "bg-cyan-500/10", text: "text-cyan-600" },
+  { bg: "bg-pink-500/10", text: "text-pink-600" },
 ];
 
 function ActivityList({
@@ -495,7 +510,7 @@ function ActivityList({
             <motion.div
               key={a.missionActivityId}
               variants={shouldReduceMotion ? undefined : reportCardVariants}
-              className={`rounded-xl border border-border/50 border-l-[3px] ${color.border} bg-background p-3`}
+              className="rounded-xl border border-border/50 bg-background p-3"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -617,27 +632,27 @@ function MemberEvaluations({ report }: { report: MissionTeamReportResponse }) {
               <div className="grid grid-cols-5 gap-3">
                 <RadialScore
                   score={m.responseTimeScore}
-                  color="#3B82F6"
+                  color="#60A5FA"
                   label="Thời gian phản hồi"
                 />
                 <RadialScore
                   score={m.rescueEffectivenessScore}
-                  color="#22C55E"
+                  color="#4ADE80"
                   label="Hiệu quả cứu hộ"
                 />
                 <RadialScore
                   score={m.decisionHandlingScore}
-                  color="#F59E0B"
+                  color="#FBBF24"
                   label="Xử lý quyết định"
                 />
                 <RadialScore
                   score={m.safetyMedicalSkillScore}
-                  color="#EF4444"
+                  color="#F87171"
                   label="Y tế & An toàn"
                 />
                 <RadialScore
                   score={m.teamworkCommunicationScore}
-                  color="#8B5CF6"
+                  color="#A78BFA"
                   label="Phối hợp nhóm"
                 />
               </div>

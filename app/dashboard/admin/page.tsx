@@ -13,10 +13,12 @@ import {
 } from "@/components/admin/dashboard";
 import { DashboardData } from "@/type";
 import { DashboardSkeleton } from "@/components/admin";
+import { useAdminDashboardChartInvalidation } from "@/hooks/useChartInvalidationRealtime";
 
 const AdminDashboardPage = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  useAdminDashboardChartInvalidation();
 
   useEffect(() => {
     const fetchData = async () => {

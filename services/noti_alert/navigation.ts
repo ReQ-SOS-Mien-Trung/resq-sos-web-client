@@ -152,7 +152,9 @@ export function resolveNotificationRoute(
     normalizedType === "assembly_checkin" ||
     normalizedType === "assembly_checkout" ||
     normalizedType === "assembly_gathering" ||
-    normalizedType === "assembly_point_assignment"
+    normalizedType === "assembly_point_assignment" ||
+    normalizedType === "assembly_event_cancelled" ||
+    normalizedType === "assembly_point_closed"
   ) {
     return buildAssemblyPointRoute(data);
   }
@@ -161,7 +163,8 @@ export function resolveNotificationRoute(
     normalizedType === "flood_alert" ||
     normalizedType === "flood_warning" ||
     normalizedType === "flood_emergency" ||
-    normalizedType === "evacuation"
+    normalizedType === "evacuation" ||
+    normalizedType === "evacuation_alert"
   ) {
     return resolveFloodRouteByRole(roleId);
   }
@@ -170,19 +173,58 @@ export function resolveNotificationRoute(
     normalizedType === "inventory_maintenance_alert" ||
     normalizedType === "inventory_maintenance"
   ) {
+    return "/dashboard/inventory/disposal";
+  }
+
+  if (
+    normalizedType === "inventory_disposal" ||
+    normalizedType === "inventory_expiring_alert" ||
+    normalizedType === "depot_relief_imported" ||
+    normalizedType === "depot_purchase_imported"
+  ) {
     return "/dashboard/inventory?tab=inventory";
   }
 
   if (
     normalizedType === "sos_request_new" ||
     normalizedType === "sos_request_assigned" ||
-    normalizedType === "sos_request_resolved"
+    normalizedType === "sos_request_resolved" ||
+    normalizedType === "sos_companion"
   ) {
     const sosRequestId = toPositiveInt(data?.sosRequestId);
     if (sosRequestId) {
       return `/dashboard/coordinator?sosRequestId=${sosRequestId}`;
     }
     return "/dashboard/coordinator";
+  }
+
+  if (normalizedType === "depot_advance") {
+    return "/dashboard/inventory/funding-request?tab=funds";
+  }
+
+  if (
+    normalizedType === "closure_transfer_completed" ||
+    normalizedType === "closure_transfer_shipped"
+  ) {
+    return depotClosureRoute ?? "/dashboard/inventory?tab=depot-closure";
+  }
+
+  if (
+    normalizedType === "coordinator_join" ||
+    normalizedType === "coordinator_leave"
+  ) {
+    return "/dashboard/coordinator";
+  }
+
+  if (normalizedType === "mission_assigned") {
+    return "/dashboard/admin/sos-requests";
+  }
+
+  if (
+    normalizedType === "team_assigned" ||
+    normalizedType === "member_left_team"
+  ) {
+    return "/dashboard/admin/team-overview";
   }
 
   return getDashboardPathByRole(roleId ?? 0) ?? "/";

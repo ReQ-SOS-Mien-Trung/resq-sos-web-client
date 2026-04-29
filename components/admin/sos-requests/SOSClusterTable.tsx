@@ -280,7 +280,7 @@ const SOSClusterTable = ({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Tìm theo mã cụm hoặc mã SOS"
-              className="h-9 text-sm"
+              className="h-9 text-sm tracking-tighter"
             />
           </div>
 
@@ -310,7 +310,7 @@ const SOSClusterTable = ({
             </SelectContent>
           </Select>
 
-          <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="ml-auto flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
             {isRefetching ? (
               <ArrowsClockwise className="h-4 w-4 animate-spin" />
             ) : null}
@@ -326,25 +326,25 @@ const SOSClusterTable = ({
           <table className="w-full min-w-230">
             <thead>
               <tr className="border-b border-border/50 text-left">
-                <th className="p-3 text-sm font-semibold tracking-tight">
+                <th className="p-3 text-sm font-semibold tracking-tighter">
                   Cụm SOS
                 </th>
-                <th className="p-3 text-sm font-semibold tracking-tight">
+                <th className="p-3 text-sm font-semibold tracking-tighter">
                   Mức độ
                 </th>
-                <th className="p-3 text-sm font-semibold tracking-tight">
+                <th className="p-3 text-sm font-semibold tracking-tighter">
                   Trạng thái
                 </th>
-                <th className="p-3 text-sm font-semibold tracking-tight">
+                <th className="p-3 text-sm font-semibold tracking-tighter">
                   Số SOS
                 </th>
-                <th className="p-3 text-sm font-semibold tracking-tight">
+                <th className="p-3 text-sm font-semibold tracking-tighter">
                   Ước tính nạn nhân
                 </th>
-                <th className="p-3 text-sm font-semibold tracking-tight">
+                <th className="p-3 text-sm font-semibold tracking-tighter">
                   Cập nhật
                 </th>
-                <th className="p-3 text-right text-sm font-semibold tracking-tight">
+                <th className="p-3 text-right text-sm font-semibold tracking-tighter">
                   Hành động
                 </th>
               </tr>
@@ -365,7 +365,7 @@ const SOSClusterTable = ({
                 <tr>
                   <td
                     colSpan={7}
-                    className="p-8 text-center text-sm text-muted-foreground"
+                    className="p-8 text-center text-sm tracking-tighter text-muted-foreground"
                   >
                     Không có cụm SOS nào phù hợp với bộ lọc hiện tại.
                   </td>
@@ -392,7 +392,7 @@ const SOSClusterTable = ({
                           <button
                             type="button"
                             onClick={() => onToggleCluster(cluster.id)}
-                            className="flex items-center gap-2 text-left text-sm font-semibold tracking-tight text-foreground hover:text-[#FF5722]"
+                            className="flex items-center gap-2 text-left text-sm font-semibold tracking-tighter text-foreground hover:text-[#FF5722]"
                           >
                             {expanded ? (
                               <CaretDown className="h-4 w-4" weight="bold" />
@@ -407,7 +407,7 @@ const SOSClusterTable = ({
                           <Badge
                             variant="outline"
                             className={cn(
-                              "text-sm",
+                              "text-sm tracking-tighter",
                               CLUSTER_SEVERITY_BADGE_CLASS[
                                 cluster.severityLevel
                               ],
@@ -421,7 +421,7 @@ const SOSClusterTable = ({
                           <Badge
                             variant="outline"
                             className={cn(
-                              "text-sm",
+                              "text-sm tracking-tighter",
                               CLUSTER_STATUS_BADGE_CLASS[clusterStatus],
                             )}
                           >
@@ -429,15 +429,15 @@ const SOSClusterTable = ({
                           </Badge>
                         </td>
 
-                        <td className="p-3 text-sm text-foreground">
+                        <td className="p-3 text-sm tracking-tighter text-foreground">
                           {cluster.sosRequestCount}
                         </td>
 
-                        <td className="p-3 text-sm text-foreground">
+                        <td className="p-3 text-sm tracking-tighter text-foreground">
                           {cluster.victimEstimated ?? "-"}
                         </td>
 
-                        <td className="p-3 text-sm text-muted-foreground">
+                        <td className="p-3 text-sm tracking-tighter text-muted-foreground">
                           {timeAgo(cluster.lastUpdatedAt)}
                         </td>
 
@@ -457,7 +457,7 @@ const SOSClusterTable = ({
                               Xem nhiệm vụ
                             </Button>
                           ) : (
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-sm tracking-tighter text-muted-foreground">
                               -
                             </span>
                           )}
@@ -480,13 +480,13 @@ const SOSClusterTable = ({
                                 ))}
                               </div>
                             ) : sosItems.length === 0 ? (
-                              <div className="rounded-lg border border-dashed border-border bg-background p-3 text-sm text-muted-foreground">
+                              <div className="rounded-lg border border-dashed border-border bg-background p-3 text-sm tracking-tighter text-muted-foreground">
                                 Không có dữ liệu chi tiết SOS trong cụm này.
                               </div>
                             ) : (
                               <div className="space-y-2">
                                 {failedIds.length > 0 ? (
-                                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm tracking-tighter text-amber-700">
                                     Không thể tải {failedIds.length} SOS trong
                                     cụm này. Bạn vẫn có thể mở các SOS đã tải
                                     thành công.
@@ -534,14 +534,14 @@ const SOSClusterTable = ({
                                       <div className="flex flex-wrap items-start justify-between gap-2">
                                         <div className="min-w-0 flex-1">
                                           <div className="flex flex-wrap items-center gap-1.5">
-                                            <p className="text-sm font-semibold tracking-tight text-foreground">
+                                            <p className="text-sm font-semibold tracking-tighter text-foreground">
                                               SOS #{sos.id}
                                             </p>
 
                                             <Badge
                                               variant="outline"
                                               className={cn(
-                                                "text-sm",
+                                                "text-sm tracking-tighter",
                                                 priorityClass,
                                               )}
                                             >
@@ -551,7 +551,7 @@ const SOSClusterTable = ({
                                             <Badge
                                               variant="outline"
                                               className={cn(
-                                                "text-sm",
+                                                "text-sm tracking-tighter",
                                                 statusClass,
                                               )}
                                             >
@@ -562,7 +562,7 @@ const SOSClusterTable = ({
                                             "SOS" ? (
                                               <Badge
                                                 variant="outline"
-                                                className="text-sm"
+                                                className="text-sm tracking-tighter"
                                               >
                                                 {getSosTypeLabel(sos.sosType)}
                                               </Badge>
@@ -570,7 +570,7 @@ const SOSClusterTable = ({
                                           </div>
 
                                           {sos.structuredData?.situation ? (
-                                            <p className="mt-1 text-sm text-muted-foreground">
+                                            <p className="mt-1 text-sm tracking-tighter text-muted-foreground">
                                               {getSituationLabel(
                                                 sos.structuredData.situation,
                                               )}
@@ -578,13 +578,13 @@ const SOSClusterTable = ({
                                           ) : null}
 
                                           {sos.msg ? (
-                                            <p className="mt-1 line-clamp-2 text-sm text-foreground/80">
+                                            <p className="mt-1 line-clamp-2 text-sm tracking-tighter text-foreground/80">
                                               {sos.msg}
                                             </p>
                                           ) : null}
                                         </div>
 
-                                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                        <div className="flex items-center gap-1 text-sm tracking-tighter text-muted-foreground">
                                           <Clock className="h-3.5 w-3.5" />
                                           {timeAgo(sos.createdAt)}
                                         </div>
@@ -594,7 +594,7 @@ const SOSClusterTable = ({
                                         {totalPeople > 0 ? (
                                           <Badge
                                             variant="outline"
-                                            className="border-slate-300 bg-slate-100 text-sm text-slate-700"
+                                            className="border-slate-300 bg-slate-100 text-sm tracking-tighter text-slate-700"
                                           >
                                             <Users
                                               className="mr-1 h-3.5 w-3.5"
@@ -607,7 +607,7 @@ const SOSClusterTable = ({
                                         {needs.medical ? (
                                           <Badge
                                             variant="outline"
-                                            className="border-red-300 bg-red-50 text-sm text-red-700"
+                                            className="border-red-300 bg-red-50 text-sm tracking-tighter text-red-700"
                                           >
                                             <Stethoscope
                                               className="mr-1 h-3.5 w-3.5"
@@ -620,7 +620,7 @@ const SOSClusterTable = ({
                                         {needs.food ? (
                                           <Badge
                                             variant="outline"
-                                            className="border-orange-300 bg-orange-50 text-sm text-orange-700"
+                                            className="border-orange-300 bg-orange-50 text-sm tracking-tighter text-orange-700"
                                           >
                                             <ForkKnife
                                               className="mr-1 h-3.5 w-3.5"
@@ -633,7 +633,7 @@ const SOSClusterTable = ({
                                         {needs.boat ? (
                                           <Badge
                                             variant="outline"
-                                            className="border-blue-300 bg-blue-50 text-sm text-blue-700"
+                                            className="border-blue-300 bg-blue-50 text-sm tracking-tighter text-blue-700"
                                           >
                                             <Waves
                                               className="mr-1 h-3.5 w-3.5"
@@ -645,7 +645,7 @@ const SOSClusterTable = ({
                                       </div>
 
                                       {sos.structuredData?.address ? (
-                                        <p className="mt-2 text-sm text-muted-foreground line-clamp-1">
+                                        <p className="mt-2 text-sm tracking-tighter text-muted-foreground line-clamp-1">
                                           {sos.structuredData.address}
                                         </p>
                                       ) : null}
@@ -668,7 +668,7 @@ const SOSClusterTable = ({
         {isServerMode ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-4">
             <div className="flex items-center gap-3">
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm tracking-tighter text-muted-foreground">
                 Hiển thị {startItem}–{endItem} trong{" "}
                 {displayTotalCount.toLocaleString("vi-VN")} cụm
               </div>
@@ -686,7 +686,7 @@ const SOSClusterTable = ({
                     <SelectItem value="50">50</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="text-sm text-muted-foreground">/ trang</span>
+                <span className="text-sm tracking-tighter text-muted-foreground">/ trang</span>
               </div>
             </div>
 
@@ -725,7 +725,7 @@ const SOSClusterTable = ({
                       page === "..." ? (
                         <span
                           key={`ellipsis-${index}`}
-                          className="px-1 text-sm text-muted-foreground"
+                          className="px-1 text-sm tracking-tighter text-muted-foreground"
                         >
                           ...
                         </span>
