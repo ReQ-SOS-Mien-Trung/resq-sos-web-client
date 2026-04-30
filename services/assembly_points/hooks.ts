@@ -163,20 +163,21 @@ export function useAssemblyPointEvents(
 }
 
 /**
- * Hook to fetch checked-in rescuers by assembly event ID with pagination
+ * Hook to fetch checked-in rescuers by assembly point ID with pagination
  */
 export function useAssemblyPointCheckedInRescuers(
-  eventId: number,
+  assemblyPointId: number,
   options?: UseAssemblyPointCheckedInRescuersOptions,
 ) {
   return useQuery<GetAssemblyPointCheckedInRescuersResponse>({
     queryKey: [
       ...ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
-      eventId,
+      assemblyPointId,
       options?.params,
     ],
-    queryFn: () => getAssemblyPointCheckedInRescuers(eventId, options?.params),
-    enabled: (options?.enabled ?? true) && Number.isFinite(eventId),
+    queryFn: () =>
+      getAssemblyPointCheckedInRescuers(assemblyPointId, options?.params),
+    enabled: (options?.enabled ?? true) && Number.isFinite(assemblyPointId),
   });
 }
 

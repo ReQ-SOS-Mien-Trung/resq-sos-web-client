@@ -22,6 +22,7 @@ import {
   ReceiveLogisticsUpdatePayload,
   ReceiveSupplyRequestUpdatePayload,
   ReceiveUpcomingReturnsUpdatePayload,
+  ReceiveAssemblyEventCheckedInRescuersUpdatePayload,
 } from "./type";
 import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
@@ -56,6 +57,10 @@ type DepotClosureUpdateListener = (
 type UpcomingReturnsUpdateListener = (
   payload: ReceiveUpcomingReturnsUpdatePayload,
 ) => void;
+ 
+type AssemblyEventCheckedInRescuersUpdateListener = (
+  payload: ReceiveAssemblyEventCheckedInRescuersUpdatePayload,
+) => void;
 
 type ChartInvalidationListener = (payload: ChartInvalidation) => void;
 
@@ -79,6 +84,8 @@ export class OperationalRealtimeClient {
   private depotActivityListeners = new Set<DepotActivityUpdateListener>();
   private depotClosureListeners = new Set<DepotClosureUpdateListener>();
   private upcomingReturnsListeners = new Set<UpcomingReturnsUpdateListener>();
+  private assemblyEventCheckedInRescuersListeners =
+    new Set<AssemblyEventCheckedInRescuersUpdateListener>();
   private chartInvalidationListeners = new Set<ChartInvalidationListener>();
   private joinedDepots = new Map<number, number>();
   private joinedClusters = new Map<number, number>();
@@ -91,6 +98,7 @@ export class OperationalRealtimeClient {
   private joinedTransfers = new Map<number, number>();
   private joinedUpcomingReturns = new Map<number, number>();
   private joinedDepotCharts = new Map<number, number>();
+  private joinedAssemblyEvents = new Map<number, number>();
 
   private notifyConnectionState(): void {
     this.stateListeners.forEach((listener) => listener(this.connectionState));
@@ -282,6 +290,15 @@ export class OperationalRealtimeClient {
       );
 
       this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveAssemblyEventCheckedInRescuersUpdate,
+        (payload: ReceiveAssemblyEventCheckedInRescuersUpdatePayload) => {
+          this.assemblyEventCheckedInRescuersListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
+
+      this.connection.on(
         OPERATIONAL_REALTIME_EVENTS.ReceiveChartInvalidation,
         (payload: ChartInvalidation) => {
           this.chartInvalidationListeners.forEach((listener) =>
@@ -357,6 +374,14 @@ export class OperationalRealtimeClient {
       ...Array.from(this.joinedDepotCharts.keys()).map((depotId) =>
         connection
           .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotCharts, depotId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedAssemblyEvents.keys()).map((eventId) =>
+        connection
+          .invoke(
+            OPERATIONAL_REALTIME_METHODS.SubscribeAssemblyEventCheckedInRescuers,
+            eventId,
+          )
           .catch(() => null),
       ),
     ]);
@@ -975,6 +1000,60 @@ export class OperationalRealtimeClient {
     await connection
       .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeDepotCharts, depotId)
       .catch(() => null);
+  }
+
+  async subscribeAssemblyEventCheckedInRescuers(
+    eventId: number,
+  ): Promise<void> {
+    const existingCount = this.joinedAssemblyEvents.get(eventId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedAssemblyEvents.set(eventId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeAssemblyEventCheckedInRescuers,
+      eventId,
+    );
+    this.joinedAssemblyEvents.set(eventId, 1);
+  }
+
+  async unsubscribeAssemblyEventCheckedInRescuers(
+    eventId: number,
+  ): Promise<void> {
+    const existingCount = this.joinedAssemblyEvents.get(eventId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedAssemblyEvents.set(eventId, existingCount - 1);
+      return;
+    }
+
+    this.joinedAssemblyEvents.delete(eventId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(
+        OPERATIONAL_REALTIME_METHODS.UnsubscribeAssemblyEventCheckedInRescuers,
+        eventId,
+      )
+      .catch(() => null);
+  }
+
+  onAssemblyEventCheckedInRescuersUpdate(
+    listener: AssemblyEventCheckedInRescuersUpdateListener,
+  ): () => void {
+    this.assemblyEventCheckedInRescuersListeners.add(listener);
+
+    return () => {
+      this.assemblyEventCheckedInRescuersListeners.delete(listener);
+    };
   }
 
   onChartInvalidation(listener: ChartInvalidationListener): () => void {

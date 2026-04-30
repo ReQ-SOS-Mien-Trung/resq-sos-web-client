@@ -230,15 +230,15 @@ export async function getAssemblyPointEvents(
 }
 
 /**
- * Get checked-in rescuers for an assembly point event with pagination and filters
- * GET /personnel/assembly-point/events/{eventId}/checked-in-rescuers
+ * Get checked-in rescuers for an assembly point with pagination and filters
+ * GET /personnel/assembly-point/{assemblyPointId}/checked-in-rescuers
  */
 export async function getAssemblyPointCheckedInRescuers(
-  eventId: number,
+  assemblyPointId: number,
   params?: GetAssemblyPointCheckedInRescuersParams,
 ): Promise<GetAssemblyPointCheckedInRescuersResponse> {
   const { data } = await api.get(
-    `/personnel/assembly-point/events/${eventId}/checked-in-rescuers`,
+    `/personnel/assembly-point/${assemblyPointId}/checked-in-rescuers`,
     {
       params: {
         pageNumber: params?.pageNumber ?? 1,

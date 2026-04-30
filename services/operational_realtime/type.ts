@@ -72,6 +72,14 @@ export type ReceiveUpcomingReturnsUpdatePayload = {
   changedAt: string;
 };
 
+export type ReceiveAssemblyEventCheckedInRescuersUpdatePayload = {
+  assemblyPointId: number;
+  eventId: number;
+  operation: string;
+  rescuerId: string | null;
+  changedAt: string;
+};
+
 export const OPERATIONAL_REALTIME_METHODS = {
   SubscribeDepot: "SubscribeDepot",
   UnsubscribeDepot: "UnsubscribeDepot",
@@ -95,6 +103,8 @@ export const OPERATIONAL_REALTIME_METHODS = {
   UnsubscribeUpcomingReturns: "UnsubscribeUpcomingReturns",
   SubscribeDepotCharts: "SubscribeDepotCharts",
   UnsubscribeDepotCharts: "UnsubscribeDepotCharts",
+  SubscribeAssemblyEventCheckedInRescuers: "SubscribeAssemblyEventCheckedInRescuers",
+  UnsubscribeAssemblyEventCheckedInRescuers: "UnsubscribeAssemblyEventCheckedInRescuers",
 } as const;
 
 export const OPERATIONAL_REALTIME_EVENTS = {
@@ -106,4 +116,5 @@ export const OPERATIONAL_REALTIME_EVENTS = {
   ReceiveDepotClosureUpdate: "ReceiveDepotClosureUpdate",
   ReceiveUpcomingReturnsUpdate: "ReceiveUpcomingReturnsUpdate",
   ReceiveChartInvalidation: "ReceiveChartInvalidation",
+  ReceiveAssemblyEventCheckedInRescuersUpdate: "ReceiveAssemblyEventCheckedInRescuersUpdate",
 } as const;

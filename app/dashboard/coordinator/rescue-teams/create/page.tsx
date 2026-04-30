@@ -57,6 +57,7 @@ import {
 } from "@/services/assembly_points/hooks";
 import { useInfiniteRescuers } from "@/services/rescuers/hooks";
 import { useAbilityCategoryMetadata } from "@/services/user/hooks";
+import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
 import type { RescuerEntity, RescuerType } from "@/services/rescuers/type";
 import type { AssemblyPointCheckedInRescuerEntity } from "@/services/assembly_points/type";
 
@@ -451,6 +452,11 @@ function CreateRescueTeamForm({
   const isEventScopedTeamCreation =
     eventId !== null && lockedAssemblyPointId !== null;
 
+  useOperationalRealtime({
+    enabled: isEventScopedTeamCreation,
+    eventId,
+  });
+
   // ─── Form State ───
   const [teamName, setTeamName] = useState("");
   const [teamType, setTeamType] = useState<RescueTeamTypeKey | "">("");
@@ -612,7 +618,7 @@ function CreateRescueTeamForm({
   });
 
   const { data: checkedInRescuersData, isLoading: isLoadingCheckedInRescuers } =
-    useAssemblyPointCheckedInRescuers(eventId ?? 0, {
+    useAssemblyPointCheckedInRescuers(lockedAssemblyPointId ?? 0, {
       enabled: isEventScopedTeamCreation,
       params: {
         pageNumber: 1,
@@ -846,9 +852,12 @@ function CreateRescueTeamForm({
       {
         name: teamName.trim(),
         type: teamType,
-        assemblyPointId: parseInt(assemblyPointId),
+        assemblyPointId: Number.parseInt(assemblyPointId),
         maxMembers: parsedMaxMembers,
-        members: selectedMembers,
+        members: selectedMembers.map((m) => ({
+          userId: m.userId,
+          isLeader: m.isLeader,
+        })),
       },
       {
         onSuccess: () => {
