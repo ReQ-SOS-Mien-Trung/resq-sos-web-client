@@ -29,6 +29,7 @@ interface UseOperationalRealtimeOptions {
   enabled?: boolean;
   depotId?: number | null;
   assemblyPointId?: number | null;
+  eventId?: number | null;
   clusterIds?: number[];
 }
 
@@ -78,6 +79,7 @@ export function useOperationalRealtime({
   enabled = true,
   depotId,
   assemblyPointId,
+  eventId,
   clusterIds,
 }: UseOperationalRealtimeOptions): OperationalRealtimeConnectionState {
   const queryClient = useQueryClient();
@@ -87,6 +89,7 @@ export function useOperationalRealtime({
       operationalRealtimeClient.getConnectionState(),
     );
   const assemblyPointIdRef = useRef<number | null>(null);
+  const eventIdRef = useRef<number | null>(null);
   const clusterIdsRef = useRef<number[]>([]);
   const activeClusterIds = useMemo(
     () =>
@@ -105,6 +108,8 @@ export function useOperationalRealtime({
     Number.isFinite(assemblyPointId) && (assemblyPointId ?? 0) > 0
       ? assemblyPointId
       : null;
+  const activeEventId =
+    Number.isFinite(eventId) && (eventId ?? 0) > 0 ? eventId : null;
 
   useEffect(() => {
     assemblyPointIdRef.current = activeAssemblyPointId;
@@ -113,6 +118,10 @@ export function useOperationalRealtime({
   useEffect(() => {
     clusterIdsRef.current = activeClusterIds;
   }, [activeClusterIds]);
+
+  useEffect(() => {
+    eventIdRef.current = activeEventId;
+  }, [activeEventId]);
 
   useEffect(() => {
     const unsubscribe = operationalRealtimeClient.subscribeConnectionState(
@@ -167,7 +176,10 @@ export function useOperationalRealtime({
             ),
         });
         void queryClient.invalidateQueries({
-          queryKey: ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+          queryKey: [
+            ...ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+            selectedAssemblyPointId,
+          ],
         });
       }
 
@@ -278,6 +290,20 @@ export function useOperationalRealtime({
     const unsubscribeLogistics =
       operationalRealtimeClient.onLogisticsUpdate(invalidateLogisticsClusterQueries);
 
+    const unsubscribeAssemblyEventCheckedInRescuers =
+      operationalRealtimeClient.onAssemblyEventCheckedInRescuersUpdate(
+        (payload) => {
+          if (payload.assemblyPointId === assemblyPointIdRef.current) {
+            void queryClient.invalidateQueries({
+              queryKey: [
+                ...ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+                payload.assemblyPointId,
+              ],
+            });
+          }
+        },
+      );
+
     const unsubscribeReconnected =
       operationalRealtimeClient.subscribeReconnected(
         invalidateActiveRealtimeQueries,
@@ -287,6 +313,7 @@ export function useOperationalRealtime({
       unsubscribeAssemblyPointList();
       unsubscribeDepotInventory();
       unsubscribeLogistics();
+      unsubscribeAssemblyEventCheckedInRescuers();
       unsubscribeReconnected();
     };
   }, [accessToken, activeDepotId, enabled, queryClient]);
@@ -348,6 +375,36 @@ export function useOperationalRealtime({
       });
     };
   }, [accessToken, activeClusterIds, enabled]);
+
+  useEffect(() => {
+    if (!enabled || !accessToken || activeEventId == null) {
+      return;
+    }
+
+    let disposed = false;
+
+    void operationalRealtimeClient
+      .subscribeAssemblyEventCheckedInRescuers(activeEventId)
+      .catch((error) => {
+        if (isNegotiationAbortError(error)) {
+          return;
+        }
+
+        if (!disposed) {
+          console.error(
+            "Failed to subscribe assembly event checked-in rescuers operational updates:",
+            error,
+          );
+        }
+      });
+
+    return () => {
+      disposed = true;
+      void operationalRealtimeClient
+        .unsubscribeAssemblyEventCheckedInRescuers(activeEventId)
+        .catch(() => null);
+    };
+  }, [accessToken, activeEventId, enabled]);
 
   return connectionState;
 }
