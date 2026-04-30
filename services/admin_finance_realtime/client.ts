@@ -16,10 +16,12 @@ import {
   ADMIN_FINANCE_REALTIME_METHODS,
   FundingRequestRealtimeUpdate,
 } from "./type";
+import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
 type FundingRequestUpdateHandler = (
   payload: FundingRequestRealtimeUpdate,
 ) => void;
+type ChartInvalidationHandler = (payload: ChartInvalidation) => void;
 
 const STOP_DEBOUNCE_MS = 1200;
 
@@ -27,10 +29,13 @@ class AdminFinanceRealtimeClient {
   private connection: HubConnection | null = null;
   private connectionRetainers = 0;
   private detailSubscriptions = new Map<number, number>();
+  private depotFundChartSubscriptions = new Map<number, number>();
+  private campaignFundFlowSubscriptions = new Map<number, number>();
   private fundingRequestListSubscribers = 0;
   private isReceiveEventBound = false;
   private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
   private startPromise: Promise<void> | null = null;
+  private chartInvalidationListeners = new Set<ChartInvalidationHandler>();
   private updateListeners = new Set<FundingRequestUpdateHandler>();
 
   private clearPendingStop(): void {
@@ -48,7 +53,9 @@ class AdminFinanceRealtimeClient {
       if (
         this.connectionRetainers > 0 ||
         this.fundingRequestListSubscribers > 0 ||
-        this.detailSubscriptions.size > 0
+        this.detailSubscriptions.size > 0 ||
+        this.depotFundChartSubscriptions.size > 0 ||
+        this.campaignFundFlowSubscriptions.size > 0
       ) {
         return;
       }
@@ -144,6 +151,14 @@ class AdminFinanceRealtimeClient {
           this.updateListeners.forEach((listener) => listener(payload));
         },
       );
+      this.connection.on(
+        ADMIN_FINANCE_REALTIME_EVENTS.ReceiveChartInvalidation,
+        (payload: ChartInvalidation) => {
+          this.chartInvalidationListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
       this.isReceiveEventBound = true;
     }
 
@@ -192,6 +207,30 @@ class AdminFinanceRealtimeClient {
         );
       }
     });
+
+    this.depotFundChartSubscriptions.forEach((subscriberCount, depotId) => {
+      if (subscriberCount > 0) {
+        tasks.push(
+          connection.invoke(
+            ADMIN_FINANCE_REALTIME_METHODS.SubscribeDepotFundCharts,
+            depotId,
+          ),
+        );
+      }
+    });
+
+    this.campaignFundFlowSubscriptions.forEach(
+      (subscriberCount, campaignId) => {
+        if (subscriberCount > 0) {
+          tasks.push(
+            connection.invoke(
+              ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaignFundFlow,
+              campaignId,
+            ),
+          );
+        }
+      },
+    );
 
     await Promise.all(tasks.map((task) => task.catch(() => null)));
   }
@@ -275,6 +314,14 @@ class AdminFinanceRealtimeClient {
     };
   }
 
+  onChartInvalidation(handler: ChartInvalidationHandler): () => void {
+    this.chartInvalidationListeners.add(handler);
+    return () => {
+      this.chartInvalidationListeners.delete(handler);
+      this.scheduleStop();
+    };
+  }
+
   async subscribeFundingRequests(): Promise<void> {
     this.fundingRequestListSubscribers += 1;
 
@@ -324,6 +371,64 @@ class AdminFinanceRealtimeClient {
     await this.invokeWhenConnected(
       ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeFundingRequest,
       requestId,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  async subscribeDepotFundCharts(depotId: number): Promise<void> {
+    const current = this.depotFundChartSubscriptions.get(depotId) ?? 0;
+    this.depotFundChartSubscriptions.set(depotId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_FINANCE_REALTIME_METHODS.SubscribeDepotFundCharts,
+      depotId,
+    );
+  }
+
+  async unsubscribeDepotFundCharts(depotId: number): Promise<void> {
+    const current = this.depotFundChartSubscriptions.get(depotId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.depotFundChartSubscriptions.set(depotId, next);
+      return;
+    }
+
+    this.depotFundChartSubscriptions.delete(depotId);
+    await this.invokeWhenConnected(
+      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeDepotFundCharts,
+      depotId,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  async subscribeCampaignFundFlow(campaignId: number): Promise<void> {
+    const current = this.campaignFundFlowSubscriptions.get(campaignId) ?? 0;
+    this.campaignFundFlowSubscriptions.set(campaignId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaignFundFlow,
+      campaignId,
+    );
+  }
+
+  async unsubscribeCampaignFundFlow(campaignId: number): Promise<void> {
+    const current = this.campaignFundFlowSubscriptions.get(campaignId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.campaignFundFlowSubscriptions.set(campaignId, next);
+      return;
+    }
+
+    this.campaignFundFlowSubscriptions.delete(campaignId);
+    await this.invokeWhenConnected(
+      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeCampaignFundFlow,
+      campaignId,
     ).catch(() => null);
     this.scheduleStop();
   }

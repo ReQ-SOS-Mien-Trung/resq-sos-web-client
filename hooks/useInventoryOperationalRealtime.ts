@@ -16,6 +16,7 @@ import {
   ReceiveDepotActivityUpdatePayload,
   ReceiveDepotClosureUpdatePayload,
   ReceiveSupplyRequestUpdatePayload,
+  ReceiveUpcomingReturnsUpdatePayload,
 } from "@/services/operational_realtime/type";
 import { useAuthStore } from "@/stores/auth.store";
 import { useState } from "react";
@@ -36,6 +37,9 @@ interface InventoryOperationalRealtimeOptions {
     transferId?: number | null;
   };
   depotInventory?: {
+    depotId?: number | null;
+  };
+  upcomingReturns?: {
     depotId?: number | null;
   };
 }
@@ -196,6 +200,7 @@ export function useInventoryOperationalRealtime(
   const activeClosureId = toPositiveId(options?.depotClosures?.closureId);
   const activeTransferId = toPositiveId(options?.depotClosures?.transferId);
   const activeInventoryDepotId = toPositiveId(options?.depotInventory?.depotId);
+  const activeUpcomingReturnsDepotId = toPositiveId(options?.upcomingReturns?.depotId);
 
   const hasActiveScope = useMemo(
     () =>
@@ -208,6 +213,7 @@ export function useInventoryOperationalRealtime(
         activeClosureId,
         activeTransferId,
         activeInventoryDepotId,
+        activeUpcomingReturnsDepotId,
       ].some((value) => value != null),
     [
       activeActivityDepotId,
@@ -218,6 +224,7 @@ export function useInventoryOperationalRealtime(
       activeSupplyDepotId,
       activeSupplyRequestId,
       activeTransferId,
+      activeUpcomingReturnsDepotId,
     ],
   );
 
@@ -377,6 +384,26 @@ export function useInventoryOperationalRealtime(
   }, [accessToken, activeInventoryDepotId, options?.enabled]);
 
   useEffect(() => {
+    if (
+      !(options?.enabled ?? true) ||
+      !accessToken ||
+      activeUpcomingReturnsDepotId == null
+    ) {
+      return;
+    }
+
+    void operationalRealtimeClient.subscribeUpcomingReturns(activeUpcomingReturnsDepotId).catch((error) => {
+      console.error("Failed to subscribe upcoming returns realtime:", error);
+    });
+
+    return () => {
+      void operationalRealtimeClient
+        .unsubscribeUpcomingReturns(activeUpcomingReturnsDepotId)
+        .catch(() => null);
+    };
+  }, [accessToken, activeUpcomingReturnsDepotId, options?.enabled]);
+
+  useEffect(() => {
     if (!(options?.enabled ?? true) || !accessToken || !hasActiveScope) {
       return;
     }
@@ -511,12 +538,37 @@ export function useInventoryOperationalRealtime(
           })
         : null;
 
+    const invalidateUpcomingReturns = () => {
+      if (activeUpcomingReturnsDepotId != null) {
+        invalidateDepotActivityQueries(queryClient, activeUpcomingReturnsDepotId);
+      }
+    };
+
+    const handleUpcomingReturnsUpdate = (
+      payload: ReceiveUpcomingReturnsUpdatePayload,
+    ) => {
+      if (
+        activeUpcomingReturnsDepotId != null &&
+        payload.depotId === activeUpcomingReturnsDepotId
+      ) {
+        invalidateUpcomingReturns();
+      }
+    };
+
+    const unsubscribeUpcomingReturns =
+      activeUpcomingReturnsDepotId != null
+        ? operationalRealtimeClient.onUpcomingReturnsUpdate(
+            handleUpcomingReturnsUpdate,
+          )
+        : null;
+
     const unsubscribeReconnected = operationalRealtimeClient.subscribeReconnected(
       () => {
         invalidateSupply();
         invalidateActivities();
         invalidateClosures();
         invalidateInventory();
+        invalidateUpcomingReturns();
       },
     );
 
@@ -525,6 +577,7 @@ export function useInventoryOperationalRealtime(
       unsubscribeActivities?.();
       unsubscribeClosures?.();
       unsubscribeInventory?.();
+      unsubscribeUpcomingReturns?.();
       unsubscribeReconnected();
     };
   }, [
@@ -537,6 +590,7 @@ export function useInventoryOperationalRealtime(
     activeSupplyDepotId,
     activeSupplyRequestId,
     activeTransferId,
+    activeUpcomingReturnsDepotId,
     hasActiveScope,
     options?.enabled,
     queryClient,

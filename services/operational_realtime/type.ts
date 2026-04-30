@@ -58,6 +58,20 @@ export type ReceiveDepotClosureUpdatePayload = {
   changedAt: string;
 };
 
+export type ReceiveUpcomingReturnsUpdatePayload = {
+  depotId: number;
+  activityId: number;
+  missionId: number;
+  missionTeamId: number;
+  rescueTeamId: number;
+  activityType: string;
+  action: string;
+  status: string;
+  estimatedTime: number | null;
+  missionExpectedEndTime: string | null;
+  changedAt: string;
+};
+
 export const OPERATIONAL_REALTIME_METHODS = {
   SubscribeDepot: "SubscribeDepot",
   UnsubscribeDepot: "UnsubscribeDepot",
@@ -77,6 +91,10 @@ export const OPERATIONAL_REALTIME_METHODS = {
   UnsubscribeClosure: "UnsubscribeClosure",
   SubscribeTransfer: "SubscribeTransfer",
   UnsubscribeTransfer: "UnsubscribeTransfer",
+  SubscribeUpcomingReturns: "SubscribeUpcomingReturns",
+  UnsubscribeUpcomingReturns: "UnsubscribeUpcomingReturns",
+  SubscribeDepotCharts: "SubscribeDepotCharts",
+  UnsubscribeDepotCharts: "UnsubscribeDepotCharts",
 } as const;
 
 export const OPERATIONAL_REALTIME_EVENTS = {
@@ -86,4 +104,6 @@ export const OPERATIONAL_REALTIME_EVENTS = {
   ReceiveSupplyRequestUpdate: "ReceiveSupplyRequestUpdate",
   ReceiveDepotActivityUpdate: "ReceiveDepotActivityUpdate",
   ReceiveDepotClosureUpdate: "ReceiveDepotClosureUpdate",
+  ReceiveUpcomingReturnsUpdate: "ReceiveUpcomingReturnsUpdate",
+  ReceiveChartInvalidation: "ReceiveChartInvalidation",
 } as const;

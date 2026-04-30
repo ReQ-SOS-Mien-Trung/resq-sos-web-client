@@ -244,7 +244,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
             })}
 
             {/* Favorites Section */}
-            <div className="mt-6 pt-4 border-t border-sidebar-border/50">
+            <div className="mt-2 pt-2 border-t border-sidebar-border/50">
               <button
                 onClick={() => setFavoritesExpanded(!favoritesExpanded)}
                 className="flex items-center justify-between w-full px-3 py-2 text-sm tracking-tighter font-semibold text-sidebar-foreground/50 uppercase hover:text-sidebar-foreground transition-colors"

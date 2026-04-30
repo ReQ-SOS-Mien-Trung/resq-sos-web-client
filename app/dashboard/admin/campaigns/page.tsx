@@ -109,6 +109,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAdminFinanceCampaignFundFlowInvalidation } from "@/hooks/useChartInvalidationRealtime";
 
 type ProvinceItem = {
   code: number;
@@ -176,6 +177,7 @@ function CampaignFundFlowChart() {
   const effectiveCampaignId = selectedCampaignId
     ? Number(selectedCampaignId)
     : campaignOptions[0]?.key;
+  useAdminFinanceCampaignFundFlowInvalidation(effectiveCampaignId);
   const selectedCampaignName = useMemo(() => {
     if (effectiveCampaignId === undefined) return "";
     return (

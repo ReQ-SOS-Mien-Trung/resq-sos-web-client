@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useMissionActivities, useMissions } from "@/services/mission/hooks";
 import type { MissionActivity, MissionEntity } from "@/services/mission/type";
+import { Icon } from "@iconify/react";
 
 const MISSION_STATUS_META: Record<
   string,
@@ -228,29 +229,28 @@ const AdminMissionSheet = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full p-0 sm:max-w-6xl overflow-hidden flex flex-col">
-        <div className="shrink-0 border-b border-border/40 bg-muted/10 px-6 pb-5 pt-10">
+      <SheetContent className="w-full p-0 sm:max-w-4xl overflow-hidden flex flex-col">
+        <div className="shrink-0 border-b border-border/40 bg-muted/10 px-6 pb-5 pt-4">
           <SheetHeader className="text-left">
-            <SheetTitle className="flex items-center gap-2 text-xl font-black tracking-tight sm:text-2xl">
-              <ListChecks className="text-primary" size={22} weight="fill" />
+            <SheetTitle className="flex items-center gap-1.5 text-xl font-semibold tracking-tighter sm:text-2xl">
               Xem nhiệm vụ cụm SOS{clusterId != null ? ` #${clusterId}` : ""}
             </SheetTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm tracking-tighter text-muted-foreground">
               Chỉ hiển thị thông tin để xem và đối chiếu nhiệm vụ đã tạo trong
               cụm.
             </p>
           </SheetHeader>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Badge variant="outline" className="text-sm">
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Badge variant="outline" className="text-sm tracking-tighter">
               Cụm: {clusterId != null ? `#${clusterId}` : "-"}
             </Badge>
-            <Badge variant="outline" className="text-sm">
+            <Badge variant="outline" className="text-sm tracking-tighter">
               Tổng nhiệm vụ: {missions.length}
             </Badge>
             {selectedMission ? (
-              <Badge className="text-sm bg-primary/10 text-primary border-primary/20">
-                Đang xem: Mission #{selectedMission.id}
+              <Badge className="text-sm tracking-tighter bg-primary/10 text-primary border-primary/20">
+                Đang xem: Nhiệm vụ #{selectedMission.id}
               </Badge>
             ) : null}
           </div>
@@ -258,11 +258,11 @@ const AdminMissionSheet = ({
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <section className="flex min-h-0 w-full flex-col border-b border-border/40 md:w-88 md:shrink-0 md:border-b-0 md:border-r">
-            <div className="shrink-0 border-b border-border/40 px-4 py-3">
-              <p className="text-sm font-semibold text-foreground">
+            <div className="shrink-0 border-b border-border/40 px-4 pb-3">
+              <p className="text-base tracking-tighter font-semibold text-foreground">
                 Danh sách nhiệm vụ
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm tracking-tighter text-muted-foreground">
                 Chọn một mission để xem chi tiết các bước.
               </p>
             </div>
@@ -277,7 +277,7 @@ const AdminMissionSheet = ({
                     />
                   ))
                 ) : missions.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm tracking-tighter text-muted-foreground">
                     Chưa có nhiệm vụ nào trong cụm này.
                   </div>
                 ) : (
@@ -293,17 +293,17 @@ const AdminMissionSheet = ({
                         className={cn(
                           "w-full rounded-lg border px-3 py-3 text-left transition-colors",
                           isSelected
-                            ? "border-primary/45 bg-primary/10"
+                            ? "border-emerald-400/50 bg-emerald-50"
                             : "border-border/60 bg-background hover:border-primary/30 hover:bg-muted/30",
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">
-                            Mission #{mission.id}
+                          <p className="text-sm tracking-tighter font-semibold text-foreground">
+                            Nhiệm vụ số {mission.id}
                           </p>
                           <span
                             className={cn(
-                              "text-xs font-bold uppercase tracking-wider",
+                              "text-sm font-semibold tracking-tighter",
                               statusMeta.className
                                 .split(" ")
                                 .filter(
@@ -318,18 +318,10 @@ const AdminMissionSheet = ({
                           </span>
                         </div>
 
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <Badge variant="outline" className="text-xs">
-                            {formatMissionTypeLabel(mission.missionType)}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {mission.activityCount} bước
-                          </Badge>
+                        <div className="mt-1 flex flex-col text-sm tracking-tighter">
+                          <span>{formatMissionTypeLabel(mission.missionType)} · {mission.activityCount} bước</span>
+                          <span>Tạo lúc: {formatDateTime(mission.createdAt)}</span>
                         </div>
-
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Tạo lúc: {formatDateTime(mission.createdAt)}
-                        </p>
                       </button>
                     );
                   })
@@ -339,11 +331,11 @@ const AdminMissionSheet = ({
           </section>
 
           <section className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-border/40 px-5 py-3">
-              <p className="text-sm font-semibold text-foreground">
+            <div className="shrink-0 border-b border-border/40 px-5 pb-3">
+              <p className="text-sm tracking-tighter font-semibold text-foreground">
                 Chi tiết bước hoạt động
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm tracking-tighter text-muted-foreground">
                 {selectedMission
                   ? `Mission #${selectedMission.id} - ${formatMissionTypeLabel(selectedMission.missionType)}`
                   : "Chọn mission bên trái để xem chi tiết."}
@@ -353,7 +345,7 @@ const AdminMissionSheet = ({
             <ScrollArea className="min-h-0 flex-1">
               <div className="space-y-4 px-5 py-4">
                 {selectedMission == null ? (
-                  <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm tracking-tighter text-muted-foreground">
                     Chưa chọn mission để xem chi tiết.
                   </div>
                 ) : isActivitiesLoading ? (
@@ -364,7 +356,7 @@ const AdminMissionSheet = ({
                     />
                   ))
                 ) : sortedActivities.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm tracking-tighter text-muted-foreground">
                     Mission này chưa có bước hoạt động.
                   </div>
                 ) : (
@@ -380,29 +372,29 @@ const AdminMissionSheet = ({
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-primary/10 px-2 text-sm font-bold text-primary">
+                            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-primary/10 px-2 text-sm tracking-tighter font-bold text-primary">
                               {activity.step}
                             </span>
-                            <p className="text-sm font-semibold text-foreground">
+                            <p className="text-sm tracking-tighter font-semibold text-foreground">
                               {activity.activityType || "Hoạt động"}
                             </p>
                           </div>
 
                           <Badge
                             variant="outline"
-                            className={cn("text-xs", activityStatus.className)}
+                            className={cn("text-xs tracking-tighter", activityStatus.className)}
                           >
                             {activityStatus.label}
                           </Badge>
                         </div>
 
-                        <p className="mt-2 text-sm leading-6 text-foreground">
+                        <p className="mt-2 text-sm tracking-tighter leading-6 text-foreground">
                           {activity.description || "Không có mô tả."}
                         </p>
 
-                        <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                        <div className="mt-3 grid gap-2 text-sm tracking-tighter text-muted-foreground sm:grid-cols-2">
                           <div className="flex items-center gap-1.5">
-                            <ClipboardText size={15} />
+                            <Icon icon="streamline-ultimate:flag-plain" width="15" height="15" />
                             <span>Ưu tiên: {activity.priority || "-"}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -419,7 +411,7 @@ const AdminMissionSheet = ({
                 )}
 
                 {isActivitiesFetching && !isActivitiesLoading ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm tracking-tighter text-muted-foreground">
                     <CircleNotch className="animate-spin" size={16} />
                     Đang cập nhật danh sách bước hoạt động...
                   </div>
@@ -430,21 +422,21 @@ const AdminMissionSheet = ({
         </div>
 
         {isMissionsFetching && !isMissionsLoading ? (
-          <div className="shrink-0 border-t border-border/40 bg-muted/10 px-6 py-2 text-sm text-muted-foreground flex items-center gap-2">
+          <div className="shrink-0 border-t border-border/40 bg-muted/10 px-6 py-2 text-sm tracking-tighter text-muted-foreground flex items-center gap-2">
             <CircleNotch className="animate-spin" size={16} />
             Đang cập nhật danh sách nhiệm vụ...
           </div>
         ) : null}
 
         {clusterId == null ? (
-          <div className="shrink-0 border-t border-amber-300/50 bg-amber-50 px-6 py-3 text-sm text-amber-700 flex items-center gap-2">
+          <div className="shrink-0 border-t border-amber-300/50 bg-amber-50 px-6 py-3 text-sm tracking-tighter text-amber-700 flex items-center gap-2">
             <WarningCircle size={16} weight="fill" />
             Chưa xác định cụm SOS để tải nhiệm vụ.
           </div>
         ) : null}
 
         {selectedMission != null && sortedActivities.length > 0 ? (
-          <div className="shrink-0 border-t border-border/40 bg-muted/10 px-6 py-2 text-sm text-muted-foreground flex items-center gap-2">
+          <div className="shrink-0 border-t border-border/40 bg-muted/10 px-6 py-2 text-sm tracking-tighter text-muted-foreground flex items-center gap-2">
             <CheckCircle size={16} className="text-emerald-600" weight="fill" />
             Hiển thị {sortedActivities.length} bước của mission #
             {selectedMission.id}.
