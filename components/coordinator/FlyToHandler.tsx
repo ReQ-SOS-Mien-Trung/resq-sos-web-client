@@ -8,12 +8,13 @@ interface FlyToHandlerProps {
   zoom?: number;
 }
 
-export function FlyToHandler({ location, zoom = 16 }: FlyToHandlerProps) {
+export function FlyToHandler({ location, zoom }: FlyToHandlerProps) {
   const map = useMap();
 
   useEffect(() => {
     if (location && map) {
-      map.flyTo([location.lat, location.lng], zoom, {
+      const targetZoom = zoom ?? map.getZoom();
+      map.flyTo([location.lat, location.lng], targetZoom, {
         duration: 1.5,
       });
     }

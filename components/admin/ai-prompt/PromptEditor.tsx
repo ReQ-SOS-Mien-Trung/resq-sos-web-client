@@ -33,7 +33,7 @@ import {
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { PromptFormData, PromptTextField } from "@/type";
-import { useSOSClusters } from "@/services/sos_cluster/hooks";
+import { useSOSClustersInfinite } from "@/services/sos_cluster/hooks";
 import type {
   ClusterMissionType,
   ClusterRescueSuggestionResponse,
@@ -699,7 +699,13 @@ const PromptEditor = ({
     [],
   );
 
-  const { data: clustersData, isLoading: clustersLoading } = useSOSClusters();
+  const {
+    data: clustersInfiniteData,
+    isLoading: clustersLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useSOSClustersInfinite({ pageSize: 20 });
   const testExistingPromptMutation = useTestPromptRescueSuggestion();
   const testNewPromptMutation = useTestNewPromptRescueSuggestion();
 
@@ -818,12 +824,18 @@ const PromptEditor = ({
     };
   }, [redoTestSnapshot, undoTestSnapshot]);
 
+  // Flatten clusters from infinite query pages
+  const clusters = useMemo(
+    () => clustersInfiniteData?.pages.flatMap((page) => page.clusters) ?? [],
+    [clustersInfiniteData],
+  );
+
   useEffect(() => {
-    const firstClusterId = clustersData?.clusters?.[0]?.id ?? null;
+    const firstClusterId = clusters[0]?.id ?? null;
     if (previewClusterId === null && firstClusterId !== null) {
       setPreviewClusterId(firstClusterId);
     }
-  }, [clustersData, previewClusterId]);
+  }, [clusters, previewClusterId]);
 
   const addReviewLog = useCallback(
     (message: string, type: PromptReviewLogEntry["type"]) => {
@@ -885,7 +897,7 @@ const PromptEditor = ({
     (option) => option.value === effectivePromptType,
   );
   const promptTypeVariables = PROMPT_VARIABLES_BY_TYPE[effectivePromptType];
-  const clusterOptions = clustersData?.clusters ?? [];
+  const clusterOptions = clusters;
   const {
     editableText: editableSystemPromptText,
     lockedJson: lockedSystemPromptJson,
@@ -1211,7 +1223,7 @@ const PromptEditor = ({
                       >
                         <SelectValue placeholder="Chọn loại mẫu lệnh" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4}>
                         {PROMPT_TYPE_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -1485,12 +1497,34 @@ const PromptEditor = ({
                     }
                   />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  className="max-h-[300px]"
+                  position="popper"
+                  sideOffset={4}
+                  onScrollCapture={(e) => {
+                    const target = e.currentTarget;
+                    const scrollBottom = target.scrollTop + target.clientHeight;
+                    const threshold = target.scrollHeight - 50;
+                    if (scrollBottom >= threshold && hasNextPage && !isFetchingNextPage) {
+                      void fetchNextPage();
+                    }
+                  }}
+                >
                   {clusterOptions.map((cluster) => (
                     <SelectItem key={cluster.id} value={String(cluster.id)}>
                       {`#${cluster.id} • ${cluster.severityLevel} • ${cluster.sosRequestCount} SOS`}
                     </SelectItem>
                   ))}
+                  {isFetchingNextPage && (
+                    <div className="flex items-center justify-center py-2">
+                      <span className="text-xs text-muted-foreground">Đang tải thêm...</span>
+                    </div>
+                  )}
+                  {!hasNextPage && clusterOptions.length > 0 && (
+                    <div className="flex items-center justify-center py-2">
+                      <span className="text-xs text-muted-foreground">Đã tải hết danh sách</span>
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>

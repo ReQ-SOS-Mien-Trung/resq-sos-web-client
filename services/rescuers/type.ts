@@ -23,6 +23,8 @@ export interface RescuerApiEntity {
   hasTeam?: boolean;
   hasAssemblyPoint?: boolean;
   teamId?: number | null;
+  activeTeamId?: number | null;
+  activeTeamName?: string | null;
   assemblyPointId?: number | string | null;
   checkedIn?: boolean | null;
   isCheckedIn?: boolean | null;
@@ -43,6 +45,8 @@ export interface RescuerEntity {
   rescuerType?: RescuerType;
   topAbilities?: string[];
   hasTeam: boolean;
+  activeTeamId?: number | null;
+  activeTeamName?: string | null;
   hasAssemblyPoint: boolean;
   assemblyPointId?: number | null;
   attendanceConfirmed?: boolean | null;

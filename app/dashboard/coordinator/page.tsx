@@ -549,7 +549,7 @@ const MapLegend = () => {
                   ),
                 },
                 {
-                  label: "Lục giác: Cả hai",
+                  label: "Lục giác: Tổng hợp",
                   icon: (
                     <svg
                       width="12"
@@ -1595,6 +1595,49 @@ const CoordinatorDashboardContent = () => {
     [createCluster, markSOSRequestsAsClustered],
   );
 
+  const handleProcessClusterOnly = useCallback(
+    (sosIds: string[]) => {
+      const pendingIds = sosIds.filter((id) => {
+        const sos = sosRequests.find((s) => s.id === id);
+        return sos?.status === "PENDING";
+      });
+      const ids = pendingIds.map(Number).filter(Boolean);
+      if (ids.length === 0) return;
+
+      const clusterIdx = autoClusters.findIndex((cluster) =>
+        sosIds.every((id) => cluster.some((s) => s.id === id)),
+      );
+      setProcessingClusterIndex(clusterIdx >= 0 ? clusterIdx : null);
+
+      if (sosIds.length === 1 && clusterIdx < 0) {
+        setProcessingSosId(sosIds[0]);
+      }
+
+      createCluster(
+        { sosRequestIds: ids },
+        {
+          onSuccess: (clusterData) => {
+            markSOSRequestsAsClustered(clusterData.sosRequestIds);
+            setActiveClusterId(clusterData.clusterId);
+            toast.success("Đã gom cụm SOS thành công");
+            setProcessingClusterIndex(null);
+            setProcessingSosId(null);
+          },
+          onError: (error: any) => {
+            console.error("Failed to create cluster:", error);
+            const errorMessage =
+              error.response?.data?.message ||
+              "Không thể gom cụm SOS. Vui lòng thử lại.";
+            toast.error(errorMessage);
+            setProcessingClusterIndex(null);
+            setProcessingSosId(null);
+          },
+        },
+      );
+    },
+    [sosRequests, autoClusters, createCluster, markSOSRequestsAsClustered],
+  );
+
   const handleProcessSOS = useCallback(
     (sosIds: string[]) => {
       const pendingIds = sosIds.filter((id) => {
@@ -2050,7 +2093,7 @@ const CoordinatorDashboardContent = () => {
         {/* Sidebar */}
         <aside
           className={cn(
-            "h-full min-h-0 shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
+            "h-full min-h-0 shrink-0 overflow-hidden transition-[width] duration-300 ease-out will-change-[width]",
             sidebarOpen ? "w-88" : "w-0",
           )}
         >
@@ -2084,6 +2127,7 @@ const CoordinatorDashboardContent = () => {
               selectedTeamIncident={selectedTeamIncident}
               autoClusters={autoClusters}
               onCreateCluster={handleProcessSOS}
+              onProcessClusterOnly={handleProcessClusterOnly}
               onClusterOnly={handleClusterOnly}
               isCreatingCluster={isProcessingSOS}
               processingClusterIndex={processingClusterIndex}
@@ -2193,6 +2237,7 @@ const CoordinatorDashboardContent = () => {
                 }}
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
+                onProcessClusterOnly={handleProcessClusterOnly}
                 isProcessing={isProcessingSOS}
                 nearbySOSRequests={nearbySOSForDetail}
                 allSOSRequests={sosRequests}

@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import {
   getSOSClusters,
+  getSOSClustersPaginated,
   createSOSCluster,
   removeSOSRequestFromCluster,
   addSOSRequestsToCluster,
@@ -50,6 +51,33 @@ export function useSOSClusters(options?: UseSOSClustersOptions) {
   return useQuery<GetSOSClustersResponse>({
     queryKey,
     queryFn: () => getSOSClusters(options?.params),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export interface UseSOSClustersInfiniteOptions {
+  pageSize?: number;
+  enabled?: boolean;
+}
+
+/**
+ * Hook to fetch SOS clusters with infinite scroll pagination
+ */
+export function useSOSClustersInfinite(options?: UseSOSClustersInfiniteOptions) {
+  const pageSize = options?.pageSize ?? 20;
+
+  return useInfiniteQuery<GetSOSClustersResponse>({
+    queryKey: [...SOS_CLUSTERS_QUERY_KEY, "infinite", pageSize],
+    queryFn: ({ pageParam = 1 }) =>
+      getSOSClustersPaginated({
+        pageNumber: pageParam as number,
+        pageSize,
+      }),
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.hasNextPage) return undefined;
+      return (lastPage.pageNumber ?? 1) + 1;
+    },
+    initialPageParam: 1,
     enabled: options?.enabled ?? true,
   });
 }

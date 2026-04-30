@@ -4906,6 +4906,15 @@ function getActivityStatusMeta(status: string | null | undefined): {
     };
   }
 
+  if (normalizedStatus === "suggested") {
+    return {
+      label: "Gợi ý",
+      className:
+        "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700",
+      icon: <Lightning className="h-3.5 w-3.5" weight="fill" />,
+    };
+  }
+
   if (normalizedStatus === "ongoing" || normalizedStatus === "inprogress") {
     return {
       label: "Đang thực hiện",
@@ -12238,11 +12247,11 @@ const RescuePlanPanel = ({
                                   <SelectItem value="RELIEF">
                                     Cứu trợ
                                   </SelectItem>
-                                  <SelectItem value="MIXED">
-                                    Tổng hợp
-                                  </SelectItem>
                                   <SelectItem value="RESCUER">
                                     Cứu hộ viên
+                                  </SelectItem>
+                                  <SelectItem value="MIXED">
+                                    Tổng hợp
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
@@ -14029,9 +14038,8 @@ const RescuePlanPanel = ({
                                             cleanDescription,
                                           )
                                         : cleanDescription;
-                                    const stepStatus = getActivityStatusMeta(
-                                      "PendingConfirmation",
-                                    );
+                                    const stepStatus =
+                                      getActivityStatusMeta("suggested");
 
                                     return (
                                       <div
@@ -14752,7 +14760,7 @@ const RescuePlanPanel = ({
                 onChange={(event) =>
                   setPendingMixedOverrideReason(event.target.value)
                 }
-                placeholder="Nhập lý do coordinator chấp nhận tiếp tục mission gộp..."
+                placeholder="Nhập lý do điều phối viên chấp nhận tiếp tục nhiệm vụ gộp..."
                 maxLength={1000}
                 rows={4}
                 className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

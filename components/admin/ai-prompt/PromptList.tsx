@@ -258,6 +258,7 @@ const PromptList = ({
             {visiblePrompts.map((prompt) => {
               const isDraft = prompt.status === "Draft";
               const isActive = prompt.status === "Active";
+              const isArchived = prompt.status === "Archived";
               const isActivating = activatingPromptId === prompt.id;
               const isSwitchOn = isActive || isActivating;
               const isRecommendedRollback =
@@ -293,18 +294,20 @@ const PromptList = ({
                         <p className="font-semibold text-foreground">
                           {prompt.name}
                         </p>
-                        <Badge
-                          variant={
-                            prompt.status === "Active" ? "success" : "outline"
-                          }
-                          className={
-                            isDraft
-                              ? "border-amber-200 bg-amber-50 text-amber-700"
-                              : undefined
-                          }
-                        >
-                          {getStatusLabel(prompt.status)}
-                        </Badge>
+                        {!isActive && (
+                          <Badge
+                            variant="outline"
+                            className={
+                              isDraft
+                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                : isArchived
+                                  ? "border-slate-200 bg-slate-50 text-slate-600"
+                                  : undefined
+                            }
+                          >
+                            {getStatusLabel(prompt.status)}
+                          </Badge>
+                        )}
                         {isRecommendedRollback ? (
                           <Badge variant="outline">Gợi ý khôi phục</Badge>
                         ) : null}

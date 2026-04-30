@@ -2841,9 +2841,7 @@ const ManualMissionBuilder = ({
     }
 
     if (isCluster111DemoInventoryLoading) {
-      toast.info(
-        "Đang tải vật phẩm từ kho gần cụm. Thử lại sau giây lát.",
-      );
+      toast.info("Đang tải vật phẩm từ kho gần cụm. Thử lại sau giây lát.");
       return;
     }
 
@@ -3902,7 +3900,9 @@ const ManualMissionBuilder = ({
                           onClick={handleApplyCluster111DemoPlan}
                         >
                           <Rocket className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">Điền demo mẫu nhiệm vụ</span>
+                          <span className="truncate">
+                            Điền demo mẫu nhiệm vụ
+                          </span>
                         </Button>
                       ) : null}
                     </div>
@@ -4479,8 +4479,8 @@ const ManualMissionBuilder = ({
                           <SelectContent className="z-1200">
                             <SelectItem value="RESCUE">Cứu hộ</SelectItem>
                             <SelectItem value="RELIEF">Cứu trợ</SelectItem>
-                            <SelectItem value="MIXED">Tổng hợp</SelectItem>
                             <SelectItem value="RESCUER">Cứu hộ viên</SelectItem>
+                            <SelectItem value="MIXED">Tổng hợp</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="mt-2 text-xs text-muted-foreground">

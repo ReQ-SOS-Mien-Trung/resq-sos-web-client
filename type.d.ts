@@ -827,6 +827,7 @@ export interface SOSDetailsPanelProps {
   onOpenChange: (open: boolean) => void;
   sosRequest: SOSRequest | null;
   onProcessSOS: (sosIds: string[]) => void;
+  onProcessClusterOnly: (sosIds: string[]) => void;
   isProcessing?: boolean;
   /** SOS requests in the same config-driven auto-cluster suggestion */
   nearbySOSRequests: SOSRequest[];
@@ -970,6 +971,7 @@ export interface SOSSidebarProps {
   /** Config-driven auto-clusters of PENDING SOS requests, containing 1-3 SOS each */
   autoClusters: SOSRequest[][];
   onCreateCluster: (sosIds: string[]) => void;
+  onProcessClusterOnly: (sosIds: string[]) => void;
   onClusterOnly: (clusterGroups: SOSRequest[][]) => void;
   isCreatingCluster?: boolean;
   /** Which cluster index is currently being processed */

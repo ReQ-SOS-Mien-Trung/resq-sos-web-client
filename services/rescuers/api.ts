@@ -62,6 +62,8 @@ function normalizeRescuer(entity: RescuerApiEntity) {
     rescuerType: normalizeRescuerType(entity.rescuerType ?? entity.type),
     topAbilities: entity.topAbilities ?? [],
     hasTeam: entity.hasTeam ?? Boolean(entity.teamId),
+    activeTeamId: entity.activeTeamId ?? entity.teamId ?? null,
+    activeTeamName: entity.activeTeamName ?? null,
     hasAssemblyPoint:
       entity.hasAssemblyPoint ?? Boolean(entity.assemblyPointId),
     assemblyPointId: normalizeAssemblyPointId(entity.assemblyPointId),

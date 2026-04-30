@@ -652,6 +652,7 @@ const SOSSidebar = ({
   selectedSOS,
   autoClusters,
   onCreateCluster,
+  onProcessClusterOnly,
   onClusterOnly,
   isCreatingCluster = false,
   processingClusterIndex = null,
@@ -2016,35 +2017,56 @@ const SOSSidebar = ({
                           </div>
                           <div className="px-3 py-2 border-t border-inherit space-y-1.5">
                             {canCreateClusterFromSOS(sos) ? (
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="w-full h-9 text-[14px] bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onCreateCluster([sos.id]);
-                                }}
-                                disabled={
-                                  processingSosId === sos.id ||
-                                  isCreatingCluster ||
-                                  isAnalyzingCluster
-                                }
-                              >
-                                {processingSosId === sos.id ? (
-                                  <>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-9 text-[14px] border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onProcessClusterOnly([sos.id]);
+                                  }}
+                                  disabled={
+                                    processingSosId === sos.id ||
+                                    isCreatingCluster ||
+                                    isAnalyzingCluster
+                                  }
+                                >
+                                  {processingSosId === sos.id ? (
                                     <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                                    Đang xử lý...
-                                  </>
-                                ) : (
-                                  <>
+                                  ) : (
+                                    <TreeStructure
+                                      className="h-3 w-3 mr-1"
+                                      weight="fill"
+                                    />
+                                  )}
+                                  Chỉ Gom
+                                </Button>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="h-9 text-[14px] bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCreateCluster([sos.id]);
+                                  }}
+                                  disabled={
+                                    processingSosId === sos.id ||
+                                    isCreatingCluster ||
+                                    isAnalyzingCluster
+                                  }
+                                >
+                                  {processingSosId === sos.id ? (
+                                    <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                                  ) : (
                                     <Lightning
                                       className="h-3 w-3 mr-1"
                                       weight="fill"
                                     />
-                                    Gom & AI Phân tích
-                                  </>
-                                )}
-                              </Button>
+                                  )}
+                                  Gom & AI
+                                </Button>
+                              </div>
                             ) : (
                               <div className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[13px] text-muted-foreground">
                                 {sos.clusterId
@@ -2975,30 +2997,38 @@ const SOSSidebar = ({
                                 Cụm {sourceIndex + 1} • {cluster.length} SOS
                               </span>
                             </div>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="h-9 text-[14px] px-3 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                              onClick={() =>
-                                onCreateCluster(cluster.map((s) => s.id))
-                              }
-                              disabled={isCreatingCluster}
-                            >
-                              {isProcessing ? (
-                                <>
-                                  <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                                  Đang xử lý...
-                                </>
-                              ) : (
-                                <>
-                                  <TreeStructure
-                                    className="h-3 w-3 mr-1"
-                                    weight="fill"
-                                  />
-                                  Gom & AI
-                                </>
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-[12px] px-2 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                                onClick={() =>
+                                  onProcessClusterOnly(cluster.map((s) => s.id))
+                                }
+                                disabled={isCreatingCluster}
+                              >
+                                {isProcessing ? (
+                                  <Spinner className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  "Gom"
+                                )}
+                              </Button>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="h-8 text-[12px] px-2 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                                onClick={() =>
+                                  onCreateCluster(cluster.map((s) => s.id))
+                                }
+                                disabled={isCreatingCluster}
+                              >
+                                {isProcessing ? (
+                                  <Spinner className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  "Gom & AI"
+                                )}
+                              </Button>
+                            </div>
                           </div>
 
                           <div className="divide-y divide-violet-100 dark:divide-violet-800/20">

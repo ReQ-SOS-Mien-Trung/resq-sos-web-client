@@ -287,6 +287,62 @@ function normalizeMissionSuggestionsResponse(
   };
 }
 
+/**
+ * Get paginated SOS clusters (single page - for infinite scroll)
+ * GET /emergency/sos-clusters
+ */
+export async function getSOSClustersPaginated(
+  params?: GetSOSClustersParams,
+): Promise<GetSOSClustersResponse> {
+  const requestedPageNumber = toPositiveInteger(params?.pageNumber) ?? 1;
+  const requestedPageSize = toPositiveInteger(params?.pageSize) ?? 20;
+  const requestedSOSRequestId = toPositiveInteger(params?.sosRequestId);
+  const requestedSort = params?.Sort;
+  const requestedStatuses = Array.from(
+    new Set(
+      (params?.statuses ?? [])
+        .filter((status): boolean => typeof status === "string")
+        .map((status) => status.trim())
+        .filter((status) => status.length > 0),
+    ),
+  );
+  const requestedPriorities = Array.from(
+    new Set(
+      (params?.priorities ?? [])
+        .filter((priority): boolean => typeof priority === "string")
+        .map((priority) => priority.trim())
+        .filter((priority) => priority.length > 0),
+    ),
+  );
+  const requestedSOSTypes = Array.from(
+    new Set(
+      (params?.sosTypes ?? [])
+        .filter((sosType): boolean => typeof sosType === "string")
+        .map((sosType) => sosType.trim())
+        .filter((sosType) => sosType.length > 0),
+    ),
+  );
+
+  const { data } = await api.get("/emergency/sos-clusters", {
+    params: {
+      pageNumber: requestedPageNumber,
+      pageSize: requestedPageSize,
+      sosRequestId: requestedSOSRequestId,
+      statuses: requestedStatuses.length > 0 ? requestedStatuses : undefined,
+      priorities: requestedPriorities.length > 0 ? requestedPriorities : undefined,
+      sosTypes: requestedSOSTypes.length > 0 ? requestedSOSTypes : undefined,
+      Sort: requestedSort,
+    },
+    paramsSerializer: { indexes: null },
+  });
+
+  return normalizeSOSClustersPage(
+    data as RawSOSClustersResponse,
+    requestedPageNumber,
+    requestedPageSize,
+  );
+}
+
 export function formatAiAnalysisErrorMessage(
   rawError: unknown,
   statusCode?: number,
@@ -344,7 +400,7 @@ export async function getSOSClusters(
   const requestedStatuses = Array.from(
     new Set(
       (params?.statuses ?? [])
-        .filter((status): status is string => typeof status === "string")
+        .filter((status): boolean => typeof status === "string")
         .map((status) => status.trim())
         .filter((status) => status.length > 0),
     ),
@@ -352,7 +408,7 @@ export async function getSOSClusters(
   const requestedPriorities = Array.from(
     new Set(
       (params?.priorities ?? [])
-        .filter((priority): priority is string => typeof priority === "string")
+        .filter((priority): boolean => typeof priority === "string")
         .map((priority) => priority.trim())
         .filter((priority) => priority.length > 0),
     ),
@@ -360,7 +416,7 @@ export async function getSOSClusters(
   const requestedSOSTypes = Array.from(
     new Set(
       (params?.sosTypes ?? [])
-        .filter((sosType): sosType is string => typeof sosType === "string")
+        .filter((sosType): boolean => typeof sosType === "string")
         .map((sosType) => sosType.trim())
         .filter((sosType) => sosType.length > 0),
     ),
