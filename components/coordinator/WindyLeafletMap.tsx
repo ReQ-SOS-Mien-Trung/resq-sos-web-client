@@ -71,9 +71,12 @@ const WindyLeafletMap = ({
   const storeRef = useRef<WindyAPI["store"] | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const activeLayerRef = useRef<WeatherLayer>(activeLayer);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Keep activeLayerRef in sync (so the init callback uses the latest value)
-  activeLayerRef.current = activeLayer;
+  // Keep activeLayerRef in sync so the async init callback uses the latest value.
+  useEffect(() => {
+    activeLayerRef.current = activeLayer;
+  }, [activeLayer]);
 
   /* ── 1. Bootstrap Windy API (runs once) ── */
   useEffect(() => {
@@ -124,7 +127,6 @@ const WindyLeafletMap = ({
         userMarkerRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── 2. Switch weather layer ── */
@@ -139,12 +141,54 @@ const WindyLeafletMap = ({
     if (isReady && mapRef.current && flyToLocation) {
       mapRef.current.flyTo(
         [flyToLocation.lat, flyToLocation.lng],
-        DEFAULT_ZOOM,
+        mapRef.current.getZoom(),
       );
     }
   }, [flyToLocation, isReady]);
 
-  /* ── 4. User Location Marker (pulsing blue dot, same as CoordinatorMap) ── */
+  /* ── 4. Keep map size in sync with sidebar width animation ── */
+  useEffect(() => {
+    if (!isReady || !mapRef.current || !containerRef.current) return;
+
+    let rafId: number | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const invalidate = (isSettling = false) => {
+      mapRef.current?.invalidateSize({
+        animate: false,
+        pan: false,
+        debounceMoveend: !isSettling,
+      });
+    };
+
+    const scheduleInvalidate = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        invalidate();
+      });
+
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
+        invalidate(true);
+      }, 120);
+    };
+
+    const observer = new ResizeObserver(scheduleInvalidate);
+    observer.observe(containerRef.current);
+    window.addEventListener("resize", scheduleInvalidate);
+    scheduleInvalidate();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleInvalidate);
+      if (rafId) cancelAnimationFrame(rafId);
+      if (settleTimer) clearTimeout(settleTimer);
+    };
+  }, [isReady]);
+
+  /* ── 5. User Location Marker (pulsing blue dot, same as CoordinatorMap) ── */
   useEffect(() => {
     if (!isReady || !mapRef.current) return;
 
@@ -195,7 +239,7 @@ const WindyLeafletMap = ({
     }
   }, [userLocation, isReady]);
 
-  /* ── 5. Fly to my location ── */
+  /* ── 6. Fly to my location ── */
   const handleGoToMyLocation = useCallback(() => {
     if (userLocation && mapRef.current) {
       mapRef.current.flyTo([userLocation.lat, userLocation.lng], 14);
@@ -204,7 +248,7 @@ const WindyLeafletMap = ({
 
   /* ═══════ RENDER ═══════ */
   return (
-    <div className="w-full h-full relative">
+    <div ref={containerRef} className="w-full h-full relative">
       {/* Windy API mounts into #windy */}
       <div id="windy" className="w-full h-full" />
 

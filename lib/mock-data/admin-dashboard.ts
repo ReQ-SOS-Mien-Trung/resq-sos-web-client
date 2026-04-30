@@ -168,8 +168,8 @@ export const mockRetentionData: RetentionRateData = {
 
 export const mockFavorites: FavoriteItem[] = [
   { id: "1", name: "Cứu hộ viên", count: 89 },
-  { id: "2", name: "Cảnh báo", count: 12 },
-  { id: "3", name: "Hoạt động", count: 156 },
+  { id: "2", name: "Nạn nhân", count: 12 },
+  { id: "3", name: "Biến động quỹ theo kho", count: 156 },
 ];
 
 export const mockProjects: Project[] = [

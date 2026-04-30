@@ -31,11 +31,14 @@ import {
   SignIn as SignInIcon,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@iconify/react";
 import { useRescuerScores } from "@/services/admin_dashboard/team-overview.hooks";
+import { useRescueTeamTypes } from "@/services/rescue_teams/hooks";
 import {
   MissionEvaluation,
   TeamHistoryItem,
 } from "@/services/admin_dashboard/team-overview.type";
+import { useRescueTeamRealtime } from "@/hooks/useRescueTeamRealtime";
 
 ChartJS.register(ArcElement, ChartTooltip);
 
@@ -149,7 +152,13 @@ const RescuerScoreSheet = ({
   const { data, isLoading } = useRescuerScores(rescuerId, {
     enabled: open && !!rescuerId,
   });
+
+  useRescueTeamRealtime({
+    enabled: open && !!rescuerId,
+    rescuerId: open ? rescuerId : null,
+  });
   const [expandedEval, setExpandedEval] = useState<number | null>(null);
+  const { data: rescueTeamTypeOptions = [] } = useRescueTeamTypes({ enabled: open });
 
   const fullName = data
     ? `${data.lastName} ${data.firstName}`
@@ -202,10 +211,10 @@ const RescuerScoreSheet = ({
             {/* ── Overall Score ──────────────────────────────────────────── */}
             <Card className="border-border/50">
               <CardHeader className="">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <CardTitle className="text-base font-semibold tracking-tighter flex items-center gap-2">
                   <Trophy size={24} className="text-amber-500" />
                   Điểm tổng quan
-                  <Badge variant="secondary" className="ml-auto text-sm">
+                  <Badge variant="secondary" className="ml-auto text-sm tracking-tighter">
                     {data.overallScore?.evaluationCount || 0} lần đánh giá
                   </Badge>
                 </CardTitle>
@@ -239,24 +248,24 @@ const RescuerScoreSheet = ({
             </Card>
 
             {/* ── Mission Evaluations ────────────────────────────────────── */}
-            <Card className="border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Card className="border-border/50 pb-0">
+              <CardHeader className="">
+                <CardTitle className="text-base font-semibold tracking-tighter flex items-center gap-2">
                   <Star size={24} className="text-amber-500" />
                   Điểm theo từng nhiệm vụ
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-0 pb-0">
                 {data.missionEvaluations.length === 0 ? (
-                  <p className="text-sm text-muted-foreground tracking-tighter text-center py-4">
+                  <p className="px-6 py-4 text-center text-sm tracking-tighter text-muted-foreground">
                     Chưa có đánh giá nào
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <ul className="w-full divide-y divide-border/40 border-t border-border/40">
                     {data.missionEvaluations.map((ev: MissionEvaluation) => (
-                      <div
+                      <li
                         key={ev.evaluationId}
-                        className="border border-border/40 rounded-lg overflow-hidden"
+                        className="overflow-hidden"
                       >
                         <button
                           onClick={() =>
@@ -266,29 +275,26 @@ const RescuerScoreSheet = ({
                                 : ev.evaluationId,
                             )
                           }
-                          className="w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-left"
+                          className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors text-left"
                         >
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-sm">
-                              {ev.missionType}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              Mission #{ev.missionId}
+                             <span className="text-sm tracking-tighter font-medium">
+                              Nhiệm vụ #{ev.missionId}
                             </span>
+                            <span className="text-sm tracking-tighter text-muted-foreground">
+                              ( Đội {rescueTeamTypeOptions.find((o) => o.key.toLowerCase() === ev.missionType?.toLowerCase())?.value || ev.missionType} )
+                            </span> 
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">
-                              {ev.averageScore.toFixed(1)}
+                            <span className="text-sm font-semibold tracking-tighter">
+                              Điểm trung bình: {ev.averageScore.toFixed(1)}
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {new Date(ev.evaluatedAt).toLocaleDateString(
-                                "vi-VN",
-                              )}
-                            </span>
+                           
+                          
                           </div>
                         </button>
                         {expandedEval === ev.evaluationId && (
-                          <div className="px-3 pb-3 border-t border-border/30">
+                          <div className="px-6 pb-4 border-t border-border/30">
                             <div className="flex justify-between w-full mt-3">
                               {CRITERIA.map(({ key, label, color }) => (
                                 <div
@@ -305,75 +311,72 @@ const RescuerScoreSheet = ({
                             </div>
                           </div>
                         )}
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </CardContent>
             </Card>
 
             {/* ── Team History ────────────────────────────────────────────── */}
-            <Card className="border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Card className="border-border/50 pb-0">
+              <CardHeader className="">
+                <CardTitle className="text-base font-semibold tracking-tighter flex items-center gap-2">
                   <CalendarBlank size={24} className="text-blue-500" />
                   Lịch sử tham gia đội
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-0 pb-0">
                 {data.teamHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground tracking-tighter text-center py-4">
+                  <p className="px-6 py-4 text-center text-sm tracking-tighter text-muted-foreground">
                     Chưa tham gia đội nào
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <ul className="w-full divide-y divide-border/40 border-t border-border/40">
                     {data.teamHistory.map(
                       (th: TeamHistoryItem, idx: number) => (
-                        <div
+                        <li
                           key={`${th.teamId}-${idx}`}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/20 transition-colors"
+                          className="flex w-full items-center gap-3 px-6 py-4"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium truncate">
+                              <span className="text-base font-semibold tracking-tighter truncate">
                                 {th.teamName}
                               </span>
-                              <Badge
-                                variant="outline"
-                                className="text-sm shrink-0"
-                              >
-                                {th.teamCode}
-                              </Badge>
-                              {th.roleInTeam && (
-                                <Badge
-                                  className={`text-sm shrink-0 ${th.roleInTeam === "Leader"
-                                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                                    : "bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                                    }`}
-                                >
-                                  {th.roleInTeam}
-                                </Badge>
+                              <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
+                                ( Mã đội: {th.teamCode} )
+                              </span>
+                              {th.roleInTeam === "Leader" && (
+                                <Icon icon="iconoir:bright-crown" width="20" height="20" className="text-amber-500 shrink-0" />
                               )}
                             </div>
-                            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                            <div className="flex flex-col gap-1 mt-1.5 text-sm tracking-tighter">
                               <span className="flex items-center gap-1">
                                 <SignInIcon size={12} />
-                                {new Date(th.joinedAt).toLocaleDateString(
+                                Ngày tham gia: {new Date(th.joinedAt).toLocaleDateString(
                                   "vi-VN",
                                 )}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <SignOutIcon size={12} />
-                                {th.leftAt
-                                  ? new Date(th.leftAt).toLocaleDateString(
-                                    "vi-VN",
-                                  )
-                                  : "Đang hoạt động"}
+                              <span className="flex items-center gap-1 text-foreground/60">
+                                {th.leftAt ? (
+                                  <>
+                                    Thời gian rời nhóm:{" "}
+                                    <span className="font-medium text-black">
+                                      {new Date(th.leftAt).toLocaleDateString("vi-VN")}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    Tình trạng hiện tại:{" "}
+                                    <span className="font-medium text-emerald-600">Đang hoạt động</span>
+                                  </>
+                                )}
                               </span>
                             </div>
                           </div>
-                          <Badge
-                            className={`text-sm shrink-0 ${th.status === "Accepted"
+                          {/* <Badge
+                            className={`text-sm tracking-tighter shrink-0 ${th.status === "Accepted"
                               ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                               : th.status === "Removed"
                                 ? "bg-rose-500/10 text-rose-700 dark:text-rose-400"
@@ -381,11 +384,11 @@ const RescuerScoreSheet = ({
                               }`}
                           >
                             {th.status}
-                          </Badge>
-                        </div>
+                          </Badge> */}
+                        </li>
                       ),
                     )}
-                  </div>
+                  </ul>
                 )}
               </CardContent>
             </Card>

@@ -109,6 +109,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAdminFinanceCampaignFundFlowInvalidation } from "@/hooks/useChartInvalidationRealtime";
 
 type ProvinceItem = {
   code: number;
@@ -176,6 +177,7 @@ function CampaignFundFlowChart() {
   const effectiveCampaignId = selectedCampaignId
     ? Number(selectedCampaignId)
     : campaignOptions[0]?.key;
+  useAdminFinanceCampaignFundFlowInvalidation(effectiveCampaignId);
   const selectedCampaignName = useMemo(() => {
     if (effectiveCampaignId === undefined) return "";
     return (
@@ -1082,7 +1084,7 @@ export default function CampaignsPage() {
                           <button
                             key={p.code}
                             type="button"
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors tracking-tighter"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setCreateForm((prev) => ({
@@ -1096,7 +1098,7 @@ export default function CampaignsPage() {
                           </button>
                         ))
                       ) : (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                        <div className="px-3 py-2 text-sm tracking-tighter text-muted-foreground">
                           Không tìm thấy tỉnh/thành
                         </div>
                       )}
@@ -1147,7 +1149,7 @@ export default function CampaignsPage() {
                     side="bottom"
                     align="start"
                     sideOffset={6}
-                    avoidCollisions={false}
+                    collisionPadding={16}
                   >
                     <Calendar
                       mode="single"
@@ -1188,7 +1190,7 @@ export default function CampaignsPage() {
                     side="bottom"
                     align="start"
                     sideOffset={6}
-                    avoidCollisions={false}
+                    collisionPadding={16}
                   >
                     <Calendar
                       mode="single"

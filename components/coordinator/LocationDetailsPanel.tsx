@@ -65,12 +65,13 @@ import { toast } from "sonner";
 import type { AxiosError } from "axios";
 import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
-import { ChartBar } from "lucide-react";
+import { ChartBar, Crown } from "lucide-react";
 import {
   getBackendCircuitBlockedUntil,
   releaseBackendCircuitForRetry,
 } from "@/lib/backend-circuit";
 import { useBackendConnectionStore } from "@/stores/backend-connection.store";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Panel width
 const PANEL_WIDTH = 420;
@@ -1739,24 +1740,40 @@ function AssemblyPointDetails({
                         {team.members.map((member) => (
                           <div
                             key={member.userId}
-                            className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5"
+                            className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-2.5 py-2 hover:bg-muted/30 transition-colors"
                           >
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium truncate">
-                                {member.lastName} {member.firstName}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {memberRoleLabel[member.roleInTeam]}
-                                {member.isLeader ? " • Leader" : ""}
-                              </p>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Avatar className="h-8 w-8 border border-border/50 shrink-0">
+                                <AvatarImage
+                                  src={member.avatarUrl ?? undefined}
+                                  alt={`${member.lastName} ${member.firstName}`}
+                                />
+                                <AvatarFallback className="bg-primary/5 text-[10px] font-medium text-primary uppercase">
+                                  {member.lastName?.[0]}
+                                  {member.firstName?.[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-semibold truncate">
+                                    {member.lastName} {member.firstName}
+                                  </p>
+                                  {member.isLeader && (
+                                    <Crown
+                                      className="h-3 w-3 text-amber-500 shrink-0"
+                                      fill="currentColor"
+                                    />
+                                  )}
+                                </div>
+                              </div>
                             </div>
                             <Badge
                               variant="secondary"
                               className={cn(
-                                "text-xs h-5 px-2 shrink-0",
+                                "text-[10px] h-5 px-1.5 shrink-0 font-medium",
                                 member.status === "Accepted"
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                  : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50"
+                                  : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50",
                               )}
                             >
                               {memberStatusLabel[member.status]}

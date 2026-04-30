@@ -1426,7 +1426,7 @@ function SOSRequestMarker({
     // Determine shape based on type
     // RELIEF (Cứu trợ) -> Circle (Tròn)
     // RESCUE (Cứu hộ) -> Triangle (Tam giác)
-    // BOTH (Cả hai) -> Hexagon (Lục giác)
+    // BOTH (Tổng hợp) -> Hexagon (Lục giác)
     const shape =
       sosType === "RESCUE"
         ? "triangle"

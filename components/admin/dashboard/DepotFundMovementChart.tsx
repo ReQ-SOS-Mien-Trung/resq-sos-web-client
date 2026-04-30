@@ -31,6 +31,7 @@ import {
   useDepotFundMovementMultiLineChart,
   useDepotMetadata,
 } from "@/services/depot/hooks";
+import { useAdminFinanceDepotFundChartInvalidation } from "@/hooks/useChartInvalidationRealtime";
 
 ChartJS.register(
   CategoryScale,
@@ -107,6 +108,7 @@ export default function DepotFundMovementChart() {
 
   const { data: depots = [], isLoading: isLoadingDepots } = useDepotMetadata();
   const effectiveDepotId = selectedDepotId ?? depots[0]?.key;
+  useAdminFinanceDepotFundChartInvalidation(effectiveDepotId);
 
   const params = useMemo(
     () => ({
@@ -397,18 +399,18 @@ export default function DepotFundMovementChart() {
               <Line data={lineChartData} options={lineChartOptions} />
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {chartModel.lines.map((line) => (
                 <div
                   key={line.key}
-                  className="flex items-center gap-2 rounded-md border border-border/60 bg-background px-2.5 py-1.5 text-sm"
+                  className="flex items-center gap-1.5 rounded-md border border-border/50 bg-background px-2.5 py-1 text-sm shadow-sm"
                 >
                   <span
-                    className="h-2.5 w-2.5 rounded-full"
+                    className="h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: line.color }}
                   />
                   <span className="font-medium tracking-tighter">{line.name}</span>
-                  <span className="text-muted-foreground">
+                  <span className="text-muted-foreground tracking-tighter">
                     {formatCompactCurrency(line.currentBalance)}
                   </span>
                 </div>

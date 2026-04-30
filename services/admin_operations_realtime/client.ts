@@ -12,31 +12,32 @@ import {
 } from "@/lib/signalr";
 import { useAuthStore } from "@/stores/auth.store";
 import {
-  ADMIN_FINANCE_REALTIME_EVENTS,
-  ADMIN_FINANCE_REALTIME_METHODS,
-  FundingRequestRealtimeUpdate,
+  ADMIN_OPERATIONS_REALTIME_EVENTS,
+  ADMIN_OPERATIONS_REALTIME_METHODS,
 } from "./type";
 import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
-type FundingRequestUpdateHandler = (
-  payload: FundingRequestRealtimeUpdate,
-) => void;
+type RescueTeamUpdateHandler = () => void;
+type RescuerScoresUpdateHandler = () => void;
 type ChartInvalidationHandler = (payload: ChartInvalidation) => void;
 
 const STOP_DEBOUNCE_MS = 1200;
 
-class AdminFinanceRealtimeClient {
+class AdminOperationsRealtimeClient {
   private connection: HubConnection | null = null;
   private connectionRetainers = 0;
-  private detailSubscriptions = new Map<number, number>();
-  private depotFundChartSubscriptions = new Map<number, number>();
-  private campaignFundFlowSubscriptions = new Map<number, number>();
-  private fundingRequestListSubscribers = 0;
   private isReceiveEventBound = false;
   private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
   private startPromise: Promise<void> | null = null;
+
+  private rescueTeamListSubscribers = 0;
+  private rescueTeamDetailSubscriptions = new Map<number, number>();
+  private rescuerScoresSubscriptions = new Map<string, number>();
+  private depotChartSubscriptions = new Map<number, number>();
+
+  private rescueTeamUpdateListeners = new Set<RescueTeamUpdateHandler>();
+  private rescuerScoresUpdateListeners = new Set<RescuerScoresUpdateHandler>();
   private chartInvalidationListeners = new Set<ChartInvalidationHandler>();
-  private updateListeners = new Set<FundingRequestUpdateHandler>();
 
   private clearPendingStop(): void {
     if (!this.pendingStopTimer) return;
@@ -52,10 +53,10 @@ class AdminFinanceRealtimeClient {
 
       if (
         this.connectionRetainers > 0 ||
-        this.fundingRequestListSubscribers > 0 ||
-        this.detailSubscriptions.size > 0 ||
-        this.depotFundChartSubscriptions.size > 0 ||
-        this.campaignFundFlowSubscriptions.size > 0
+        this.rescueTeamListSubscribers > 0 ||
+        this.rescueTeamDetailSubscriptions.size > 0 ||
+        this.rescuerScoresSubscriptions.size > 0 ||
+        this.depotChartSubscriptions.size > 0
       ) {
         return;
       }
@@ -72,7 +73,9 @@ class AdminFinanceRealtimeClient {
 
     while (connection.state === HubConnectionState.Disconnecting) {
       if (Date.now() - startedAt >= timeoutMs) {
-        throw new Error("Admin finance realtime connection is still disconnecting.");
+        throw new Error(
+          "Admin operations realtime connection is still disconnecting.",
+        );
       }
 
       await new Promise((resolve) => setTimeout(resolve, 80));
@@ -91,7 +94,7 @@ class AdminFinanceRealtimeClient {
     ) {
       if (Date.now() - startedAt >= timeoutMs) {
         throw new Error(
-          "Admin finance realtime connection did not connect in time.",
+          "Admin operations realtime connection did not connect in time.",
         );
       }
 
@@ -111,16 +114,20 @@ class AdminFinanceRealtimeClient {
   }
 
   private buildConnection(): HubConnection {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") || "";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") || "";
 
     if (!baseUrl) {
-      throw new Error("Missing NEXT_PUBLIC_BASE_URL for admin finance realtime.");
+      throw new Error(
+        "Missing NEXT_PUBLIC_BASE_URL for admin operations realtime.",
+      );
     }
 
     const connection = applySignalRConnectionDefaults(
       new HubConnectionBuilder()
-        .withUrl(`${baseUrl}/hubs/admin-finance`, {
-          accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
+        .withUrl(`${baseUrl}/hubs/admin-operations`, {
+          accessTokenFactory: () =>
+            useAuthStore.getState().accessToken ?? "",
           withCredentials: false,
           transport:
             HttpTransportType.WebSockets |
@@ -146,19 +153,28 @@ class AdminFinanceRealtimeClient {
 
     if (!this.isReceiveEventBound) {
       this.connection.on(
-        ADMIN_FINANCE_REALTIME_EVENTS.ReceiveFundingRequestUpdate,
-        (payload: FundingRequestRealtimeUpdate) => {
-          this.updateListeners.forEach((listener) => listener(payload));
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveRescueTeamUpdate,
+        () => {
+          this.rescueTeamUpdateListeners.forEach((listener) => listener());
         },
       );
+
       this.connection.on(
-        ADMIN_FINANCE_REALTIME_EVENTS.ReceiveChartInvalidation,
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveRescuerScoresUpdate,
+        () => {
+          this.rescuerScoresUpdateListeners.forEach((listener) => listener());
+        },
+      );
+
+      this.connection.on(
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveChartInvalidation,
         (payload: ChartInvalidation) => {
           this.chartInvalidationListeners.forEach((listener) =>
             listener(payload),
           );
         },
       );
+
       this.isReceiveEventBound = true;
     }
 
@@ -189,48 +205,46 @@ class AdminFinanceRealtimeClient {
 
     const tasks: Promise<unknown>[] = [];
 
-    if (this.fundingRequestListSubscribers > 0) {
+    if (this.rescueTeamListSubscribers > 0) {
       tasks.push(
         connection.invoke(
-          ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequests,
+          ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescueTeams,
         ),
       );
     }
 
-    this.detailSubscriptions.forEach((subscriberCount, requestId) => {
-      if (subscriberCount > 0) {
+    this.rescueTeamDetailSubscriptions.forEach((count, teamId) => {
+      if (count > 0) {
         tasks.push(
           connection.invoke(
-            ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequest,
-            requestId,
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescueTeam,
+            teamId,
           ),
         );
       }
     });
 
-    this.depotFundChartSubscriptions.forEach((subscriberCount, depotId) => {
-      if (subscriberCount > 0) {
+    this.rescuerScoresSubscriptions.forEach((count, rescuerId) => {
+      if (count > 0) {
         tasks.push(
           connection.invoke(
-            ADMIN_FINANCE_REALTIME_METHODS.SubscribeDepotFundCharts,
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescuerScores,
+            rescuerId,
+          ),
+        );
+      }
+    });
+
+    this.depotChartSubscriptions.forEach((count, depotId) => {
+      if (count > 0) {
+        tasks.push(
+          connection.invoke(
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeDepotCharts,
             depotId,
           ),
         );
       }
     });
-
-    this.campaignFundFlowSubscriptions.forEach(
-      (subscriberCount, campaignId) => {
-        if (subscriberCount > 0) {
-          tasks.push(
-            connection.invoke(
-              ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaignFundFlow,
-              campaignId,
-            ),
-          );
-        }
-      },
-    );
 
     await Promise.all(tasks.map((task) => task.catch(() => null)));
   }
@@ -304,13 +318,76 @@ class AdminFinanceRealtimeClient {
     this.scheduleStop();
   }
 
-  onFundingRequestUpdate(
-    handler: FundingRequestUpdateHandler,
-  ): () => void {
-    this.updateListeners.add(handler);
+  // ─── Rescue Team List ─────────────────────────────────────────────
+
+  onRescueTeamUpdate(handler: RescueTeamUpdateHandler): () => void {
+    this.rescueTeamUpdateListeners.add(handler);
     return () => {
-      this.updateListeners.delete(handler);
-      this.scheduleStop();
+      this.rescueTeamUpdateListeners.delete(handler);
+    };
+  }
+
+  async subscribeRescueTeams(): Promise<void> {
+    this.rescueTeamListSubscribers += 1;
+
+    if (this.rescueTeamListSubscribers > 1) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescueTeams,
+    );
+  }
+
+  async unsubscribeRescueTeams(): Promise<void> {
+    this.rescueTeamListSubscribers = Math.max(
+      0,
+      this.rescueTeamListSubscribers - 1,
+    );
+
+    if (this.rescueTeamListSubscribers > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeRescueTeams,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  // ─── Rescue Team Detail ───────────────────────────────────────────
+
+  async subscribeRescueTeam(teamId: number): Promise<void> {
+    const current = this.rescueTeamDetailSubscriptions.get(teamId) ?? 0;
+    this.rescueTeamDetailSubscriptions.set(teamId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescueTeam,
+      teamId,
+    );
+  }
+
+  async unsubscribeRescueTeam(teamId: number): Promise<void> {
+    const current = this.rescueTeamDetailSubscriptions.get(teamId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.rescueTeamDetailSubscriptions.set(teamId, next);
+      return;
+    }
+
+    this.rescueTeamDetailSubscriptions.delete(teamId);
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeRescueTeam,
+      teamId,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  // ─── Rescuer Scores ───────────────────────────────────────────────
+
+  onRescuerScoresUpdate(handler: RescuerScoresUpdateHandler): () => void {
+    this.rescuerScoresUpdateListeners.add(handler);
+    return () => {
+      this.rescuerScoresUpdateListeners.delete(handler);
     };
   }
 
@@ -322,116 +399,66 @@ class AdminFinanceRealtimeClient {
     };
   }
 
-  async subscribeFundingRequests(): Promise<void> {
-    this.fundingRequestListSubscribers += 1;
-
-    if (this.fundingRequestListSubscribers > 1) return;
-
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequests,
-    );
-  }
-
-  async unsubscribeFundingRequests(): Promise<void> {
-    this.fundingRequestListSubscribers = Math.max(
-      0,
-      this.fundingRequestListSubscribers - 1,
-    );
-
-    if (this.fundingRequestListSubscribers > 0) return;
-
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeFundingRequests,
-    ).catch(() => null);
-    this.scheduleStop();
-  }
-
-  async subscribeFundingRequest(requestId: number): Promise<void> {
-    const current = this.detailSubscriptions.get(requestId) ?? 0;
-    this.detailSubscriptions.set(requestId, current + 1);
+  async subscribeRescuerScores(rescuerId: string): Promise<void> {
+    const current = this.rescuerScoresSubscriptions.get(rescuerId) ?? 0;
+    this.rescuerScoresSubscriptions.set(rescuerId, current + 1);
 
     if (current > 0) return;
 
     await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequest,
-      requestId,
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeRescuerScores,
+      rescuerId,
     );
   }
 
-  async unsubscribeFundingRequest(requestId: number): Promise<void> {
-    const current = this.detailSubscriptions.get(requestId) ?? 0;
+  async unsubscribeRescuerScores(rescuerId: string): Promise<void> {
+    const current = this.rescuerScoresSubscriptions.get(rescuerId) ?? 0;
     const next = Math.max(0, current - 1);
 
     if (next > 0) {
-      this.detailSubscriptions.set(requestId, next);
+      this.rescuerScoresSubscriptions.set(rescuerId, next);
       return;
     }
 
-    this.detailSubscriptions.delete(requestId);
+    this.rescuerScoresSubscriptions.delete(rescuerId);
     await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeFundingRequest,
-      requestId,
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeRescuerScores,
+      rescuerId,
     ).catch(() => null);
     this.scheduleStop();
   }
 
-  async subscribeDepotFundCharts(depotId: number): Promise<void> {
-    const current = this.depotFundChartSubscriptions.get(depotId) ?? 0;
-    this.depotFundChartSubscriptions.set(depotId, current + 1);
+  // ─── Depot Charts ─────────────────────────────────────────────────
+
+  async subscribeDepotCharts(depotId: number): Promise<void> {
+    const current = this.depotChartSubscriptions.get(depotId) ?? 0;
+    this.depotChartSubscriptions.set(depotId, current + 1);
 
     if (current > 0) return;
 
     await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.SubscribeDepotFundCharts,
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeDepotCharts,
       depotId,
     );
   }
 
-  async unsubscribeDepotFundCharts(depotId: number): Promise<void> {
-    const current = this.depotFundChartSubscriptions.get(depotId) ?? 0;
+  async unsubscribeDepotCharts(depotId: number): Promise<void> {
+    const current = this.depotChartSubscriptions.get(depotId) ?? 0;
     const next = Math.max(0, current - 1);
 
     if (next > 0) {
-      this.depotFundChartSubscriptions.set(depotId, next);
+      this.depotChartSubscriptions.set(depotId, next);
       return;
     }
 
-    this.depotFundChartSubscriptions.delete(depotId);
+    this.depotChartSubscriptions.delete(depotId);
     await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeDepotFundCharts,
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeDepotCharts,
       depotId,
-    ).catch(() => null);
-    this.scheduleStop();
-  }
-
-  async subscribeCampaignFundFlow(campaignId: number): Promise<void> {
-    const current = this.campaignFundFlowSubscriptions.get(campaignId) ?? 0;
-    this.campaignFundFlowSubscriptions.set(campaignId, current + 1);
-
-    if (current > 0) return;
-
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaignFundFlow,
-      campaignId,
-    );
-  }
-
-  async unsubscribeCampaignFundFlow(campaignId: number): Promise<void> {
-    const current = this.campaignFundFlowSubscriptions.get(campaignId) ?? 0;
-    const next = Math.max(0, current - 1);
-
-    if (next > 0) {
-      this.campaignFundFlowSubscriptions.set(campaignId, next);
-      return;
-    }
-
-    this.campaignFundFlowSubscriptions.delete(campaignId);
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeCampaignFundFlow,
-      campaignId,
     ).catch(() => null);
     this.scheduleStop();
   }
 }
 
-export const adminFinanceRealtimeClient = new AdminFinanceRealtimeClient();
+export const adminOperationsRealtimeClient =
+  new AdminOperationsRealtimeClient();

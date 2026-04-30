@@ -1284,7 +1284,7 @@ const AIPromptPage = () => {
                 </CardDescription>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-nowrap items-center justify-end gap-1">
                 {aiConfigs.length === 0 ? (
                   <Button onClick={openCreateAiConfigDialog}>
                     <Plus size={16} className="mr-2" />
@@ -1294,50 +1294,65 @@ const AIPromptPage = () => {
                   <>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={handleCreateAiConfigDraft}
                       disabled={!selectedAiConfig}
+                      className="h-8 shrink-0 px-2 md:px-2.5"
+                      title="Tạo bản nháp để chỉnh sửa"
                     >
-                      <Plus size={16} className="mr-2" />
-                      Tạo bản nháp để chỉnh sửa
+                      <Plus size={14} className="md:mr-1" />
+                      <span className="hidden md:inline">Tạo bản nháp</span>
                     </Button>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={openEditAiConfigDialog}
                       disabled={selectedAiConfig?.status !== "Draft"}
+                      className="h-8 shrink-0 px-2 md:px-2.5"
+                      title="Mở bản nháp"
                     >
-                      <PencilSimple size={16} className="mr-2" />
-                      Mở bản nháp
+                      <PencilSimple size={14} className="md:mr-1" />
+                      <span className="hidden md:inline">Mở nháp</span>
                     </Button>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={handleActivateAiConfig}
                       disabled={
                         !selectedAiConfig ||
                         (selectedAiConfig.status !== "Draft" &&
                           selectedAiConfig.status !== "Archived")
                       }
+                      className="h-8 shrink-0 px-2 md:px-2.5"
+                      title="Kích hoạt"
                     >
-                      <CheckCircle size={16} className="mr-2" />
-                      Kích hoạt bản đã chọn
+                      <CheckCircle size={14} className="md:mr-1" />
+                      <span className="hidden md:inline">Kích hoạt</span>
                     </Button>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={handleRollbackAiConfig}
                       disabled={
                         !selectedAiConfig ||
                         selectedAiConfig.status === "Active"
                       }
+                      className="h-8 shrink-0 px-2 md:px-2.5"
+                      title="Khôi phục"
                     >
-                      <ClockCounterClockwise size={16} className="mr-2" />
-                      Khôi phục bản đã chọn
+                      <ClockCounterClockwise size={14} className="md:mr-1" />
+                      <span className="hidden md:inline">Khôi phục</span>
                     </Button>
                     <Button
                       variant="destructive"
+                      size="sm"
                       onClick={handleDeleteAiConfigDraft}
                       disabled={selectedAiConfig?.status !== "Draft"}
+                      className="h-8 shrink-0 px-2 md:px-2.5"
+                      title="Xóa bản nháp"
                     >
-                      <Trash size={16} className="mr-2" />
-                      Xóa bản nháp
+                      <Trash size={14} className="md:mr-1" />
+                      <span className="hidden md:inline">Xóa nháp</span>
                     </Button>
                   </>
                 )}
@@ -1364,6 +1379,8 @@ const AIPromptPage = () => {
                     const isActive =
                       config.id === activeAiConfig?.id ||
                       config.status === "Active";
+                    const isDraft = config.status === "Draft";
+                    const isArchived = config.status === "Archived";
 
                     return (
                       <button
@@ -1371,52 +1388,81 @@ const AIPromptPage = () => {
                         type="button"
                         onClick={() => setSelectedAiConfigId(config.id)}
                         className={cn(
-                          "rounded-xl border p-4 text-left transition-all",
-                          isSelected
-                            ? "border-primary/50 bg-primary/5 shadow-sm"
-                            : "border-border/60 hover:border-border hover:bg-muted/20",
+                          "relative rounded-xl border p-4 text-left transition-all",
+                          isActive
+                            ? "border-emerald-500/50 bg-emerald-50/50 shadow-sm ring-1 ring-emerald-500/20 border-l-4 border-l-emerald-500"
+                            : isSelected
+                              ? "border-primary/50 bg-primary/5 shadow-sm border-l-4 border-l-primary"
+                              : "border-border/60 hover:border-border hover:bg-muted/20",
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-foreground">
-                              {config.name}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-foreground truncate">
+                              {isActive ? "Cấu hình AI đang chạy" : config.name}
                             </p>
-                            <div className="mt-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2">
-                              <p className="text-sm font-semibold text-primary">
-                                Model AI
-                              </p>
-                              <p className="mt-1 break-all text-base font-semibold text-foreground">
-                                {config.provider} • {config.model}
-                              </p>
+                            <div className={cn(
+                              "mt-2 rounded-lg border px-3 py-2.5",
+                              isActive
+                                ? "border-emerald-200 bg-emerald-100/50"
+                                : "border-primary/20 bg-primary/5"
+                            )}>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                  {config.provider}
+                                </span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-sm font-semibold text-foreground truncate">
+                                  {config.model}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {isActive ? (
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            {isActive && (
                               <span
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"
-                                title="Đang hoạt động"
-                                aria-label="Đang hoạt động"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
+                                title="Đang chạy"
                               >
                                 <CheckCircle weight="fill" size={16} />
                               </span>
-                            ) : null}
-                            {!isActive ? (
-                              <Badge variant="outline">
-                                {getStatusLabel(config.status)}
+                            )}
+                            {!isActive && isDraft && (
+                              <Badge variant="secondary" className="text-amber-700 bg-amber-100 hover:bg-amber-100">
+                                Bản nháp
                               </Badge>
-                            ) : null}
+                            )}
+                            {!isActive && isArchived && (
+                              <Badge variant="secondary" className="text-slate-700 bg-slate-100 hover:bg-slate-100">
+                                Lưu trữ
+                              </Badge>
+                            )}
+                            {isSelected && !isActive && (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">
+                                <CheckCircle weight="fill" size={14} />
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-muted-foreground">
-                          <span>Phiên bản: {config.version || "—"}</span>
-                          <span>
-                            Khóa API:{" "}
-                            {config.hasApiKey
-                              ? config.apiKeyMasked || "Đã cấu hình"
-                              : "Chưa cấu hình"}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-xs">Ver:</span>
+                            <span className="font-medium text-foreground">{config.version || "—"}</span>
                           </span>
-                          <span>Cập nhật: {formatDate(config.updatedAt)}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-xs">Key:</span>
+                            <code className={cn(
+                              "px-1.5 py-0.5 rounded text-xs font-mono",
+                              config.hasApiKey
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-destructive/10 text-destructive"
+                            )}>
+                              {config.apiKeyMasked || (config.hasApiKey ? "Đã cấu hình" : "Chưa cấu hình")}
+                            </code>
+                          </span>
+                          <span className="text-xs ml-auto">
+                            {formatDate(config.updatedAt)}
+                          </span>
                         </div>
                       </button>
                     );

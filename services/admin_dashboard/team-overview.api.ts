@@ -4,6 +4,7 @@ import {
   GetRescueTeamsOverviewResponse,
   RescueTeamDetailResponse,
   RescuerScoresResponse,
+  TeamOverviewMetadataOption,
 } from "./team-overview.type";
 
 /**
@@ -37,5 +38,29 @@ export async function getRescuerScores(
   const { data } = await api.get(
     `/personnel/dashboard/rescuers/${rescuerId}/scores`,
   );
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/rescue-teams/metadata/team-types
+ */
+export async function getTeamOverviewTeamTypes(): Promise<TeamOverviewMetadataOption[]> {
+  const { data } = await api.get("/personnel/dashboard/rescue-teams/metadata/team-types");
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/rescue-teams/metadata/statuses
+ */
+export async function getTeamOverviewStatuses(): Promise<TeamOverviewMetadataOption[]> {
+  const { data } = await api.get("/personnel/dashboard/rescue-teams/metadata/statuses");
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/rescue-teams/metadata/assembly-point-names
+ */
+export async function getTeamOverviewAssemblyPointNames(): Promise<TeamOverviewMetadataOption[]> {
+  const { data } = await api.get("/personnel/dashboard/rescue-teams/metadata/assembly-point-names");
   return data;
 }

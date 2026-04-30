@@ -598,14 +598,23 @@ export const navigationItems = [
   },
 ];
 
+const RescuerHelmetIcon = ({ size, className }: { size?: number; className?: string }) => (
+  <IconifyIcon
+    icon="fluent-emoji-high-contrast:rescue-workers-helmet"
+    width={size ?? 16}
+    height={size ?? 16}
+    className={className}
+  />
+);
+
 export const getFavoriteIcon = (name: string) => {
   switch (name) {
     case "Cứu hộ viên":
-      return Shield;
-    case "Cảnh báo":
-      return Warning;
-    case "Hoạt động":
-      return Pulse;
+      return RescuerHelmetIcon;
+    case "Nạn nhân":
+      return Users;
+    case "Biến động quỹ theo kho":
+      return ChartBar;
     default:
       return Shield;
   }
@@ -615,10 +624,10 @@ export const getFavoriteHref = (name: string): string => {
   switch (name) {
     case "Cứu hộ viên":
       return "/dashboard/admin#rescuer-overview";
-    case "Cảnh báo":
-      return "/dashboard/admin#sos-overview";
-    case "Hoạt động":
-      return "/dashboard/admin#sos-overview";
+    case "Nạn nhân":
+      return "/dashboard/admin#victims-chart";
+    case "Biến động quỹ theo kho":
+      return "/dashboard/admin#depot-fund-movement";
     default:
       return "/dashboard/admin";
   }

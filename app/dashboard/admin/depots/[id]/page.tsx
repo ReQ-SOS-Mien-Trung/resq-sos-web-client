@@ -85,6 +85,7 @@ import {
 } from "@/services/depot/hooks";
 import { useDepotManagers } from "@/services/depot_manager";
 import { useInventoryItemTypes } from "@/services/inventory/hooks";
+import { InventoryExportReportCards } from "@/components/inventory/InventoryExportReportCards";
 import type {
   DepotClosureDetailTransfer,
   DepotClosureRemainingInventoryItem,
@@ -5415,6 +5416,9 @@ export default function DepotDetailPage() {
             </div>
           )}
         </div>
+
+        {/* ══ Export Report Cards ══ */}
+        <InventoryExportReportCards depotId={depotId} />
       </div>
 
       {/* ═══════════════════════════════════

@@ -31,6 +31,13 @@ import {
   useDepotInventoryMovementChart,
   useDepotFundMovementChart,
 } from "@/services/depot/hooks";
+import {
+  useAdminOperationsDepotChartInvalidation,
+  useAdminFinanceDepotFundChartInvalidation,
+  useOperationalDepotChartInvalidation,
+} from "@/hooks/useChartInvalidationRealtime";
+import { ROLES } from "@/lib/roles";
+import { useAuthStore } from "@/stores/auth.store";
 import LowStockAlerts from "./LowStockAlerts";
 import {
   Cube,
@@ -601,6 +608,14 @@ function Chart3FundMovement({ depotId }: { depotId: number }) {
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
 export default function DepotChartsSection({ depotId }: { depotId: number }) {
+  const roleId = useAuthStore((state) => state.user?.roleId);
+  const isAdmin = roleId === ROLES.ADMIN;
+  const isManager = roleId === ROLES.MANAGER;
+
+  useOperationalDepotChartInvalidation(depotId, { enabled: isManager });
+  useAdminOperationsDepotChartInvalidation(depotId, { enabled: isAdmin });
+  useAdminFinanceDepotFundChartInvalidation(depotId, { enabled: roleId != null });
+
   return (
     <div className="space-y-4">
       {/* <h2 className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">

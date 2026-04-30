@@ -87,7 +87,7 @@ export const SOS_TYPE_OPTIONS: Array<
   },
   {
     value: "BOTH",
-    label: "Cứu hộ và Cứu trợ",
+    label: "Tổng hợp",
     description: "Vừa cần cứu hộ, vừa cần cứu trợ",
   },
 ];
@@ -846,7 +846,7 @@ export function getSosTypeLabel(value?: CoordinatorSOSType | string | null) {
     case "RELIEF":
       return "Cứu trợ";
     case "BOTH":
-      return "Cứu hộ và Cứu trợ";
+      return "Tổng hợp";
     default:
       return value || "SOS";
   }
