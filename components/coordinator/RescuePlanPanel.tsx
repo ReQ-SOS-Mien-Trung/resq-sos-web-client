@@ -12207,19 +12207,6 @@ const RescuePlanPanel = ({
                               </>
                             )}
                           </p>
-                          {activeSuggestion && (
-                            <div className="mt-2 rounded-md border border-orange-300/80 bg-orange-100/70 dark:border-orange-700/60 dark:bg-orange-900/20 px-2 py-1.5">
-                              <p className="text-sm text-orange-800 dark:text-orange-300 flex items-start gap-1.5 leading-relaxed">
-                                <Warning
-                                  className="h-3.5 w-3.5 mt-0.5 shrink-0"
-                                  weight="fill"
-                                />
-                                Khi xóa vật phẩm hoặc xóa bước trong phần chỉnh
-                                sửa, dữ liệu đó sẽ bị loại khỏi nhiệm vụ lúc xác
-                                nhận.
-                              </p>
-                            </div>
-                          )}
                         </div>
 
                         {/* Mission config */}
