@@ -460,7 +460,7 @@ const MapLegend = () => {
     <div className="absolute bottom-6 left-6 z-[40] pointer-events-auto select-none flex flex-col items-start gap-3">
       {/* Legend Panel */}
       {isOpen && (
-        <div className="bg-background/90 backdrop-blur-md border border-border/60 shadow-2xl rounded-2xl p-3.5 flex flex-col gap-3.5 min-w-[180px] animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="bg-background border border-border/60 shadow-2xl rounded-2xl p-3.5 flex flex-col gap-3.5 min-w-[180px] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center justify-between px-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
               Chú thích
@@ -615,7 +615,7 @@ const MapLegend = () => {
           "w-10 h-10 rounded-full flex items-center justify-center shadow-xl border transition-all duration-300 hover:scale-105 active:scale-95 group",
           isOpen
             ? "bg-primary text-primary-foreground border-primary"
-            : "bg-background/95 backdrop-blur-md text-foreground border-border/60",
+            : "bg-background text-foreground border-border/60",
         )}
         title={isOpen ? "Đóng chú thích" : "Xem chú thích bản đồ"}
       >
@@ -1216,16 +1216,24 @@ const CoordinatorDashboardContent = () => {
     });
   }, [teamIncidents]);
 
-  // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
+  // ─── Sidebar auto-collapse when RescuePlanPanel or LocationDetailsPanel opens ───
   useEffect(() => {
-    if (rescuePlanOpen) {
+    if (rescuePlanOpen || locationPanelOpen) {
       sidebarBeforeRescuePlanRef.current = sidebarOpen;
       setSidebarOpen(false);
-    } else {
+    } else if (!rescuePlanOpen && !locationPanelOpen) {
       setSidebarOpen(sidebarBeforeRescuePlanRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rescuePlanOpen]);
+  }, [rescuePlanOpen, locationPanelOpen]);
+
+  // ─── Auto-hide detail panels when AI Stream opens ───
+  useEffect(() => {
+    if (aiStreamOpen && !aiStreamMinimized) {
+      setSOSDetailOpen(false);
+      setLocationPanelOpen(false);
+    }
+  }, [aiStreamOpen, aiStreamMinimized]);
 
   // ─── URL → State: Restore selection from URL on initial load ───
   useEffect(() => {
@@ -2215,12 +2223,12 @@ const CoordinatorDashboardContent = () => {
                 {/* Create SOS Button */}
                 <Button
                   size="lg"
-                  className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
+                  className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105 will-change-transform"
                   onClick={() => {
                     router.push("/dashboard/coordinator/create-sos");
                   }}
                 >
-                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <span className="absolute inset-0 w-full h-full bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer-slide_2s_infinite] pointer-events-none" />
                   <Phone className="w-5 h-5 animate-bounce" weight="fill" />
                   <span className="tracking-wide">TẠO YÊU CẦU SOS</span>
                 </Button>

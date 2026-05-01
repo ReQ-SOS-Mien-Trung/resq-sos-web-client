@@ -63,6 +63,7 @@ import {
   InventoryLotItem,
 } from "@/services/inventory/type";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
+import { useInventoryLotsRealtime } from "@/hooks/useInventoryLotsRealtime";
 import {
   useInventoryItemTypes,
   useInventoryTargetGroups,
@@ -195,9 +196,16 @@ export function VatTuDetailsSheet({
     {
       itemModelId: item?.itemModelId ?? 0,
       depotId: selectedDepotId ?? 0,
+      pageNumber: 1,
+      pageSize: 20,
     },
     { enabled: open && item?.itemType === "Consumable" && !!item?.itemModelId },
   );
+  useInventoryLotsRealtime({
+    depotId: selectedDepotId,
+    itemModelId: item?.itemModelId,
+    enabled: open && item?.itemType === "Consumable",
+  });
 
   const itemTypeLabel = (key: string) =>
     itemTypesData?.find((t) => t.key === key)?.value ?? key;
@@ -420,7 +428,13 @@ export function VatTuDetailsSheet({
       setDisposeReason("");
       setDisposeNote("");
     },
-    [disposeLot?.lotId],
+    [
+      disposeLot?.lotId,
+      setDisposeLot,
+      setDisposeNote,
+      setDisposeQty,
+      setDisposeReason,
+    ],
   );
 
   const handleDispose = useCallback(async () => {
@@ -473,6 +487,10 @@ export function VatTuDetailsSheet({
     disposeNote,
     disposeMutation,
     selectedDepotId,
+    setDisposeLot,
+    setDisposeNote,
+    setDisposeQty,
+    setDisposeReason,
   ]);
 
   const handleSheetOpenChange = useCallback(
@@ -493,7 +511,21 @@ export function VatTuDetailsSheet({
       }
       onOpenChange(nextOpen);
     },
-    [onOpenChange],
+    [
+      onOpenChange,
+      setDisposeLot,
+      setDisposeNote,
+      setDisposeQty,
+      setDisposeReason,
+      setExpandedReusableAction,
+      setIsFullscreen,
+      setReusableActionCondition,
+      setReusableActionNote,
+      setReusableSerialSearch,
+      setReusableSort,
+      setReusableUnitsPage,
+      setReusableUnitsPageSize,
+    ],
   );
 
   if (!item) return null;

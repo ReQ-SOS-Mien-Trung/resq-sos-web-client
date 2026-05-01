@@ -8,7 +8,7 @@ import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import {
   MagnifyingGlass,
   X,
-  Factory,
+  Package,
   MapPin,
   Plus,
   Minus,
@@ -68,8 +68,8 @@ type LayerFilterKey =
 
 const DEFAULT_LAYER_FILTER: Record<LayerFilterKey, boolean> = {
   sos: true,
-  rescueTeams: true,
-  teamIncidents: true,
+  rescueTeams: false,
+  teamIncidents: false,
   depots: true,
   assemblyPoints: true,
   serviceZones: true,
@@ -95,7 +95,7 @@ function LayerFilterIcon({
   }
 
   if (layerKey === "depots") {
-    return <Factory size={16} weight="fill" className={className} />;
+    return <Package size={16} weight="fill" className={className} />;
   }
 
   if (layerKey === "assemblyPoints") {
@@ -429,20 +429,6 @@ const CoordinatorMap = ({
           "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
       },
       {
-        key: "rescueTeams" as const,
-        label: "Đội cứu hộ",
-        count: visibleRescuers.length,
-        badgeClass:
-          "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-      },
-      {
-        key: "teamIncidents" as const,
-        label: "Sự cố đội",
-        count: validTeamIncidents.length,
-        badgeClass:
-          "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-      },
-      {
         key: "depots" as const,
         label: "Kho",
         count: depots.length,
@@ -489,8 +475,6 @@ const CoordinatorMap = ({
   const showOnlyLayer = useCallback((layer: LayerFilterKey) => {
     setLayerFilter({
       sos: false,
-      rescueTeams: false,
-      teamIncidents: false,
       depots: false,
       assemblyPoints: false,
       serviceZones: false,
@@ -501,8 +485,6 @@ const CoordinatorMap = ({
   const setAllLayers = useCallback((value: boolean) => {
     setLayerFilter({
       sos: value,
-      rescueTeams: value,
-      teamIncidents: value,
       depots: value,
       assemblyPoints: value,
       serviceZones: value,
@@ -622,7 +604,7 @@ const CoordinatorMap = ({
       >
         <div
           className={cn(
-            "rounded-2xl bg-background/95 backdrop-blur-md shadow-xl border transition-all duration-200",
+            "rounded-2xl bg-background shadow-xl border transition-all duration-200",
             isSearchFocused
               ? "ring-2 ring-primary/40 border-primary/50"
               : "border-border/60",
@@ -759,7 +741,7 @@ const CoordinatorMap = ({
 
         {/* Search Results Dropdown */}
         {isSearchOpen && searchResults.length > 0 && (
-          <div className="mt-2 bg-background/95 backdrop-blur-md rounded-2xl border border-border/60 shadow-xl overflow-hidden max-h-72 overflow-y-auto">
+          <div className="mt-2 bg-background rounded-2xl border border-border/60 shadow-xl overflow-hidden max-h-72 overflow-y-auto">
             <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
               Kết quả ({searchResults.length})
             </div>
@@ -809,7 +791,7 @@ const CoordinatorMap = ({
 
         {/* No results message */}
         {isSearchOpen && searchQuery.trim() && searchResults.length === 0 && (
-          <div className="mt-2 bg-background/95 backdrop-blur-md rounded-2xl border border-border/60 shadow-xl p-6 text-center">
+          <div className="mt-2 bg-background rounded-2xl border border-border/60 shadow-xl p-6 text-center">
             <MagnifyingGlass
               size={28}
               className="text-muted-foreground/30 mx-auto mb-2"
@@ -838,7 +820,7 @@ const CoordinatorMap = ({
                   type="button"
                   aria-label="Lớp hiển thị"
                   title="Lớp hiển thị"
-                  className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/95 text-foreground shadow-xl backdrop-blur-md transition-colors hover:bg-accent/70"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background text-foreground shadow-xl transition-colors hover:bg-accent/70"
                 >
                   <SquaresFour size={18} weight="fill" />
                   <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground shadow-sm">
@@ -853,8 +835,8 @@ const CoordinatorMap = ({
           </Tooltip>
           <PopoverContent
             align="end"
-            sideOffset={8}
-            className="w-[min(16rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background/95 p-3 shadow-xl backdrop-blur-md"
+            side="right"
+            className="w-[min(16rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background p-3 shadow-xl"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold">
@@ -909,28 +891,8 @@ const CoordinatorMap = ({
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground">
                   <MapTrifold size={14} weight="fill" />
-                  <span className="truncate">Nền Goong</span>
+                  <span className="truncate">Nền Goong (Đã ẩn POI)</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setHideGoongPoi((current) => !current)}
-                  aria-pressed={hideGoongPoi}
-                  aria-label={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
-                  title={hideGoongPoi ? "Hiện POI nền" : "Ẩn POI nền"}
-                  className={cn(
-                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors",
-                    hideGoongPoi
-                      ? "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-                      : "bg-primary/10 text-primary hover:bg-primary/15",
-                  )}
-                >
-                  {hideGoongPoi ? (
-                    <Eye size={13} weight="bold" />
-                  ) : (
-                    <EyeSlash size={13} weight="bold" />
-                  )}
-                  {hideGoongPoi ? "Hiện POI" : "Ẩn POI"}
-                </button>
               </div>
             </div>
 
@@ -1078,31 +1040,6 @@ const CoordinatorMap = ({
             />
           ))}
 
-        {/* Rescuer Markers */}
-        {!isServiceZoneOverview &&
-          layerFilter.rescueTeams &&
-          visibleRescuers.map((rescuer) => (
-            <RescuerMarker
-              key={rescuer.id}
-              rescuer={rescuer}
-              isSelected={selectedRescuer?.id === rescuer.id}
-              onClick={() => onRescuerSelect(rescuer)}
-            />
-          ))}
-
-        {/* Team Incident Markers */}
-        {!isServiceZoneOverview &&
-          layerFilter.teamIncidents &&
-          validTeamIncidents.map((incident) => (
-            <TeamIncidentMarker
-              key={incident.incidentId}
-              incident={incident}
-              isSelected={
-                selectedTeamIncident?.incidentId === incident.incidentId
-              }
-              onClick={() => onTeamIncidentSelect?.(incident)}
-            />
-          ))}
 
         {/* Depot Markers */}
         {!isServiceZoneOverview &&
@@ -1177,14 +1114,14 @@ const CoordinatorMap = ({
       <div className="absolute bottom-6 right-4 z-1000 flex flex-col gap-2">
         <button
           onClick={() => mapControls?.zoomIn()}
-          className="w-10 h-10 rounded-full bg-background/95 backdrop-blur-md border border-border/60 shadow-lg flex items-center justify-center text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
+          className="w-10 h-10 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
           title="Phóng to"
         >
           <Plus size={18} weight="bold" />
         </button>
         <button
           onClick={() => mapControls?.zoomOut()}
-          className="w-10 h-10 rounded-full bg-background/95 backdrop-blur-md border border-border/60 shadow-lg flex items-center justify-center text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
+          className="w-10 h-10 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
           title="Thu nhỏ"
         >
           <Minus size={18} weight="bold" />
@@ -1192,7 +1129,7 @@ const CoordinatorMap = ({
         <div className="h-px bg-border/40 mx-2" />
         <button
           onClick={() => mapControls?.recenter()}
-          className="w-10 h-10 rounded-full bg-background/95 backdrop-blur-md border border-border/60 shadow-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
+          className="w-10 h-10 rounded-full bg-background border border-border/60 shadow-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
           title="Về trung tâm"
         >
           <Crosshair size={18} weight="bold" />

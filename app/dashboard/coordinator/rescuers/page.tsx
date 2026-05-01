@@ -534,15 +534,7 @@ export default function CoordinatorRescuerManagementPage() {
     ? splitUniqueRescuerCount
     : (rescuersData?.totalCount ?? rescuers.length);
 
-  useEffect(() => {
-    const visibleRescuerIds = new Set(
-      selectableRescuers.map((rescuer) => rescuer.id),
-    );
 
-    setSelectedRescuerIds((previous) =>
-      previous.filter((rescuerId) => visibleRescuerIds.has(rescuerId)),
-    );
-  }, [selectableRescuers]);
 
   const assemblyPointNameById = useMemo(() => {
     const entries = (assemblyPointOptions ?? [])
@@ -767,6 +759,7 @@ export default function CoordinatorRescuerManagementPage() {
     [selectedRescuerIds],
   );
 
+  const totalSelectedCount = selectedRescuerIds.length;
   const selectedVisibleRescuerCount = useMemo(
     () =>
       selectableRescuers.reduce(
@@ -893,9 +886,22 @@ export default function CoordinatorRescuerManagementPage() {
   };
 
   const handleToggleSelectAllVisible = (shouldSelect: boolean) => {
-    setSelectedRescuerIds(
-      shouldSelect ? selectableRescuers.map((rescuer) => rescuer.id) : [],
-    );
+    setSelectedRescuerIds((previous) => {
+      const visibleIds = selectableRescuers.map((rescuer) => rescuer.id);
+
+      if (shouldSelect) {
+        const nextIds = [...previous];
+        for (const id of visibleIds) {
+          if (!nextIds.includes(id)) {
+            nextIds.push(id);
+          }
+        }
+        return nextIds;
+      }
+
+      const visibleIdsSet = new Set(visibleIds);
+      return previous.filter((id) => !visibleIdsSet.has(id));
+    });
   };
 
   const handleToggleLayoutMode = () => {
@@ -2207,7 +2213,7 @@ export default function CoordinatorRescuerManagementPage() {
                       variant="outline"
                       className="border-[#FF5722]/25 bg-white text-[#C2410C]"
                     >
-                      {selectedVisibleRescuerCount} người cứu hộ đã chọn
+                      {totalSelectedCount} người cứu hộ đã chọn
                     </Badge>
 
                     {isSplitByAssemblyPointView && splitPendingSaveCount > 0 ? (
@@ -2219,7 +2225,7 @@ export default function CoordinatorRescuerManagementPage() {
                       </Badge>
                     ) : null}
 
-                    {selectedVisibleRescuerCount > 0 ? (
+                    {totalSelectedCount > 0 ? (
                       <Button
                         type="button"
                         variant="ghost"
@@ -2255,7 +2261,7 @@ export default function CoordinatorRescuerManagementPage() {
                         value={bulkSelectedAssemblyPointId}
                         onValueChange={setBulkSelectedAssemblyPointId}
                         disabled={
-                          isAssignmentBusy || selectedVisibleRescuerCount === 0
+                          isAssignmentBusy || totalSelectedCount === 0
                         }
                       >
                         <SelectTrigger className="h-9 w-full border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20 sm:flex-1">
@@ -2289,7 +2295,7 @@ export default function CoordinatorRescuerManagementPage() {
                       onClick={handleBulkSaveAssignment}
                       disabled={
                         isAssignmentBusy ||
-                        selectedVisibleRescuerCount === 0 ||
+                        totalSelectedCount === 0 ||
                         !bulkSelectedAssemblyPointId
                       }
                     >
