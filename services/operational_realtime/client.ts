@@ -20,6 +20,7 @@ import {
   ReceiveDepotClosureUpdatePayload,
   ReceiveDepotInventoryUpdatePayload,
   ReceiveLogisticsUpdatePayload,
+  ReceiveInventoryLotsUpdatePayload,
   ReceiveSupplyRequestUpdatePayload,
   ReceiveUpcomingReturnsUpdatePayload,
   ReceiveAssemblyEventCheckedInRescuersUpdatePayload,
@@ -63,6 +64,9 @@ type AssemblyEventCheckedInRescuersUpdateListener = (
 ) => void;
 
 type ChartInvalidationListener = (payload: ChartInvalidation) => void;
+type InventoryLotsUpdateListener = (
+  payload: ReceiveInventoryLotsUpdatePayload,
+) => void;
 
 const START_RETRY_DELAY_MS = 2000;
 
@@ -87,6 +91,7 @@ export class OperationalRealtimeClient {
   private assemblyEventCheckedInRescuersListeners =
     new Set<AssemblyEventCheckedInRescuersUpdateListener>();
   private chartInvalidationListeners = new Set<ChartInvalidationListener>();
+  private inventoryLotsListeners = new Set<InventoryLotsUpdateListener>();
   private joinedDepots = new Map<number, number>();
   private joinedClusters = new Map<number, number>();
   private joinedSupplyRequestDepots = new Map<number, number>();
@@ -98,6 +103,10 @@ export class OperationalRealtimeClient {
   private joinedTransfers = new Map<number, number>();
   private joinedUpcomingReturns = new Map<number, number>();
   private joinedDepotCharts = new Map<number, number>();
+  private joinedInventoryLots = new Map<
+    string,
+    { depotId: number; itemModelId: number; count: number }
+  >();
   private joinedAssemblyEvents = new Map<number, number>();
 
   private notifyConnectionState(): void {
@@ -182,6 +191,19 @@ export class OperationalRealtimeClient {
   private isNotConnectedInvokeError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return /not in the 'Connected' State/i.test(message);
+  }
+
+  private isBenignStopError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = message.toLowerCase();
+
+    return (
+      normalized.includes("underlying connection being closed") ||
+      normalized.includes("connection being closed") ||
+      normalized.includes("connection was stopped") ||
+      normalized.includes("connection is not active") ||
+      normalized.includes("not in the 'connected' state")
+    );
   }
 
   private buildConnection(): HubConnection {
@@ -307,6 +329,13 @@ export class OperationalRealtimeClient {
         },
       );
 
+      this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveInventoryLotsUpdate,
+        (payload: ReceiveInventoryLotsUpdatePayload) => {
+          this.inventoryLotsListeners.forEach((listener) => listener(payload));
+        },
+      );
+
       this.isReceiveEventsBound = true;
     }
 
@@ -376,6 +405,15 @@ export class OperationalRealtimeClient {
           .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotCharts, depotId)
           .catch(() => null),
       ),
+      ...Array.from(this.joinedInventoryLots.values()).map((entry) =>
+        connection
+          .invoke(
+            OPERATIONAL_REALTIME_METHODS.SubscribeInventoryLots,
+            entry.depotId,
+            entry.itemModelId,
+          )
+          .catch(() => null),
+      ),
       ...Array.from(this.joinedAssemblyEvents.keys()).map((eventId) =>
         connection
           .invoke(
@@ -406,6 +444,34 @@ export class OperationalRealtimeClient {
         throw error;
       }
     }
+  }
+
+  private async invokeWithReconnectRetryArgs(
+    method: string,
+    ...args: number[]
+  ): Promise<void> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await this.start();
+      const connection = this.getOrCreateConnection();
+
+      try {
+        await connection.invoke(method, ...args);
+        return;
+      } catch (error) {
+        if (attempt === 0 && this.isNotConnectedInvokeError(error)) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  private getInventoryLotsSubscriptionKey(
+    depotId: number,
+    itemModelId: number,
+  ): string {
+    return `${depotId}:${itemModelId}`;
   }
 
   getConnectionState(): OperationalRealtimeConnectionState {
@@ -528,13 +594,25 @@ export class OperationalRealtimeClient {
       }
     }
 
-    if (this.connection.state === HubConnectionState.Disconnected) {
+    const connection = this.connection;
+
+    if (connection.state === HubConnectionState.Disconnected) {
       this.setConnectionState("disconnected");
       return;
     }
 
-    await this.connection.stop();
-    this.setConnectionState("disconnected");
+    try {
+      await connection.stop();
+    } catch (error) {
+      if (
+        !this.isBenignStopError(error) &&
+        connection.state !== HubConnectionState.Disconnected
+      ) {
+        throw error;
+      }
+    } finally {
+      this.setConnectionState("disconnected");
+    }
   }
 
   async subscribeDepot(depotId: number): Promise<void> {
@@ -1002,6 +1080,64 @@ export class OperationalRealtimeClient {
       .catch(() => null);
   }
 
+  async subscribeInventoryLots(
+    depotId: number,
+    itemModelId: number,
+  ): Promise<void> {
+    const key = this.getInventoryLotsSubscriptionKey(depotId, itemModelId);
+    const current = this.joinedInventoryLots.get(key);
+
+    if (current) {
+      this.joinedInventoryLots.set(key, {
+        ...current,
+        count: current.count + 1,
+      });
+      return;
+    }
+
+    await this.invokeWithReconnectRetryArgs(
+      OPERATIONAL_REALTIME_METHODS.SubscribeInventoryLots,
+      depotId,
+      itemModelId,
+    );
+    this.joinedInventoryLots.set(key, { depotId, itemModelId, count: 1 });
+  }
+
+  async unsubscribeInventoryLots(
+    depotId: number,
+    itemModelId: number,
+  ): Promise<void> {
+    const key = this.getInventoryLotsSubscriptionKey(depotId, itemModelId);
+    const current = this.joinedInventoryLots.get(key);
+
+    if (!current) {
+      return;
+    }
+
+    if (current.count > 1) {
+      this.joinedInventoryLots.set(key, {
+        ...current,
+        count: current.count - 1,
+      });
+      return;
+    }
+
+    this.joinedInventoryLots.delete(key);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(
+        OPERATIONAL_REALTIME_METHODS.UnsubscribeInventoryLots,
+        depotId,
+        itemModelId,
+      )
+      .catch(() => null);
+  }
+
   async subscribeAssemblyEventCheckedInRescuers(
     eventId: number,
   ): Promise<void> {
@@ -1061,6 +1197,14 @@ export class OperationalRealtimeClient {
 
     return () => {
       this.chartInvalidationListeners.delete(listener);
+    };
+  }
+
+  onInventoryLotsUpdate(listener: InventoryLotsUpdateListener): () => void {
+    this.inventoryLotsListeners.add(listener);
+
+    return () => {
+      this.inventoryLotsListeners.delete(listener);
     };
   }
 }

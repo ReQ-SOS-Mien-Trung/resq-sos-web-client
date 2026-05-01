@@ -97,6 +97,11 @@ function formatDateShort(dateString: string | null | undefined) {
   }
 }
 
+function formatItemNote(note: string | null | undefined) {
+  const value = note?.trim();
+  return value ? value : "—";
+}
+
 function getStockMovementItemRowKey(
   transactionId: string,
   item: StockMovementEntity["items"][number],
@@ -422,20 +427,23 @@ export function StockMovementDetailSheet({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="w-[30%] text-sm tracking-tighter">
+                    <TableHead className="w-[24%] text-sm tracking-tighter">
                       Vật phẩm
                     </TableHead>
-                    <TableHead className="w-[15%] text-sm tracking-tighter">
+                    <TableHead className="w-[12%] text-sm tracking-tighter">
                       Loại
                     </TableHead>
-                    <TableHead className="w-[15%] text-sm tracking-tighter text-right pr-6">
+                    <TableHead className="w-[13%] text-sm tracking-tighter text-right pr-6">
                       Số lượng
                     </TableHead>
-                    <TableHead className="w-[18%] text-sm tracking-tighter">
+                    <TableHead className="w-[14%] text-sm tracking-tighter">
                       Ngày nhập / HSD
                     </TableHead>
-                    <TableHead className="w-[22%] text-sm tracking-tighter">
+                    <TableHead className="w-[17%] text-sm tracking-tighter">
                       Thông tin chi tiết
+                    </TableHead>
+                    <TableHead className="w-[20%] text-sm tracking-tighter">
+                      Ghi chú
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -614,6 +622,11 @@ export function StockMovementDetailSheet({
                               )}
                             </div>
                           )}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed tracking-tighter text-foreground/80">
+                            {formatItemNote(item.note)}
+                          </p>
                         </TableCell>
                       </TableRow>
                     );

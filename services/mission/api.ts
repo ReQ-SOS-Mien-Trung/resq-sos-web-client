@@ -519,30 +519,26 @@ function normalizeConfirmReturnSuppliesRequest(
     ? request.consumableItems.map((item) => ({
         itemModelId: toNumberOrZero(item?.itemModelId),
         quantity: toNumberOrZero(item?.quantity),
+        note: toTrimmedStringOrNull(item?.note),
         lotAllocations: Array.isArray(item?.lotAllocations)
           ? item.lotAllocations.map((allocation) => ({
               lotId: toNumberOrZero(allocation?.lotId),
               quantityTaken: toNumberOrZero(allocation?.quantityTaken),
-              receivedDate: String(allocation?.receivedDate ?? ""),
-              expiredDate: String(allocation?.expiredDate ?? ""),
-              remainingQuantityAfterExecution: toNumberOrZero(
-                allocation?.remainingQuantityAfterExecution,
-              ),
             }))
           : [],
-        expiredDate: toTrimmedStringOrNull(item?.expiredDate),
       }))
     : [];
 
   const normalizedReusableItems = Array.isArray(request?.reusableItems)
     ? request.reusableItems.map((item) => ({
         itemModelId: toNumberOrZero(item?.itemModelId),
-        quantity: toNumberOrZero(item?.quantity),
         units: Array.isArray(item?.units)
           ? item.units.map((unit) => ({
               reusableItemId: toNumberOrZero(unit?.reusableItemId),
-              serialNumber: String(unit?.serialNumber ?? "").trim(),
-              condition: String(unit?.condition ?? "").trim(),
+              isReturned: Boolean(unit?.isReturned),
+              condition: unit?.isReturned
+                ? toTrimmedStringOrNull(unit?.condition)
+                : null,
               note: toTrimmedStringOrNull(unit?.note),
             }))
           : [],
