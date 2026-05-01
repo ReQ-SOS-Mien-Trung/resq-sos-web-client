@@ -320,27 +320,24 @@ export interface UpdateActivityResponse {
 export interface ConfirmReturnLotAllocationRequest {
   lotId: number;
   quantityTaken: number;
-  receivedDate?: string | null;
-  expiredDate?: string | null;
 }
 
 export interface ConfirmReturnConsumableItemRequest {
   itemModelId: number;
   quantity: number;
+  note?: string | null;
   lotAllocations: ConfirmReturnLotAllocationRequest[];
-  expiredDate?: string | null;
 }
 
 export interface ConfirmReturnReusableUnitRequest {
   reusableItemId: number;
-  serialNumber: string;
-  condition: string;
+  isReturned: boolean;
+  condition: string | null;
   note?: string | null;
 }
 
 export interface ConfirmReturnReusableItemRequest {
   itemModelId: number;
-  quantity: number;
   units: ConfirmReturnReusableUnitRequest[];
 }
 

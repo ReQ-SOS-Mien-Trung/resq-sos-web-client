@@ -252,6 +252,14 @@ export interface StockMovementReusableDetail {
 
 export interface StockMovementItem {
   itemId: number;
+  itemModelId: number;
+  actionType: string;
+  note?: string | null;
+  remainingQuantity: number | null;
+  supplyInventoryLotId?: number | null;
+  lotId?: number | null;
+  reusableItemId?: number | null;
+  serialNumber?: string | null;
   itemName: string;
   quantityChange: number;
   formattedQuantityChange: string;
@@ -263,13 +271,6 @@ export interface StockMovementItem {
   receivedDate?: string | null;
   /** Ngày hết hạn lô (chỉ có với Consumable) */
   expiredDate?: string | null;
-  /** ID lô hàng gắn kết */
-  supplyInventoryLotId?: number | null;
-  itemModelId: number;
-  remainingQuantity: number;
-  lotId?: number | null;
-  reusableItemId?: number | null;
-  serialNumber?: string | null;
   lotDetails?: StockMovementLotDetail[];
   reusableDetails?: StockMovementReusableDetail[];
 }
@@ -356,6 +357,8 @@ export interface GetInventoryLotsResponse {
 export interface GetInventoryLotsParams {
   itemModelId: number;
   depotId: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 // ─── Search Depots by Relief Items ───

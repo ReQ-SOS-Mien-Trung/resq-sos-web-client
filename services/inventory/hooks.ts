@@ -160,7 +160,13 @@ export const INVENTORY_KEYS = {
   stockMovements: (params: GetDepotStockMovementsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
   lots: (params: GetInventoryLotsParams) =>
-    [...INVENTORY_KEYS.all, "lots", params] as const,
+    [
+      "inventory-lots",
+      params.depotId,
+      params.itemModelId,
+      params.pageNumber ?? 1,
+      params.pageSize ?? 20,
+    ] as const,
   warningBandConfig: () =>
     [...INVENTORY_KEYS.all, "warningBandConfig"] as const,
   thresholdsByDepot: (params?: GetThresholdsParams) =>
