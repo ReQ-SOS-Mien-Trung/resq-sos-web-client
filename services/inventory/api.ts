@@ -295,6 +295,8 @@ export async function getMyDepotQuantityByCategory(
     {
       params: {
         depotId: params.depotId,
+        pageNumber: params.pageNumber,
+        pageSize: params.pageSize,
       },
     },
   );

@@ -80,6 +80,17 @@ export type ReceiveAssemblyEventCheckedInRescuersUpdatePayload = {
   changedAt: string;
 };
 
+export type ReceiveInventoryLotsUpdatePayload = {
+  depotId: number;
+  itemModelId: number;
+  operation: string;
+  endpoint: string;
+  query?: {
+    depotId?: number;
+  } | null;
+  changedAt: string;
+};
+
 export const OPERATIONAL_REALTIME_METHODS = {
   SubscribeDepot: "SubscribeDepot",
   UnsubscribeDepot: "UnsubscribeDepot",
@@ -103,6 +114,8 @@ export const OPERATIONAL_REALTIME_METHODS = {
   UnsubscribeUpcomingReturns: "UnsubscribeUpcomingReturns",
   SubscribeDepotCharts: "SubscribeDepotCharts",
   UnsubscribeDepotCharts: "UnsubscribeDepotCharts",
+  SubscribeInventoryLots: "SubscribeInventoryLots",
+  UnsubscribeInventoryLots: "UnsubscribeInventoryLots",
   SubscribeAssemblyEventCheckedInRescuers: "SubscribeAssemblyEventCheckedInRescuers",
   UnsubscribeAssemblyEventCheckedInRescuers: "UnsubscribeAssemblyEventCheckedInRescuers",
 } as const;
@@ -116,5 +129,6 @@ export const OPERATIONAL_REALTIME_EVENTS = {
   ReceiveDepotClosureUpdate: "ReceiveDepotClosureUpdate",
   ReceiveUpcomingReturnsUpdate: "ReceiveUpcomingReturnsUpdate",
   ReceiveChartInvalidation: "ReceiveChartInvalidation",
+  ReceiveInventoryLotsUpdate: "ReceiveInventoryLotsUpdate",
   ReceiveAssemblyEventCheckedInRescuersUpdate: "ReceiveAssemblyEventCheckedInRescuersUpdate",
 } as const;

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -169,8 +170,10 @@ interface ConfirmReturnConsumableDraft {
   expectedQuantity: number;
   reportedQuantity: number;
   quantity: string;
+  note: string;
   expiredDate?: string | null;
   lotAllocations: PickupLotAllocation[];
+  lockQuantityToLots?: boolean;
 }
 
 interface ConfirmReturnReusableUnitDraft {
@@ -178,6 +181,7 @@ interface ConfirmReturnReusableUnitDraft {
   itemModelId: number;
   itemName: string;
   serialNumber: string;
+  isReturned: boolean;
   condition: string;
   note: string;
 }
@@ -189,8 +193,6 @@ interface ConfirmReturnReusableDraft {
   unit: string;
   expectedQuantity: number;
   reportedQuantity: number;
-  quantity: string;
-  lockQuantityToUnits?: boolean;
   units: ConfirmReturnReusableUnitDraft[];
 }
 
@@ -541,9 +543,9 @@ function buildConfirmReturnFormState(
       expectedQuantity,
     );
     const unitsSource =
-      (item.returnedReusableUnits ?? []).length > 0
-        ? (item.returnedReusableUnits ?? [])
-        : (item.expectedReturnUnits ?? []);
+      (item.expectedReturnUnits ?? []).length > 0
+        ? (item.expectedReturnUnits ?? [])
+        : (item.returnedReusableUnits ?? []);
     const itemModelId = resolveReturnItemModelId(item);
 
     if (isReusableReturnItem(item)) {
@@ -554,13 +556,12 @@ function buildConfirmReturnFormState(
         unit: item.unit,
         expectedQuantity,
         reportedQuantity,
-        quantity: formatDraftQuantityInput(expectedQuantity),
-        lockQuantityToUnits: false,
         units: unitsSource.map((unit) => ({
           reusableItemId: unit.reusableItemId,
           itemModelId: unit.itemModelId ?? itemModelId,
           itemName: unit.itemName || item.itemName,
           serialNumber: unit.serialNumber || "",
+          isReturned: true,
           condition: unit.condition || "",
           note: "",
         })),
@@ -577,8 +578,10 @@ function buildConfirmReturnFormState(
       expectedQuantity,
       reportedQuantity,
       quantity: formatDraftQuantityInput(expectedQuantity),
+      note: "",
       expiredDate: getResolvedItemExpiredDate(item),
       lotAllocations: getExpectedReturnLotAllocations(item),
+      lockQuantityToLots: false,
     };
     consumableItems.push(consumableDraft);
   }
@@ -852,15 +855,15 @@ function ConfirmReturnFormSection({
     [],
   );
 
-  const handleReusableQuantityChange = useCallback(
+  const handleConsumableNoteChange = useCallback(
     (itemId: number, value: string) => {
       setForm((prev) => ({
         ...prev,
-        reusableItems: prev.reusableItems.map((row) =>
+        consumableItems: prev.consumableItems.map((row) =>
           row.itemId === itemId
             ? {
                 ...row,
-                quantity: clampQuantityInput(value, row.expectedQuantity),
+                note: value,
               }
             : row,
         ),
@@ -885,6 +888,31 @@ function ConfirmReturnFormSection({
                 units: (row.units ?? []).map((unit) =>
                   unit.reusableItemId === reusableItemId
                     ? { ...unit, [field]: value }
+                    : unit,
+                ),
+              }
+            : row,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const handleReusableUnitReturnedChange = useCallback(
+    (itemId: number, reusableItemId: number, isReturned: boolean) => {
+      setForm((prev) => ({
+        ...prev,
+        reusableItems: prev.reusableItems.map((row) =>
+          row.itemId === itemId
+            ? {
+                ...row,
+                units: (row.units ?? []).map((unit) =>
+                  unit.reusableItemId === reusableItemId
+                    ? {
+                        ...unit,
+                        isReturned,
+                        condition: isReturned ? unit.condition : "",
+                      }
                     : unit,
                 ),
               }
@@ -925,36 +953,56 @@ function ConfirmReturnFormSection({
           );
           return;
         }
-      }
 
-      for (const row of form.reusableItems) {
-        const parsed = Number.parseInt(row.quantity || "0", 10);
-
-        if (!Number.isFinite(parsed) || parsed < 0) {
-          toast.error(`Số lượng xác nhận của "${row.itemName}" chưa hợp lệ.`);
-          return;
-        }
-
-        if (parsed > row.expectedQuantity) {
+        if (parsed < row.expectedQuantity && !row.note.trim()) {
           toast.error(
-            `Số lượng xác nhận của "${row.itemName}" không được vượt quá số dự kiến (${row.expectedQuantity.toLocaleString("vi-VN")} ${row.unit}).`,
+            `Vui lòng nhập ghi chú cho "${row.itemName}" vì số lượng trả về thấp hơn dự kiến.`,
           );
           return;
         }
+      }
 
+      for (const row of form.reusableItems) {
         for (const unit of row.units) {
           const normalizedCondition = normalizeReusableConditionKey(
             unit.condition,
             conditionOptions,
           );
 
-          if (!normalizedCondition) {
+          if (unit.isReturned && !normalizedCondition) {
             toast.error(
               `Vui lòng chọn tình trạng cho thiết bị serial "${unit.serialNumber || unit.reusableItemId}".`,
             );
             return;
           }
+
+          if (!unit.isReturned && !unit.note.trim()) {
+            toast.error(
+              `Vui lòng nhập ghi chú cho thiết bị serial "${unit.serialNumber || unit.reusableItemId}" vì chưa được trả về.`,
+            );
+            return;
+          }
         }
+      }
+
+      const hasDiscrepancy =
+        form.consumableItems.some(
+          (row) =>
+            (Number.parseInt(row.quantity || "0", 10) || 0) <
+            row.expectedQuantity,
+        ) ||
+        form.reusableItems.some((row) =>
+          row.units.some((unit) => !unit.isReturned),
+        );
+      const discrepancyNote = buildDiscrepancyNotePayload(
+        form.discrepancyFields,
+      );
+
+      if (hasDiscrepancy && !discrepancyNote) {
+        toast.error(
+          "Vui lòng nhập ghi chú đối soát khi có thiếu/mất/chênh lệch so với dự kiến.",
+        );
+        return;
       }
 
       try {
@@ -962,31 +1010,29 @@ function ConfirmReturnFormSection({
           missionId: activity.missionId,
           activityId: activity.activityId,
           request: {
-            discrepancyNote: buildDiscrepancyNotePayload(
-              form.discrepancyFields,
-            ),
+            discrepancyNote,
             consumableItems: form.consumableItems.map((row) => {
               const quantity = Number.parseInt(row.quantity || "0", 10) || 0;
-              const { lotAllocations, expiredDate } =
-                buildConfirmReturnLotAllocations(row);
+              const { lotAllocations } = buildConfirmReturnLotAllocations(row);
 
               return {
                 itemModelId: row.itemModelId,
                 quantity,
+                note: normalizeRequestNote(row.note),
                 lotAllocations,
-                expiredDate,
               };
             }),
             reusableItems: form.reusableItems.map((row) => ({
               itemModelId: row.itemModelId,
-              quantity: Number.parseInt(row.quantity || "0", 10) || 0,
               units: (row.units ?? []).map((unit) => ({
                 reusableItemId: unit.reusableItemId,
-                serialNumber: unit.serialNumber,
-                condition: normalizeReusableConditionKey(
-                  unit.condition,
-                  conditionOptions,
-                ),
+                isReturned: unit.isReturned,
+                condition: unit.isReturned
+                  ? normalizeReusableConditionKey(
+                      unit.condition,
+                      conditionOptions,
+                    )
+                  : null,
                 note: normalizeRequestNote(unit.note),
               })),
             })),
@@ -1020,13 +1066,14 @@ function ConfirmReturnFormSection({
   const isFormReady =
     form.consumableItems.every((row) => {
       const v = Number.parseInt(row.quantity || "0", 10);
-      return Number.isFinite(v) && v > 0 && v <= row.expectedQuantity;
+      return Number.isFinite(v) && v >= 0 && v <= row.expectedQuantity;
     }) &&
-    form.reusableItems.every(
-      (row) =>
-        Number.parseInt(row.quantity || "0", 10) > 0 &&
-        Number.parseInt(row.quantity || "0", 10) <= row.expectedQuantity &&
-        row.units.every((u) => !!u.condition),
+    form.reusableItems.every((row) =>
+      row.units.every((u) =>
+        u.isReturned
+          ? !!normalizeReusableConditionKey(u.condition, conditionOptions)
+          : !!u.note.trim(),
+      ),
     );
 
   const consumableSection = hasConsumableItems ? (
@@ -1049,6 +1096,9 @@ function ConfirmReturnFormSection({
               <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap w-36">
                 Số lượng kho xác nhận
               </th>
+              <th className="p-3 text-sm font-semibold tracking-tighter text-foreground min-w-56">
+                Ghi chú
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1066,7 +1116,7 @@ function ConfirmReturnFormSection({
                       {row.lotAllocations
                         .map(
                           (lot) =>
-                            `Lô #${lot.lotId} — ${lot.quantityTaken.toLocaleString("vi-VN")} ${row.unit}${lot.expiredDate ? ` · HSD: ${new Date(lot.expiredDate).toLocaleDateString("vi-VN")}` : ""}`,
+                            `Lô #${lot.lotId}${lot.expiredDate ? ` · HSD: ${new Date(lot.expiredDate).toLocaleDateString("vi-VN")}` : ""}`,
                         )
                         .join(" · ")}
                     </p>
@@ -1091,6 +1141,21 @@ function ConfirmReturnFormSection({
                       )
                     }
                     className="h-8 bg-background text-right w-full"
+                  />
+                </td>
+                <td className="p-3">
+                  <Input
+                    value={row.note}
+                    onChange={(event) =>
+                      handleConsumableNoteChange(row.itemId, event.target.value)
+                    }
+                    placeholder={
+                      Number.parseInt(row.quantity || "0", 10) <
+                      row.expectedQuantity
+                        ? "Bắt buộc nhập..."
+                        : "Ghi chú..."
+                    }
+                    className="h-8 bg-background text-sm"
                   />
                 </td>
               </tr>
@@ -1120,19 +1185,19 @@ function ConfirmReturnFormSection({
         <table className="w-full">
           <thead>
             <tr className="border-b border-border/50">
-              <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+              <th className="min-w-72 p-3 text-left text-sm font-semibold tracking-tighter text-foreground">
                 Tên vật phẩm / Serial
               </th>
               <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
                 Dự kiến
               </th>
-              <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap w-32">
-                Số lượng kho xác nhận
+              <th className="w-28 p-3 text-right text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                Đã trả
               </th>
-              <th className="p-3 text-sm font-semibold tracking-tighter text-foreground w-44">
+              <th className="w-36 p-3 text-sm font-semibold tracking-tighter text-foreground">
                 Tình trạng
               </th>
-              <th className="p-3 text-sm font-semibold tracking-tighter text-foreground">
+              <th className="w-40 p-3 text-sm font-semibold tracking-tighter text-foreground">
                 Ghi chú
               </th>
             </tr>
@@ -1155,20 +1220,13 @@ function ConfirmReturnFormSection({
                       {row.expectedQuantity.toLocaleString("vi-VN")} {row.unit}
                     </span>
                   </td>
-                  <td className="p-3 text-right">
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      value={row.quantity}
-                      placeholder="Nhập"
-                      onChange={(event) =>
-                        handleReusableQuantityChange(
-                          row.itemId,
-                          event.target.value,
-                        )
-                      }
-                      className="h-8 bg-background text-right w-full"
-                    />
+                  <td className="w-28 p-3 text-right">
+                    <span className="whitespace-nowrap text-sm font-semibold tracking-tighter text-emerald-700 dark:text-emerald-300">
+                      {row.units
+                        .filter((unit) => unit.isReturned)
+                        .length.toLocaleString("vi-VN")}{" "}
+                      {row.unit}
+                    </span>
                   </td>
                   <td className="p-3" />
                   <td className="p-3" />
@@ -1180,18 +1238,36 @@ function ConfirmReturnFormSection({
                     className="border-b border-border/20 hover:bg-muted/20 transition-colors"
                   >
                     <td className="p-3 pl-6">
-                      <p className="text-sm font-medium tracking-tighter">
-                        {unit.serialNumber || "—"}
-                      </p>
-                      <p className="text-xs text-muted-foreground tracking-tighter">
-                        Mã số {unit.reusableItemId}
-                      </p>
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={unit.isReturned}
+                          onCheckedChange={(checked) =>
+                            handleReusableUnitReturnedChange(
+                              row.itemId,
+                              unit.reusableItemId,
+                              checked === true,
+                            )
+                          }
+                          aria-label={`Đã trả ${unit.serialNumber || unit.reusableItemId}`}
+                          className="mt-0.5 h-5 w-5 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium tracking-tighter">
+                            {unit.serialNumber || "—"}
+                          </p>
+                          <p className="text-xs text-muted-foreground tracking-tighter">
+                            Mã số {unit.reusableItemId} ·{" "}
+                            {unit.isReturned ? "Đã trả" : "Không thu hồi"}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="p-3" />
                     <td className="p-3" />
                     <td className="p-3">
                       <Select
                         value={unit.condition}
+                        disabled={!unit.isReturned}
                         onValueChange={(value) =>
                           handleReusableUnitFieldChange(
                             row.itemId,
@@ -1201,7 +1277,7 @@ function ConfirmReturnFormSection({
                           )
                         }
                       >
-                        <SelectTrigger className="h-8 w-full bg-background text-sm">
+                        <SelectTrigger className="h-8 w-36 bg-background text-sm">
                           <SelectValue placeholder="Chọn" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1227,8 +1303,10 @@ function ConfirmReturnFormSection({
                             event.target.value,
                           )
                         }
-                        placeholder="Ghi chú..."
-                        className="h-8 bg-background text-sm"
+                        placeholder={
+                          unit.isReturned ? "Ghi chú..." : "Bắt buộc nhập..."
+                        }
+                        className="h-8 w-40 bg-background text-sm"
                       />
                     </td>
                   </tr>
@@ -1303,7 +1381,7 @@ function ConfirmReturnFormSection({
 
         {/* Items */}
         {hasConsumableItems && hasReusableItems ? (
-          <div className="grid grid-cols-[2fr_3fr] gap-4">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[5fr_6fr]">
             {consumableSection}
             {reusableSection}
           </div>
@@ -1839,423 +1917,437 @@ function DetailPanel({
                             : "flex flex-col gap-1.5"
                         }
                       >
-                        {isReturnActivity ? (
-                          (() => {
-                            const returnItems = item.items as UpcomingReturnItem[];
-                            const hasAnyActualReturnData = returnItems.some(
-                              (returnItem) =>
-                                getSafeNumericValue(
-                                  returnItem.actualReturnedQuantity,
-                                  0,
-                                ) > 0 ||
-                                (returnItem.returnedLotAllocations?.length ?? 0) >
-                                  0 ||
-                                (returnItem.returnedReusableUnits?.length ?? 0) >
-                                  0,
-                            );
+                        {isReturnActivity
+                          ? (() => {
+                              const returnItems =
+                                item.items as UpcomingReturnItem[];
+                              const hasAnyActualReturnData = returnItems.some(
+                                (returnItem) =>
+                                  getSafeNumericValue(
+                                    returnItem.actualReturnedQuantity,
+                                    0,
+                                  ) > 0 ||
+                                  (returnItem.returnedLotAllocations?.length ??
+                                    0) > 0 ||
+                                  (returnItem.returnedReusableUnits?.length ??
+                                    0) > 0,
+                              );
 
-                            return (
-                              <table className="w-full">
-                                <thead>
-                                  <tr className="border-b border-border/50">
-                                    <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground w-12"></th>
-                                    <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
-                                      Tên vật phẩm
-                                    </th>
-                                    <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
-                                      Dự kiến hoàn trả
-                                    </th>
-                                    {hasAnyActualReturnData && (
-                                      <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
-                                        Đã trả thực tế
+                              return (
+                                <table className="w-full">
+                                  <thead>
+                                    <tr className="border-b border-border/50">
+                                      <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground w-12"></th>
+                                      <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+                                        Tên vật phẩm
                                       </th>
-                                    )}
-                                    <th
-                                      className={cn(
-                                        "text-left p-3 text-sm font-semibold tracking-tighter text-foreground",
-                                        !hasAnyActualReturnData &&
-                                          "min-w-[34rem] w-[52%]",
+                                      <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                                        Dự kiến hoàn trả
+                                      </th>
+                                      {hasAnyActualReturnData && (
+                                        <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                                          Đã trả thực tế
+                                        </th>
                                       )}
-                                    >
-                                      Chi tiết lô / serial
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {returnItems.map((it) => {
-                                    const expectedQty = Number.isFinite(
-                                      it.quantity,
-                                    )
-                                      ? it.quantity
-                                      : 0;
-                                    const actualQty = Number.isFinite(
-                                      it.actualReturnedQuantity,
-                                    )
-                                      ? it.actualReturnedQuantity
-                                      : 0;
-                                    const expectedLots =
-                                      getExpectedReturnLotAllocations(it);
-                                    const returnedLots =
-                                      it.returnedLotAllocations ?? [];
-                                    const pickupLots =
-                                      it.pickupLotAllocations ?? [];
-                                    const expectedUnits =
-                                      it.expectedReturnUnits ?? [];
-                                    const returnedUnits =
-                                      it.returnedReusableUnits ?? [];
-                                    return (
-                                      <tr
-                                        key={it.itemId}
-                                        className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                                      <th
+                                        className={cn(
+                                          "text-left p-3 text-sm font-semibold tracking-tighter text-foreground",
+                                          !hasAnyActualReturnData &&
+                                            "min-w-[34rem] w-[52%]",
+                                        )}
                                       >
-                                        <td className="p-3 w-10">
-                                          {it.imageUrl ? (
-                                            <button
-                                              onClick={() =>
-                                                setPreviewUrl(it.imageUrl!)
-                                              }
-                                              className="inline-flex items-center justify-center h-8 w-8 rounded transition-colors"
-                                              title="Xem ảnh"
-                                            >
-                                              <Eye className="h-4 w-4 text-muted-foreground" />
-                                            </button>
-                                          ) : (
-                                            <div className="inline-flex items-center justify-center h-8 w-8">
-                                              <Package
-                                                className="h-4 w-4 text-muted-foreground/30"
-                                                weight="fill"
-                                              />
-                                            </div>
-                                          )}
-                                        </td>
-                                        <td className="p-3">
-                                          <p className="text-sm font-medium tracking-tighter">
-                                            {it.itemName}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground tracking-tighter">
-                                            Mã vật phẩm số {it.itemId}
-                                          </p>
-                                        </td>
-                                        <td className="p-3 text-right">
-                                          <span className="text-sm font-semibold tracking-tighter text-blue-600 dark:text-blue-300">
-                                            {expectedQty.toLocaleString("vi-VN")}{" "}
-                                            {it.unit}
-                                          </span>
-                                        </td>
-                                        {hasAnyActualReturnData && (
+                                        Chi tiết lô / serial
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {returnItems.map((it) => {
+                                      const expectedQty = Number.isFinite(
+                                        it.quantity,
+                                      )
+                                        ? it.quantity
+                                        : 0;
+                                      const actualQty = Number.isFinite(
+                                        it.actualReturnedQuantity,
+                                      )
+                                        ? it.actualReturnedQuantity
+                                        : 0;
+                                      const expectedLots =
+                                        getExpectedReturnLotAllocations(it);
+                                      const returnedLots =
+                                        it.returnedLotAllocations ?? [];
+                                      const pickupLots =
+                                        it.pickupLotAllocations ?? [];
+                                      const expectedUnits =
+                                        it.expectedReturnUnits ?? [];
+                                      const returnedUnits =
+                                        it.returnedReusableUnits ?? [];
+                                      return (
+                                        <tr
+                                          key={it.itemId}
+                                          className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                                        >
+                                          <td className="p-3 w-10">
+                                            {it.imageUrl ? (
+                                              <button
+                                                onClick={() =>
+                                                  setPreviewUrl(it.imageUrl!)
+                                                }
+                                                className="inline-flex items-center justify-center h-8 w-8 rounded transition-colors"
+                                                title="Xem ảnh"
+                                              >
+                                                <Eye className="h-4 w-4 text-muted-foreground" />
+                                              </button>
+                                            ) : (
+                                              <div className="inline-flex items-center justify-center h-8 w-8">
+                                                <Package
+                                                  className="h-4 w-4 text-muted-foreground/30"
+                                                  weight="fill"
+                                                />
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td className="p-3">
+                                            <p className="text-sm font-medium tracking-tighter">
+                                              {it.itemName}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground tracking-tighter">
+                                              Mã vật phẩm số {it.itemId}
+                                            </p>
+                                          </td>
                                           <td className="p-3 text-right">
-                                            <span className="text-sm font-semibold tracking-tighter text-emerald-600 dark:text-emerald-300">
-                                              {actualQty.toLocaleString("vi-VN")}{" "}
+                                            <span className="text-sm font-semibold tracking-tighter text-blue-600 dark:text-blue-300">
+                                              {expectedQty.toLocaleString(
+                                                "vi-VN",
+                                              )}{" "}
                                               {it.unit}
                                             </span>
                                           </td>
-                                        )}
-                                        <td
-                                          className={cn(
-                                            "p-3",
-                                            !hasAnyActualReturnData &&
-                                              "min-w-[34rem]",
+                                          {hasAnyActualReturnData && (
+                                            <td className="p-3 text-right">
+                                              <span className="text-sm font-semibold tracking-tighter text-emerald-600 dark:text-emerald-300">
+                                                {actualQty.toLocaleString(
+                                                  "vi-VN",
+                                                )}{" "}
+                                                {it.unit}
+                                              </span>
+                                            </td>
                                           )}
-                                        >
-                                        {expectedLots.length === 0 &&
-                                        returnedLots.length === 0 &&
-                                        pickupLots.length === 0 &&
-                                        expectedUnits.length === 0 &&
-                                        returnedUnits.length === 0 ? (
-                                          <span className="text-sm text-muted-foreground tracking-tighter">
-                                            —
-                                          </span>
-                                        ) : (
-                                          <div className="flex flex-col gap-2">
-                                            {pickupLots.length > 0 && (
-                                              <div className="space-y-1">
-                                                <p className="text-[13px] font-medium tracking-tighter">
-                                                  Lô đã xuất khi lấy
-                                                </p>
-                                                <div className="flex flex-col gap-1">
-                                                  {pickupLots.map((lot) => (
-                                                    <div
-                                                      key={`pickup-${it.itemId}-${lot.lotId}`}
-                                                      className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 text-sm tracking-tighter dark:border-slate-800/40 dark:bg-slate-900/20"
-                                                    >
-                                                      <span className="font-semibold text-foreground">
-                                                        Lô số {lot.lotId}
-                                                      </span>
-                                                      <span className="text-muted-foreground">
-                                                        {" "}
-                                                        —{" "}
-                                                        {lot.quantityTaken.toLocaleString(
-                                                          "vi-VN",
-                                                        )}{" "}
-                                                        {it.unit}
-                                                      </span>
-                                                      {lot.expiredDate && (
-                                                        <span className="text-muted-foreground">
-                                                          {" "}
-                                                          · HSD:{" "}
-                                                          {new Date(
-                                                            lot.expiredDate,
-                                                          ).toLocaleDateString(
-                                                            "vi-VN",
+                                          <td
+                                            className={cn(
+                                              "p-3",
+                                              !hasAnyActualReturnData &&
+                                                "min-w-[34rem]",
+                                            )}
+                                          >
+                                            {expectedLots.length === 0 &&
+                                            returnedLots.length === 0 &&
+                                            pickupLots.length === 0 &&
+                                            expectedUnits.length === 0 &&
+                                            returnedUnits.length === 0 ? (
+                                              <span className="text-sm text-muted-foreground tracking-tighter">
+                                                —
+                                              </span>
+                                            ) : (
+                                              <div className="flex flex-col gap-2">
+                                                {pickupLots.length > 0 && (
+                                                  <div className="space-y-1">
+                                                    <p className="text-[13px] font-medium tracking-tighter">
+                                                      Lô đã xuất khi lấy
+                                                    </p>
+                                                    <div className="flex flex-col gap-1">
+                                                      {pickupLots.map((lot) => (
+                                                        <div
+                                                          key={`pickup-${it.itemId}-${lot.lotId}`}
+                                                          className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 text-sm tracking-tighter dark:border-slate-800/40 dark:bg-slate-900/20"
+                                                        >
+                                                          <span className="font-semibold text-foreground">
+                                                            Lô số {lot.lotId}
+                                                          </span>
+                                                          <span className="text-muted-foreground">
+                                                            {" "}
+                                                            —{" "}
+                                                            {lot.quantityTaken.toLocaleString(
+                                                              "vi-VN",
+                                                            )}{" "}
+                                                            {it.unit}
+                                                          </span>
+                                                          {lot.expiredDate && (
+                                                            <span className="text-muted-foreground">
+                                                              {" "}
+                                                              · HSD:{" "}
+                                                              {new Date(
+                                                                lot.expiredDate,
+                                                              ).toLocaleDateString(
+                                                                "vi-VN",
+                                                              )}
+                                                            </span>
                                                           )}
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            )}
-
-                                            {(expectedLots.length > 0 ||
-                                              returnedLots.length > 0) && (
-                                              <div
-                                                className={cn(
-                                                  "grid gap-2",
-                                                  expectedLots.length > 0 &&
-                                                    returnedLots.length > 0
-                                                    ? "grid-cols-2"
-                                                    : "grid-cols-1",
-                                                )}
-                                              >
-                                                {expectedLots.length > 0 && (
-                                                  <div className="space-y-1">
-                                                    <p className="text-[13px] font-medium tracking-tighter">
-                                                      Lô dự kiến trả
-                                                    </p>
-                                                    <div className="flex flex-col gap-1">
-                                                      {expectedLots.map(
-                                                        (lot) => (
-                                                          <div
-                                                            key={`expected-lot-${it.itemId}-${lot.lotId}`}
-                                                            className="rounded-lg border border-amber-200/60 bg-amber-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-amber-800/40 dark:bg-amber-950/20"
-                                                          >
-                                                            <span className="font-semibold text-foreground">
-                                                              Lô số {lot.lotId}
-                                                            </span>
-                                                            <span className="text-muted-foreground">
-                                                              {" "}
-                                                              —{" "}
-                                                              {lot.quantityTaken.toLocaleString(
-                                                                "vi-VN",
-                                                              )}{" "}
-                                                              {it.unit}
-                                                            </span>
-                                                            {lot.expiredDate && (
-                                                              <span className="text-muted-foreground">
-                                                                {" "}
-                                                                · HSD:{" "}
-                                                                {new Date(
-                                                                  lot.expiredDate,
-                                                                ).toLocaleDateString(
-                                                                  "vi-VN",
-                                                                )}
-                                                              </span>
-                                                            )}
-                                                          </div>
-                                                        ),
-                                                      )}
+                                                        </div>
+                                                      ))}
                                                     </div>
                                                   </div>
                                                 )}
 
-                                                {returnedLots.length > 0 && (
-                                                  <div className="space-y-1">
-                                                    <p className="text-[13px] font-medium tracking-tighter">
-                                                      Lô đã trả thực tế
-                                                    </p>
-                                                    <div className="flex flex-col gap-1">
-                                                      {returnedLots.map(
-                                                        (lot) => (
-                                                          <div
-                                                            key={`returned-lot-${it.itemId}-${lot.lotId}`}
-                                                            className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-emerald-800/40 dark:bg-emerald-950/20"
-                                                          >
-                                                            <span className="font-semibold text-foreground">
-                                                              Lô số {lot.lotId}
-                                                            </span>
-                                                            <span className="text-muted-foreground">
-                                                              {" "}
-                                                              —{" "}
-                                                              {lot.quantityTaken.toLocaleString(
-                                                                "vi-VN",
-                                                              )}{" "}
-                                                              {it.unit}
-                                                            </span>
-                                                            {lot.expiredDate && (
-                                                              <span className="text-muted-foreground">
-                                                                {" "}
-                                                                · HSD:{" "}
-                                                                {new Date(
-                                                                  lot.expiredDate,
-                                                                ).toLocaleDateString(
-                                                                  "vi-VN",
-                                                                )}
-                                                              </span>
-                                                            )}
-                                                          </div>
-                                                        ),
-                                                      )}
-                                                    </div>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-
-                                            {(expectedUnits.length > 0 ||
-                                              returnedUnits.length > 0) && (
-                                              <div
-                                                className={cn(
-                                                  "grid gap-2",
-                                                  expectedUnits.length > 0 &&
-                                                    returnedUnits.length > 0
-                                                    ? "grid-cols-2"
-                                                    : "grid-cols-1",
-                                                )}
-                                              >
-                                                {expectedUnits.length > 0 && (
-                                                  <div className="space-y-1">
-                                                    <p className="text-[13px] font-medium tracking-tighter">
-                                                      Thiết bị dự kiến trả
-                                                    </p>
-                                                    <div className="flex flex-col gap-1">
-                                                      {expectedUnits.map(
-                                                        (unit) => (
-                                                          <div
-                                                            key={`expected-unit-${it.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
-                                                            className="rounded-lg border border-blue-200/60 bg-blue-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-blue-800/40 dark:bg-blue-950/20"
-                                                          >
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                              <span className="font-semibold text-foreground">
-                                                                {unit.serialNumber ||
-                                                                  `Thiết bị #${unit.reusableItemId}`}
-                                                              </span>
-                                                              <span className="text-muted-foreground">
-                                                                Mã số{" "}
-                                                                {
-                                                                  unit.reusableItemId
-                                                                }
-                                                              </span>
-                                                              {unit.condition && (
-                                                                <span className="text-muted-foreground">
-                                                                  · Tình trạng:{" "}
-                                                                  {resolveConditionLabel(
-                                                                    unit.condition,
-                                                                  )}
+                                                {(expectedLots.length > 0 ||
+                                                  returnedLots.length > 0) && (
+                                                  <div
+                                                    className={cn(
+                                                      "grid gap-2",
+                                                      expectedLots.length > 0 &&
+                                                        returnedLots.length > 0
+                                                        ? "grid-cols-2"
+                                                        : "grid-cols-1",
+                                                    )}
+                                                  >
+                                                    {expectedLots.length >
+                                                      0 && (
+                                                      <div className="space-y-1">
+                                                        <p className="text-[13px] font-medium tracking-tighter">
+                                                          Lô dự kiến trả
+                                                        </p>
+                                                        <div className="flex flex-col gap-1">
+                                                          {expectedLots.map(
+                                                            (lot) => (
+                                                              <div
+                                                                key={`expected-lot-${it.itemId}-${lot.lotId}`}
+                                                                className="rounded-lg border border-amber-200/60 bg-amber-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-amber-800/40 dark:bg-amber-950/20"
+                                                              >
+                                                                <span className="font-semibold text-foreground">
+                                                                  Lô số{" "}
+                                                                  {lot.lotId}
                                                                 </span>
-                                                              )}
-                                                            </div>
-                                                            {unit.note && (
-                                                              <p className="mt-1 text-blue-700 dark:text-blue-300">
-                                                                Ghi chú từ đội:{" "}
-                                                                {unit.note}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                        ),
-                                                      )}
-                                                    </div>
+                                                                <span className="text-muted-foreground">
+                                                                  {" "}
+                                                                  —{" "}
+                                                                  {lot.quantityTaken.toLocaleString(
+                                                                    "vi-VN",
+                                                                  )}{" "}
+                                                                  {it.unit}
+                                                                </span>
+                                                                {lot.expiredDate && (
+                                                                  <span className="text-muted-foreground">
+                                                                    {" "}
+                                                                    · HSD:{" "}
+                                                                    {new Date(
+                                                                      lot.expiredDate,
+                                                                    ).toLocaleDateString(
+                                                                      "vi-VN",
+                                                                    )}
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                            ),
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    )}
+
+                                                    {returnedLots.length >
+                                                      0 && (
+                                                      <div className="space-y-1">
+                                                        <p className="text-[13px] font-medium tracking-tighter">
+                                                          Lô đã trả thực tế
+                                                        </p>
+                                                        <div className="flex flex-col gap-1">
+                                                          {returnedLots.map(
+                                                            (lot) => (
+                                                              <div
+                                                                key={`returned-lot-${it.itemId}-${lot.lotId}`}
+                                                                className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-emerald-800/40 dark:bg-emerald-950/20"
+                                                              >
+                                                                <span className="font-semibold text-foreground">
+                                                                  Lô số{" "}
+                                                                  {lot.lotId}
+                                                                </span>
+                                                                <span className="text-muted-foreground">
+                                                                  {" "}
+                                                                  —{" "}
+                                                                  {lot.quantityTaken.toLocaleString(
+                                                                    "vi-VN",
+                                                                  )}{" "}
+                                                                  {it.unit}
+                                                                </span>
+                                                                {lot.expiredDate && (
+                                                                  <span className="text-muted-foreground">
+                                                                    {" "}
+                                                                    · HSD:{" "}
+                                                                    {new Date(
+                                                                      lot.expiredDate,
+                                                                    ).toLocaleDateString(
+                                                                      "vi-VN",
+                                                                    )}
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                            ),
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    )}
                                                   </div>
                                                 )}
 
-                                                {returnedUnits.length > 0 && (
-                                                  <div className="space-y-1">
-                                                    <p className="text-[13px] font-medium tracking-tighter">
-                                                      Thiết bị đã trả thực tế
-                                                    </p>
-                                                    <div className="flex flex-col gap-1">
-                                                      {returnedUnits.map(
-                                                        (unit) => (
-                                                          <div
-                                                            key={`returned-unit-${it.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
-                                                            className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-emerald-800/40 dark:bg-emerald-950/20"
-                                                          >
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                              <span className="font-semibold text-foreground">
-                                                                {unit.serialNumber ||
-                                                                  `Thiết bị #${unit.reusableItemId}`}
-                                                              </span>
-                                                              <span className="text-muted-foreground">
-                                                                Mã số{" "}
-                                                                {
-                                                                  unit.reusableItemId
-                                                                }
-                                                              </span>
-                                                              {unit.condition && (
-                                                                <span className="text-muted-foreground">
-                                                                  · Tình trạng:{" "}
-                                                                  {resolveConditionLabel(
-                                                                    unit.condition,
+                                                {(expectedUnits.length > 0 ||
+                                                  returnedUnits.length > 0) && (
+                                                  <div
+                                                    className={cn(
+                                                      "grid gap-2",
+                                                      expectedUnits.length >
+                                                        0 &&
+                                                        returnedUnits.length > 0
+                                                        ? "grid-cols-2"
+                                                        : "grid-cols-1",
+                                                    )}
+                                                  >
+                                                    {expectedUnits.length >
+                                                      0 && (
+                                                      <div className="space-y-1">
+                                                        <p className="text-[13px] font-medium tracking-tighter">
+                                                          Thiết bị dự kiến trả
+                                                        </p>
+                                                        <div className="flex flex-col gap-1">
+                                                          {expectedUnits.map(
+                                                            (unit) => (
+                                                              <div
+                                                                key={`expected-unit-${it.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
+                                                                className="rounded-lg border border-blue-200/60 bg-blue-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-blue-800/40 dark:bg-blue-950/20"
+                                                              >
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                  <span className="font-semibold text-foreground">
+                                                                    {unit.serialNumber ||
+                                                                      `Thiết bị #${unit.reusableItemId}`}
+                                                                  </span>
+                                                                  <span className="text-muted-foreground">
+                                                                    Mã số{" "}
+                                                                    {
+                                                                      unit.reusableItemId
+                                                                    }
+                                                                  </span>
+                                                                  {unit.condition && (
+                                                                    <span className="text-muted-foreground">
+                                                                      · Tình
+                                                                      trạng:{" "}
+                                                                      {resolveConditionLabel(
+                                                                        unit.condition,
+                                                                      )}
+                                                                    </span>
                                                                   )}
-                                                                </span>
-                                                              )}
-                                                            </div>
-                                                            {unit.note && (
-                                                              <p className="mt-1 text-emerald-700 dark:text-emerald-300">
-                                                                Ghi chú:{" "}
-                                                                {unit.note}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                        ),
-                                                      )}
-                                                    </div>
+                                                                </div>
+                                                                {unit.note && (
+                                                                  <p className="mt-1 text-blue-700 dark:text-blue-300">
+                                                                    Ghi chú từ
+                                                                    đội:{" "}
+                                                                    {unit.note}
+                                                                  </p>
+                                                                )}
+                                                              </div>
+                                                            ),
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    )}
+
+                                                    {returnedUnits.length >
+                                                      0 && (
+                                                      <div className="space-y-1">
+                                                        <p className="text-[13px] font-medium tracking-tighter">
+                                                          Thiết bị đã trả thực
+                                                          tế
+                                                        </p>
+                                                        <div className="flex flex-col gap-1">
+                                                          {returnedUnits.map(
+                                                            (unit) => (
+                                                              <div
+                                                                key={`returned-unit-${it.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
+                                                                className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-emerald-800/40 dark:bg-emerald-950/20"
+                                                              >
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                  <span className="font-semibold text-foreground">
+                                                                    {unit.serialNumber ||
+                                                                      `Thiết bị #${unit.reusableItemId}`}
+                                                                  </span>
+                                                                  <span className="text-muted-foreground">
+                                                                    Mã số{" "}
+                                                                    {
+                                                                      unit.reusableItemId
+                                                                    }
+                                                                  </span>
+                                                                  {unit.condition && (
+                                                                    <span className="text-muted-foreground">
+                                                                      · Tình
+                                                                      trạng:{" "}
+                                                                      {resolveConditionLabel(
+                                                                        unit.condition,
+                                                                      )}
+                                                                    </span>
+                                                                  )}
+                                                                </div>
+                                                                {unit.note && (
+                                                                  <p className="mt-1 text-emerald-700 dark:text-emerald-300">
+                                                                    Ghi chú:{" "}
+                                                                    {unit.note}
+                                                                  </p>
+                                                                )}
+                                                              </div>
+                                                            ),
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    )}
                                                   </div>
                                                 )}
                                               </div>
                                             )}
-                                          </div>
-                                        )}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            );
-                          })()
-                        ) : (
-                          item.items.map((it, idx) => (
-                            <motion.div
-                              key={it.itemId}
-                              className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-colors px-3 py-2.5"
-                              initial={{ opacity: 0, x: -8 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{
-                                delay: 0.04 + idx * 0.03,
-                                type: "spring",
-                                stiffness: 260,
-                                damping: 22,
-                              }}
-                            >
-                              {it.imageUrl ? (
-                                <img
-                                  src={it.imageUrl}
-                                  alt={it.itemName}
-                                  className="h-16 w-16 rounded-lg object-cover border border-border/60 shrink-0"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center border border-border/60 shrink-0">
-                                  <Package
-                                    className="h-7 w-7 text-muted-foreground"
-                                    weight="fill"
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              );
+                            })()
+                          : item.items.map((it, idx) => (
+                              <motion.div
+                                key={it.itemId}
+                                className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-colors px-3 py-2.5"
+                                initial={{ opacity: 0, x: -8 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{
+                                  delay: 0.04 + idx * 0.03,
+                                  type: "spring",
+                                  stiffness: 260,
+                                  damping: 22,
+                                }}
+                              >
+                                {it.imageUrl ? (
+                                  <img
+                                    src={it.imageUrl}
+                                    alt={it.itemName}
+                                    className="h-16 w-16 rounded-lg object-cover border border-border/60 shrink-0"
+                                    loading="lazy"
                                   />
+                                ) : (
+                                  <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center border border-border/60 shrink-0">
+                                    <Package
+                                      className="h-7 w-7 text-muted-foreground"
+                                      weight="fill"
+                                    />
+                                  </div>
+                                )}
+                                <span className="flex-1 text-base font-semibold tracking-tight leading-snug line-clamp-1">
+                                  {it.itemName}
+                                </span>
+                                <div className="flex items-baseline gap-1 shrink-0">
+                                  <span className="text-xl font-bold text-orange-500 tabular-nums">
+                                    {it.quantity.toLocaleString("vi-VN")}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground tracking-tighter">
+                                    {it.unit}
+                                  </span>
                                 </div>
-                              )}
-                              <span className="flex-1 text-base font-semibold tracking-tight leading-snug line-clamp-1">
-                                {it.itemName}
-                              </span>
-                              <div className="flex items-baseline gap-1 shrink-0">
-                                <span className="text-xl font-bold text-orange-500 tabular-nums">
-                                  {it.quantity.toLocaleString("vi-VN")}
-                                </span>
-                                <span className="text-sm text-muted-foreground tracking-tighter">
-                                  {it.unit}
-                                </span>
-                              </div>
-                            </motion.div>
-                          ))
-                        )}
+                              </motion.div>
+                            ))}
                       </div>
                     )}
                   </div>
@@ -2816,7 +2908,7 @@ function ActivityOperationsPanel({
   useInventoryOperationalRealtime({
     depotActivities: {
       depotId: selectedDepotId,
-      activityId: panelOpen ? selectedItem?.activityId ?? null : null,
+      activityId: panelOpen ? (selectedItem?.activityId ?? null) : null,
     },
     upcomingReturns: {
       depotId: selectedDepotId,
