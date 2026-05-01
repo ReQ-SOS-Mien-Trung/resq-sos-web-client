@@ -12284,22 +12284,24 @@ const RescuePlanPanel = ({
                               />
                               Các bước thực hiện
                             </h3>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 relative">
                               <Badge
                                 variant="secondary"
                                 className="text-sm h-5 px-2"
                               >
                                 {editActivities.length} bước
                               </Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-sm gap-1 border-dashed"
-                                onClick={addEditActivity}
-                              >
-                                <Plus className="h-3 w-3" weight="bold" />
-                                Thêm bước
-                              </Button>
+                              <div className="relative">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-sm gap-1 border-dashed bg-background/50 hover:bg-background shadow-xs transition-all"
+                                  onClick={addEditActivity}
+                                >
+                                  <Plus className="h-3 w-3" weight="bold" />
+                                  Thêm bước
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
@@ -12342,20 +12344,19 @@ const RescuePlanPanel = ({
                                       : undefined
                                   }
                                   className={cn(
-                                    isGroupedExecution
-                                      ? "overflow-hidden rounded-2xl border shadow-sm transition-all"
+                                    "isGroupedExecution"
+                                      ? "overflow-hidden rounded-xl border-2 shadow-sm transition-all"
                                       : "space-y-3",
                                     isGroupedExecution &&
                                       (groupHasError
-                                        ? "border-red-300/80 bg-red-50/20 shadow-red-100/70 dark:border-red-800/70 dark:bg-red-950/10"
+                                        ? "border-red-400 bg-red-50/20 dark:border-red-800 dark:bg-red-950/10"
                                         : group.matchedSOS?.priority === "P1"
-                                          ? "border-red-200/80 bg-red-50/40 dark:border-red-800/40 dark:bg-red-950/10"
+                                          ? "border-red-400 bg-red-50/30 dark:border-red-800 dark:bg-red-950/10"
                                           : group.matchedSOS?.priority === "P2"
-                                            ? "border-orange-200/80 bg-orange-50/40 dark:border-orange-800/40 dark:bg-orange-950/10"
-                                            : group.matchedSOS?.priority ===
-                                                "P3"
-                                              ? "border-amber-200/80 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/10"
-                                              : "border-border/80 bg-card/80"),
+                                            ? "border-orange-400 bg-orange-50/30 dark:border-orange-800 dark:bg-orange-950/10"
+                                            : group.matchedSOS?.priority === "P3"
+                                              ? "border-amber-400 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/10"
+                                              : "border-border bg-card"),
                                     dragOverGroupId === group.id &&
                                       dragGroupId !== group.id &&
                                       "ring-2 ring-primary/30 ring-offset-2",
@@ -12387,7 +12388,7 @@ const RescuePlanPanel = ({
                                           }
                                           onDragEnd={handleGroupDragEnd}
                                           className={cn(
-                                            "mt-0.5 flex h-11 w-11 shrink-0 cursor-grab items-center justify-center rounded-2xl border border-primary/20 bg-primary/5 text-primary shadow-sm active:cursor-grabbing",
+                                            "mt-0.5 flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-xl border border-primary/10 bg-primary/5 text-primary/70 shadow-xs active:cursor-grabbing",
                                             dragGroupId === group.id &&
                                               "scale-95 opacity-60",
                                           )}
@@ -12638,6 +12639,7 @@ const RescuePlanPanel = ({
                                         return (
                                           <div
                                             key={activity._id}
+                                            className="relative group/step"
                                             data-edit-activity-id={activity._id}
                                             onDragOver={
                                               lockGeneralActivityEdits
@@ -12651,22 +12653,36 @@ const RescuePlanPanel = ({
                                                 : () => handleDrop(idx)
                                             }
                                             onDragEnd={handleDragEnd}
-                                            className={cn(
-                                              "space-y-2.5 rounded-xl border bg-background p-3 transition-all",
-                                              hasActivityError &&
-                                                "border-red-300 bg-red-50/40 shadow-sm shadow-red-100/60 dark:border-red-800/70 dark:bg-red-950/10 dark:shadow-none",
-                                              !hasActivityError &&
-                                                hasSupplyBalanceIssues &&
-                                                "border-amber-300 bg-amber-50/30 shadow-sm shadow-amber-100/60 dark:border-amber-700/60 dark:bg-amber-950/10 dark:shadow-none",
-                                              dragIdx === idx
-                                                ? "scale-[0.98] opacity-50"
-                                                : "hover:shadow-sm",
-                                              dragOverIdx === idx &&
-                                                dragIdx !== idx &&
-                                                "border-primary/30 ring-2 ring-primary/40",
-                                            )}
                                           >
+
+
+                                            <div
+                                              className={cn(
+                                                "space-y-3 rounded-xl border-2 bg-card p-4 transition-all shadow-sm",
+                                                hasActivityError
+                                                  ? "border-red-400 bg-red-50/30 dark:border-red-800 dark:bg-red-950/10"
+                                                  : hasSupplyBalanceIssues
+                                                    ? "border-amber-400 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/10"
+                                                    : "border-border bg-card",
+                                                dragIdx === idx
+                                                  ? "scale-[0.98] opacity-50"
+                                                  : "hover:border-primary/30 hover:shadow-md",
+                                                dragOverIdx === idx &&
+                                                  dragIdx !== idx &&
+                                                  "border-primary ring-2 ring-primary/20",
+                                              )}
+                                            >
                                             <div className="flex items-center gap-2">
+                                              <div
+                                                className={cn(
+                                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black shadow-xs",
+                                                  hasActivityError
+                                                    ? "bg-red-500 text-white"
+                                                    : [config.bgColor, config.color],
+                                                )}
+                                              >
+                                                {idx + 1}
+                                              </div>
                                               <div
                                                 draggable={
                                                   !lockGeneralActivityEdits &&
@@ -12701,29 +12717,16 @@ const RescuePlanPanel = ({
                                                 }}
                                                 onDragEnd={handleDragEnd}
                                                 className={cn(
-                                                  "text-muted-foreground",
+                                                  "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
                                                   lockGeneralActivityEdits
-                                                    ? "cursor-not-allowed opacity-45"
-                                                    : "cursor-grab hover:text-foreground active:cursor-grabbing",
+                                                    ? "cursor-not-allowed opacity-30"
+                                                    : "cursor-grab hover:bg-muted hover:text-foreground active:cursor-grabbing",
                                                 )}
                                               >
                                                 <DotsSixVertical
                                                   className="h-4 w-4"
                                                   weight="bold"
                                                 />
-                                              </div>
-                                              <div
-                                                className={cn(
-                                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                                                  hasActivityError
-                                                    ? "bg-red-100 text-red-700 ring-1 ring-red-300 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-700/60"
-                                                    : [
-                                                        config.bgColor,
-                                                        config.color,
-                                                      ],
-                                                )}
-                                              >
-                                                {idx + 1}
                                               </div>
                                               {isManual ? (
                                                 <Select
@@ -12881,9 +12884,9 @@ const RescuePlanPanel = ({
                                               </div>
                                             ) : null}
 
-                                            <div>
-                                              <Label className="text-sm uppercase tracking-wider text-muted-foreground">
-                                                Mô tả
+                                            <div className="bg-muted/10 dark:bg-muted/5 p-2.5 rounded-lg border border-border/20 space-y-1.5">
+                                              <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 flex items-center gap-1.5">
+                                                Mô tả chi tiết
                                               </Label>
                                               {isManual ? (
                                                 <textarea
@@ -13516,6 +13519,7 @@ const RescuePlanPanel = ({
                                                 ) : null}
                                               </div>
                                             ) : null}
+                                            </div>
                                           </div>
                                         );
                                       },
