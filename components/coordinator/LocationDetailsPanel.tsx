@@ -763,25 +763,11 @@ function DepotDetails({
                             {category.categoryName}
                           </p>
                           <span className="text-[11px] font-medium text-muted-foreground">
-                            {availQty.toLocaleString("vi-VN")} khả dụng
+                            {availQty.toLocaleString("vi-VN")} sản phẩm
                           </span>
                         </div>
 
-                        <div className="mt-2 flex items-center gap-4">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-muted-foreground uppercase">Tiêu thụ</span>
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                              {category.totalConsumableQuantity.toLocaleString("vi-VN")}
-                            </span>
-                          </div>
-                          <div className="w-px h-6 bg-border/60" />
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-muted-foreground uppercase">Tái sử dụng</span>
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                              {category.totalReusableUnits.toLocaleString("vi-VN")}
-                            </span>
-                          </div>
-                        </div>
+
                       </div>
                     </div>
                   </div>
