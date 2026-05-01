@@ -1788,8 +1788,8 @@ function ActionFlowTimeline({
     <div className="relative">
       <AiOriginNode />
       <div className="ml-12 space-y-0">
-        {activities.slice(0, revealedCount).map((activity) => (
-          <ActivityFlowNode key={activity.step} activity={activity} />
+        {activities.slice(0, revealedCount).map((activity, idx) => (
+          <ActivityFlowNode key={`${activity.step}-${idx}`} activity={activity} />
         ))}
       </div>
       {revealedCount < activities.length && (
@@ -2244,9 +2244,9 @@ function ActivityFlowNode({
         {activity.suppliesToCollect &&
           activity.suppliesToCollect.length > 0 && (
             <div className="ml-9 flex flex-wrap gap-1.5 mt-1">
-              {activity.suppliesToCollect.map((supply) => (
+              {activity.suppliesToCollect.map((supply, idx) => (
                 <div
-                  key={supply.itemId}
+                  key={`${supply.itemId}-${idx}`}
                   className="supply-tag flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/15 text-sm"
                 >
                   <Package className="h-4 w-4 text-primary" weight="fill" />
