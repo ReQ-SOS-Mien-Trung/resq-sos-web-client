@@ -59,7 +59,7 @@ function formatQuantity(quantity: number, unit: string): string {
   return `${quantity} ${unit}`.trim();
 }
 
-function getSupplyIdentity(supply: {
+export function getSupplyIdentity(supply: {
   itemId?: number | null;
   itemName?: string | null;
   unit?: string | null;

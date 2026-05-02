@@ -39,6 +39,7 @@ import {
   getSOSClusterMaxSizeBySeverity,
   getSOSClusterRemainingCapacity,
   getSOSClusterRequestCount,
+  getSOSPriorityForClusterSeverity,
 } from "@/lib/sos-cluster-capacity";
 import type {
   ClusterLifecycleStatus,
@@ -79,7 +80,6 @@ import {
   Eye,
   X,
   Brain,
-  ShieldCheck,
   Tray,
   Trash,
   ArrowsDownUp,
@@ -488,6 +488,46 @@ function getClusterCapacityLimitMessage(
   } chỉ được tối đa ${maxSize} SOS. Hiện đã có ${currentCount}/${maxSize} SOS.${addingText}`;
 }
 
+function getClusterPriorityMismatchMessage(
+  cluster: SOSClusterEntity,
+  sosRequests: SOSRequest[],
+): string | null {
+  const expectedPriority = getSOSPriorityForClusterSeverity(
+    cluster.severityLevel,
+  );
+  const mismatchedSOSRequests = sosRequests.filter(
+    (sos) => sos.priority !== expectedPriority,
+  );
+
+  if (mismatchedSOSRequests.length === 0) {
+    return null;
+  }
+
+  const preview = mismatchedSOSRequests
+    .slice(0, 3)
+    .map((sos) => `SOS ${sos.id} (${PRIORITY_LABELS[sos.priority]})`)
+    .join(", ");
+  const suffix = mismatchedSOSRequests.length > 3 ? ", ..." : "";
+
+  return `Cụm #${cluster.id} mức ${
+    CLUSTER_SEVERITY_LABELS[cluster.severityLevel]
+  } chỉ nhận SOS mức ${PRIORITY_LABELS[expectedPriority]}. Không thể thêm ${preview}${suffix}.`;
+}
+
+function getClusterDropBlockedMessage(cluster: SOSClusterEntity): string | null {
+  const clusterStatus = resolveClusterStatus(cluster);
+
+  if (clusterStatus === "Pending" || clusterStatus === "Suggested") {
+    return null;
+  }
+
+  if (clusterStatus === "InProgress") {
+    return `Cụm #${cluster.id} đang thực hiện nhiệm vụ, không thể kéo thêm SOS vào cụm này.`;
+  }
+
+  return `Cụm #${cluster.id} đã hoàn thành, không thể kéo thêm SOS vào cụm này.`;
+}
+
 const STANDALONE_REQUESTS_PAGE_SIZE = 8;
 const BACKEND_CLUSTERS_PAGE_SIZE = 6;
 const AUTO_CLUSTERS_PAGE_SIZE = 4;
@@ -738,6 +778,25 @@ const SOSSidebar = ({
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeDragSOS, setActiveDragSOS] = useState<SOSRequest | null>(null);
 
+  const draggableSOSById = useMemo(() => {
+    const byId = new Map<string, SOSRequest>();
+
+    for (const sos of sosRequests) {
+      byId.set(normalizeSOSRequestId(sos.id), sos);
+    }
+
+    if (incomingRequests) {
+      for (const sos of incomingRequests) {
+        const key = normalizeSOSRequestId(sos.id);
+        if (!byId.has(key)) {
+          byId.set(key, sos);
+        }
+      }
+    }
+
+    return byId;
+  }, [incomingRequests, sosRequests]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -753,9 +812,7 @@ const SOSSidebar = ({
       return;
     }
     const sosIdStr = String(event.active.id).replace("sos-", "");
-    const sos =
-      sosRequests.find((s) => String(s.id) === sosIdStr) ||
-      incomingRequests?.find((s) => String(s.id) === sosIdStr);
+    const sos = draggableSOSById.get(normalizeSOSRequestId(sosIdStr));
     setActiveDragSOS(sos || null);
   };
 
@@ -780,9 +837,7 @@ const SOSSidebar = ({
     // Drop SOS to Cart
     if (activeId.startsWith("sos-") && overId === "cart") {
       const sosIdStr = activeId.replace("sos-", "");
-      const sosToAdd =
-        sosRequests.find((s) => String(s.id) === sosIdStr) ||
-        incomingRequests?.find((s) => String(s.id) === sosIdStr);
+      const sosToAdd = draggableSOSById.get(normalizeSOSRequestId(sosIdStr));
 
       if (sosToAdd && !cartItems.some((item) => item.id === sosToAdd.id)) {
         setCartItems((prev) => [...prev, sosToAdd]);
@@ -805,6 +860,13 @@ const SOSSidebar = ({
           return;
         }
 
+        const clusterDropBlockedMessage =
+          getClusterDropBlockedMessage(targetCluster);
+        if (clusterDropBlockedMessage) {
+          toast.error(clusterDropBlockedMessage);
+          return;
+        }
+
         const sosRequestIds = getNewSOSRequestIdsForCluster(
           targetCluster,
           cartItems.map((item) => item.id),
@@ -812,6 +874,21 @@ const SOSSidebar = ({
 
         if (sosRequestIds.length === 0) {
           toast.error("Các SOS này đã thuộc cụm hoặc không hợp lệ.");
+          return;
+        }
+
+        const newSOSRequestIdSet = new Set(
+          sosRequestIds.map(normalizeSOSRequestId),
+        );
+        const newCartSOSRequests = cartItems.filter((item) =>
+          newSOSRequestIdSet.has(normalizeSOSRequestId(item.id)),
+        );
+        const priorityMismatchError = getClusterPriorityMismatchMessage(
+          targetCluster,
+          newCartSOSRequests,
+        );
+        if (priorityMismatchError) {
+          toast.error(priorityMismatchError);
           return;
         }
 
@@ -867,11 +944,33 @@ const SOSSidebar = ({
           return;
         }
 
+        const clusterDropBlockedMessage =
+          getClusterDropBlockedMessage(targetCluster);
+        if (clusterDropBlockedMessage) {
+          toast.error(clusterDropBlockedMessage);
+          return;
+        }
+
         const sosRequestIds = getNewSOSRequestIdsForCluster(targetCluster, [
           sosId,
         ]);
         if (sosRequestIds.length === 0) {
           toast.error(`SOS ${sosId} đã thuộc cụm #${clusterId}.`);
+          return;
+        }
+
+        const sosToAdd = draggableSOSById.get(normalizeSOSRequestId(sosId));
+        if (!sosToAdd) {
+          toast.error("Không tìm thấy thông tin SOS để kiểm tra mức độ.");
+          return;
+        }
+
+        const priorityMismatchError = getClusterPriorityMismatchMessage(
+          targetCluster,
+          [sosToAdd],
+        );
+        if (priorityMismatchError) {
+          toast.error(priorityMismatchError);
           return;
         }
 
@@ -1957,33 +2056,12 @@ const SOSSidebar = ({
                             </p>
 
                             {/* Evaluation Scores Section */}
-                            {(sos.evaluation?.ruleEvaluation ||
-                              sos.evaluation?.aiAnalyses?.length) && (
+                            {sos.evaluation?.aiAnalyses &&
+                              sos.evaluation.aiAnalyses.length > 0 && (
                               <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
-                                {sos.evaluation.ruleEvaluation && (
-                                  <div
-                                    className="flex items-center gap-1.5 min-w-0"
-                                    title="Điểm hệ thống (Rule-base)"
-                                  >
-                                    <ShieldCheck
-                                      className="h-3.5 w-3.5 text-blue-500 shrink-0"
-                                      weight="fill"
-                                    />
-                                    <span className="text-xs font-medium text-muted-foreground tracking-tighter">
-                                      Hệ thống:
-                                    </span>
-                                    <span className="text-xs font-mono font-bold text-foreground">
-                                      {sos.evaluation.ruleEvaluation.totalScore.toFixed(
-                                        1,
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-
                                 {sos.evaluation.aiAnalyses &&
                                   sos.evaluation.aiAnalyses.length > 0 && (
                                     <>
-                                      <div className="w-px h-3 bg-border/60 shrink-0" />
                                       <div
                                         className={cn(
                                           "flex items-center gap-1.5 min-w-0",
@@ -2833,37 +2911,14 @@ const SOSSidebar = ({
                                             </p>
 
                                             {/* Evaluation Scores Section */}
-                                            {(sos.evaluation?.ruleEvaluation ||
-                                              (sos.evaluation?.aiAnalyses &&
-                                                sos.evaluation.aiAnalyses
-                                                  .length > 0)) && (
+                                            {sos.evaluation?.aiAnalyses &&
+                                              sos.evaluation.aiAnalyses.length >
+                                                0 && (
                                               <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
-                                                {sos.evaluation
-                                                  .ruleEvaluation && (
-                                                  <div
-                                                    className="flex items-center gap-1.5 min-w-0"
-                                                    title="Điểm hệ thống (Rule-base)"
-                                                  >
-                                                    <ShieldCheck
-                                                      className="h-3.5 w-3.5 text-blue-500 shrink-0"
-                                                      weight="fill"
-                                                    />
-                                                    <span className="text-xs font-medium tracking-tighter">
-                                                      Hệ thống:
-                                                    </span>
-                                                    <span className="text-xs font-mono font-bold text-foreground">
-                                                      {sos.evaluation.ruleEvaluation.totalScore.toFixed(
-                                                        1,
-                                                      )}
-                                                    </span>
-                                                  </div>
-                                                )}
-
                                                 {sos.evaluation.aiAnalyses &&
                                                   sos.evaluation.aiAnalyses
                                                     .length > 0 && (
                                                     <>
-                                                      <div className="w-px h-3 bg-border/60 shrink-0" />
                                                       <div
                                                         className={cn(
                                                           "flex items-center gap-1.5 min-w-0",

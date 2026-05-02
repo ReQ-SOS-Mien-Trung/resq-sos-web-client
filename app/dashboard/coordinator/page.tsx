@@ -116,6 +116,7 @@ import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { useSosClusterGroupingConfig } from "@/services/config/hooks";
+import { PRIORITY_LABELS } from "@/lib/priority";
 
 // ── Lazy-loaded map components ──
 
@@ -208,6 +209,13 @@ function compareSOSIds(leftId: string, rightId: string): number {
   return leftId.localeCompare(rightId);
 }
 
+function normalizeSOSId(id: string | number): string {
+  const normalized = String(id).trim();
+  const numericId = Number(normalized);
+
+  return Number.isFinite(numericId) ? String(numericId) : normalized;
+}
+
 function compareSOSSeeds(left: SOSRequest, right: SOSRequest): number {
   const priorityDelta =
     SOS_PRIORITY_ORDER[left.priority] - SOS_PRIORITY_ORDER[right.priority];
@@ -282,6 +290,31 @@ function compareAutoClusterCandidates(
   return compareSOSIds(left.request.id, right.request.id);
 }
 
+function getPriorityMismatchMessage(requests: SOSRequest[]): string | null {
+  const uniquePriorities = Array.from(
+    new Set(requests.map((request) => request.priority)),
+  ).sort(
+    (left, right) => SOS_PRIORITY_ORDER[left] - SOS_PRIORITY_ORDER[right],
+  );
+
+  if (uniquePriorities.length <= 1) {
+    return null;
+  }
+
+  const breakdown = uniquePriorities
+    .map((priority) => {
+      const ids = requests
+        .filter((request) => request.priority === priority)
+        .map((request) => `SOS ${request.id}`)
+        .join(", ");
+
+      return `${PRIORITY_LABELS[priority]}: ${ids}`;
+    })
+    .join("; ");
+
+  return `Không thể gom SOS khác mức độ ưu tiên. ${breakdown}.`;
+}
+
 /** Build client-side auto-clusters using config-driven incremental radius scans. */
 function buildAutoClusters(
   sosRequests: SOSRequest[],
@@ -337,7 +370,9 @@ function buildAutoClusters(
       const neighborsWithinRadius = pending
         .filter(
           (candidate) =>
-            candidate.id !== seed.id && !clusteredIds.has(candidate.id),
+            candidate.id !== seed.id &&
+            candidate.priority === seed.priority &&
+            !clusteredIds.has(candidate.id),
         )
         .map((candidate) => ({
           request: candidate,
@@ -917,6 +952,23 @@ const CoordinatorDashboardContent = () => {
     () => mapSOSRequestEntitiesToSOS(sidebarSosData?.items ?? []),
     [sidebarSosData],
   );
+
+  const actionSOSById = useMemo(() => {
+    const byId = new Map<string, SOSRequest>();
+
+    for (const sos of sosRequests) {
+      byId.set(normalizeSOSId(sos.id), sos);
+    }
+
+    for (const sos of sidebarSOSRequests) {
+      const key = normalizeSOSId(sos.id);
+      if (!byId.has(key)) {
+        byId.set(key, sos);
+      }
+    }
+
+    return byId;
+  }, [sidebarSOSRequests, sosRequests]);
 
   useEffect(() => {
     if (!selectedSOS) {
@@ -1552,15 +1604,20 @@ const CoordinatorDashboardContent = () => {
     (clusterGroups: SOSRequest[][]) => {
       const validClusterGroups = clusterGroups
         .map((group) =>
-          group
-            .filter((s) => s.status === "PENDING")
-            .map((s) => Number(s.id))
-            .filter(Boolean),
+          group.filter((s) => s.status === "PENDING" && Boolean(Number(s.id))),
         )
-        .filter((ids) => ids.length > 0);
+        .filter((group) => group.length > 0);
 
       if (validClusterGroups.length === 0) {
         toast.error("Không còn SOS chờ xử lý để gom cụm.");
+        return;
+      }
+
+      const mixedPriorityError = validClusterGroups
+        .map(getPriorityMismatchMessage)
+        .find((message): message is string => message != null);
+      if (mixedPriorityError) {
+        toast.error(mixedPriorityError);
         return;
       }
 
@@ -1568,7 +1625,9 @@ const CoordinatorDashboardContent = () => {
       let failed = 0;
       const total = validClusterGroups.length;
 
-      validClusterGroups.forEach((ids) => {
+      validClusterGroups.forEach((group) => {
+        const ids = group.map((s) => Number(s.id)).filter(Boolean);
+
         createCluster(
           { sosRequestIds: ids },
           {
@@ -1605,12 +1664,19 @@ const CoordinatorDashboardContent = () => {
 
   const handleProcessClusterOnly = useCallback(
     (sosIds: string[]) => {
-      const pendingIds = sosIds.filter((id) => {
-        const sos = sosRequests.find((s) => s.id === id);
-        return sos?.status === "PENDING";
-      });
-      const ids = pendingIds.map(Number).filter(Boolean);
+      const pendingRequests = sosIds
+        .map((id) => actionSOSById.get(normalizeSOSId(id)))
+        .filter(
+          (sos): sos is SOSRequest => !!sos && sos.status === "PENDING",
+        );
+      const ids = pendingRequests.map((sos) => Number(sos.id)).filter(Boolean);
       if (ids.length === 0) return;
+
+      const priorityError = getPriorityMismatchMessage(pendingRequests);
+      if (priorityError) {
+        toast.error(priorityError);
+        return;
+      }
 
       const clusterIdx = autoClusters.findIndex((cluster) =>
         sosIds.every((id) => cluster.some((s) => s.id === id)),
@@ -1643,17 +1709,24 @@ const CoordinatorDashboardContent = () => {
         },
       );
     },
-    [sosRequests, autoClusters, createCluster, markSOSRequestsAsClustered],
+    [actionSOSById, autoClusters, createCluster, markSOSRequestsAsClustered],
   );
 
   const handleProcessSOS = useCallback(
     (sosIds: string[]) => {
-      const pendingIds = sosIds.filter((id) => {
-        const sos = sosRequests.find((s) => s.id === id);
-        return sos?.status === "PENDING";
-      });
-      const ids = pendingIds.map(Number).filter(Boolean);
+      const pendingRequests = sosIds
+        .map((id) => actionSOSById.get(normalizeSOSId(id)))
+        .filter(
+          (sos): sos is SOSRequest => !!sos && sos.status === "PENDING",
+        );
+      const ids = pendingRequests.map((sos) => Number(sos.id)).filter(Boolean);
       if (ids.length === 0) return;
+
+      const priorityError = getPriorityMismatchMessage(pendingRequests);
+      if (priorityError) {
+        toast.error(priorityError);
+        return;
+      }
 
       const clusterIdx = autoClusters.findIndex((cluster) =>
         sosIds.every((id) => cluster.some((s) => s.id === id)),
@@ -1692,7 +1765,7 @@ const CoordinatorDashboardContent = () => {
       );
     },
     [
-      sosRequests,
+      actionSOSById,
       autoClusters,
       createCluster,
       aiStream,
