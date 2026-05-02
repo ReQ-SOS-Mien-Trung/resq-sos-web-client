@@ -31,7 +31,11 @@ import {
   getSupplyLabel,
   getWaterDurationLabel,
 } from "@/lib/sos";
-import { analyzeMissionSupplyBalance } from "@/lib/mission-supply-balance";
+import {
+  analyzeMissionSupplyBalance,
+  getSupplyIdentity,
+  type SupplyBalanceIssue,
+} from "@/lib/mission-supply-balance";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import {
   formatSupplyBufferPercent,
@@ -3865,6 +3869,15 @@ function getSupplyStepTitle(activityType: string): string {
 function toValidTeamId(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeSupplyMatchText(value?: string | null): string {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 function toValidSosRequestId(value: unknown): number | null {
@@ -9089,6 +9102,196 @@ const RescuePlanPanel = ({
     setPendingRemoval(null);
   }, [pendingRemoval, removeEditActivity, handleRemoveSupply]);
 
+  const handleQuickFixSupplyIssue = useCallback(
+    (issue: SupplyBalanceIssue<string>) => {
+      const teamId = issue.teamId;
+      const itemKey = issue.itemKey;
+      const issueActivityIndex = editActivities.findIndex(
+        (activity) => activity._id === issue.activityId,
+      );
+      const searchStartIndex =
+        issueActivityIndex >= 0
+          ? issueActivityIndex
+          : Math.min(Math.max(issue.step - 1, 0), editActivities.length - 1);
+      const issueItemId = itemKey.startsWith("id:")
+        ? Number(itemKey.replace("id:", ""))
+        : null;
+      const issueItemName = normalizeSupplyMatchText(issue.itemName);
+      const matchesIssueSupply = (
+        supply: Pick<ClusterSupplyCollection, "itemId" | "itemName" | "unit">,
+      ) => {
+        const supplyItemId = Number(supply.itemId);
+        if (
+          Number.isFinite(issueItemId) &&
+          issueItemId != null &&
+          issueItemId > 0 &&
+          supplyItemId === issueItemId
+        ) {
+          return true;
+        }
+
+        const identity = getSupplyIdentity(supply);
+        if (identity.itemKey === itemKey) {
+          return true;
+        }
+
+        return (
+          issueItemName.length > 0 &&
+          normalizeSupplyMatchText(identity.itemName) === issueItemName
+        );
+      };
+      let targetActivityIdx = -1;
+
+      const findTargetCollectActivity = (strictTeam: boolean) => {
+        let fallbackIdx = -1;
+
+        for (let i = searchStartIndex; i >= 0; i -= 1) {
+          const candidate = editActivities[i];
+          if (candidate.activityType !== "COLLECT_SUPPLIES") {
+            continue;
+          }
+
+          if (
+            strictTeam &&
+            toValidTeamId(candidate.suggestedTeam?.teamId) !== teamId
+          ) {
+            continue;
+          }
+
+          const hasItem = candidate.suppliesToCollect?.some(matchesIssueSupply);
+
+          if (issue.issueType === "insufficient-collected") {
+            if (fallbackIdx === -1) {
+              fallbackIdx = i;
+            }
+            if (hasItem) {
+              return i;
+            }
+            continue;
+          }
+
+          if (hasItem) {
+            return i;
+          }
+        }
+
+        return issue.issueType === "insufficient-collected" ? fallbackIdx : -1;
+      };
+
+      targetActivityIdx = findTargetCollectActivity(true);
+      if (targetActivityIdx === -1) {
+        targetActivityIdx = findTargetCollectActivity(false);
+      }
+
+      if (
+        targetActivityIdx === -1 &&
+        issue.issueType === "remaining-supplies" &&
+        issueActivityIndex >= 0
+      ) {
+        const issueActivity = editActivities[issueActivityIndex];
+        if (
+          issueActivity.activityType === "COLLECT_SUPPLIES" &&
+          issueActivity.suppliesToCollect?.some(matchesIssueSupply)
+        ) {
+          targetActivityIdx = issueActivityIndex;
+        }
+      }
+
+      if (targetActivityIdx === -1) {
+        if (issue.issueType === "insufficient-collected") {
+          toast.error(
+            "Không tìm thấy bước Thu gom vật phẩm phù hợp để tự động sửa.",
+            {
+              description:
+                "Vui lòng thêm bước Thu gom vật phẩm trước khi phân phát.",
+            },
+          );
+        } else {
+          toast.error(
+            "Không tìm thấy bước Thu gom vật phẩm gốc để điều chỉnh giảm.",
+          );
+        }
+        return;
+      }
+
+      const targetActivity = { ...editActivities[targetActivityIdx] };
+      const targetSupplies = [...(targetActivity.suppliesToCollect ?? [])];
+      const targetSupplyIdx = targetSupplies.findIndex(matchesIssueSupply);
+      let fixedQuantity = issue.quantity;
+
+      if (issue.issueType === "insufficient-collected") {
+        if (targetSupplyIdx >= 0) {
+          targetSupplies[targetSupplyIdx] = {
+            ...targetSupplies[targetSupplyIdx],
+            quantity: targetSupplies[targetSupplyIdx].quantity + issue.quantity,
+          };
+        } else {
+          const itemId = itemKey.startsWith("id:")
+            ? Number(itemKey.replace("id:", ""))
+            : null;
+          targetSupplies.push({
+            itemId: Number.isFinite(itemId) ? itemId : null,
+            itemName: issue.itemName,
+            quantity: issue.quantity,
+            unit: issue.unit,
+            bufferRatio: 0,
+          });
+        }
+      } else {
+        if (targetSupplyIdx < 0) {
+          toast.error(
+            "Không tìm thấy bước Thu gom vật phẩm gốc để điều chỉnh giảm.",
+          );
+          return;
+        }
+
+        const currentQty = targetSupplies[targetSupplyIdx].quantity;
+        fixedQuantity = Math.min(currentQty, issue.quantity);
+        const nextQty = currentQty - fixedQuantity;
+
+        if (nextQty <= 0) {
+          targetSupplies.splice(targetSupplyIdx, 1);
+        } else {
+          targetSupplies[targetSupplyIdx] = {
+            ...targetSupplies[targetSupplyIdx],
+            quantity: nextQty,
+          };
+        }
+      }
+
+      targetActivity.suppliesToCollect =
+        targetSupplies.length > 0 ? targetSupplies : null;
+      const nextActivities = editActivities.map((activity, index) =>
+        index === targetActivityIdx ? targetActivity : activity,
+      );
+
+      clearEditActivityErrors();
+      setEditActivities(
+        syncReturnActivitiesWithCollectors(nextActivities, {
+          sourceActivityId: targetActivity._id,
+        }),
+      );
+      setExpandedEditSupplyKeys((previous) => ({
+        ...previous,
+        [targetActivity._id]: true,
+      }));
+      toast.success(
+        issue.issueType === "insufficient-collected"
+          ? `Đã tự tăng ${issue.itemName} thêm ${fixedQuantity} ${issue.unit} ở Bước ${targetActivityIdx + 1}.`
+          : `Đã tự giảm ${issue.itemName} ${fixedQuantity} ${issue.unit} ở Bước ${targetActivityIdx + 1}.`,
+        {
+          description: `Đã cân bằng vật phẩm cho ${issue.teamName || "đội cứu hộ"}.`,
+        },
+      );
+    },
+    [
+      clearEditActivityErrors,
+      editActivities,
+      setEditActivities,
+      syncReturnActivitiesWithCollectors,
+    ],
+  );
+
   const editSupplyBalanceAnalysis = useMemo(
     () =>
       analyzeMissionSupplyBalance(
@@ -13303,7 +13506,15 @@ const RescuePlanPanel = ({
                                                   >
                                                     {hasSupplyBalanceIssues &&
                                                     primarySupplyBalanceIssue ? (
-                                                      <div className="mb-2 rounded-lg border border-amber-300/80 bg-amber-100/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-200">
+                                                      <button
+                                                        type="button"
+                                                        className="mb-2 w-full rounded-lg border border-amber-300/80 bg-amber-100/80 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                                                        onClick={() =>
+                                                          handleQuickFixSupplyIssue(
+                                                            primarySupplyBalanceIssue,
+                                                          )
+                                                        }
+                                                      >
                                                         <p className="flex items-center gap-1.5 font-semibold">
                                                           <Warning
                                                             className="h-3.5 w-3.5 shrink-0"
@@ -13326,7 +13537,14 @@ const RescuePlanPanel = ({
                                                             cảnh báo tương tự
                                                           </p>
                                                         ) : null}
-                                                      </div>
+                                                        <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold">
+                                                          <ArrowsClockwise
+                                                            className="h-3.5 w-3.5"
+                                                            weight="bold"
+                                                          />
+                                                          Tự sửa vật phẩm
+                                                        </span>
+                                                      </button>
                                                     ) : null}
 
                                                     {isReturnSuppliesActivity ? (
@@ -14636,14 +14854,25 @@ const RescuePlanPanel = ({
         {/* Footer */}
         <div className="p-4 border-t shrink-0 bg-background">
           {isEditMode && editSupplyBalanceAnalysis.firstIssue ? (
-            <div className="mb-3 rounded-xl border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/25 dark:text-amber-200">
+            <button
+              type="button"
+              className="mb-3 w-full rounded-xl border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:border-amber-700/60 dark:bg-amber-950/25 dark:text-amber-200 dark:hover:bg-amber-900/35"
+              onClick={() => {
+                const firstIssue = editSupplyBalanceAnalysis.firstIssue;
+                if (firstIssue) handleQuickFixSupplyIssue(firstIssue);
+              }}
+            >
               <p className="font-semibold">
                 Cần xử lý cảnh báo vật phẩm trước khi xác nhận
               </p>
               <p className="mt-1 leading-relaxed">
                 {editSupplyBalanceAnalysis.firstIssue.message}
               </p>
-            </div>
+              <span className="mt-2 inline-flex items-center gap-1.5 font-semibold">
+                <ArrowsClockwise className="h-3.5 w-3.5" weight="bold" />
+                Tự sửa vật phẩm
+              </span>
+            </button>
           ) : null}
 
           <div className="flex items-center gap-3">

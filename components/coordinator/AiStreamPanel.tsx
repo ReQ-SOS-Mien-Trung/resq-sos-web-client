@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
 import { Icon as IconifyIcon } from "@iconify/react";
 import { cn } from "@/lib/utils";
-import { formatSupplyBufferPercent } from "@/lib/supply-buffer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -373,11 +372,13 @@ function ActivityExecutionMeta({
 
 function TargetVictimsBlock({
   activity,
+  className,
 }: {
   activity: Pick<
     ClusterSuggestedActivity,
     "targetVictimSummary" | "targetVictims" | "sosRequestId"
   >;
+  className?: string;
 }) {
   const victims = Array.isArray(activity.targetVictims)
     ? activity.targetVictims
@@ -387,7 +388,7 @@ function TargetVictimsBlock({
   if (victims.length === 0 && !fallbackSummary) return null;
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-white/50 p-3 transition-all hover:shadow-md dark:border-rose-800/30 dark:from-rose-950/20 dark:to-background">
+    <div className={cn("group relative overflow-hidden rounded-xl border border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-white/50 p-3 transition-all hover:shadow-md dark:border-rose-800/30 dark:from-rose-950/20 dark:to-background", className)}>
       <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
         <Users className="h-4 w-4" weight="fill" />
         Đối tượng cần hỗ trợ
@@ -1910,7 +1911,7 @@ function StatsRow({
         return (
           <div
             key={s.label}
-            className="stat-hex flex flex-col items-center gap-1 p-3 rounded-xl bg-card border hover:border-primary/20 transition-colors"
+            className="stat-hex h-full flex flex-col items-center justify-center gap-1.5 p-4 rounded-2xl bg-card border hover:border-primary/20 transition-all hover:shadow-md"
           >
             {typeof s.icon === "string" ? (
               <IconifyIcon
@@ -2131,13 +2132,13 @@ function ActivityFlowNode({
         <div className="ml-10">
           <ActivityExecutionMeta activity={activity} />
 
-          <div className={cn("grid gap-4 mt-4 mb-4", hasVictims ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1")}>
+          <div className={cn("grid gap-4 mt-4 mb-4 items-stretch", hasVictims ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1")}>
             {/* Cột trái: Nạn nhân & Ghi chú phối hợp (Tạo bối cảnh) */}
-            <div className="space-y-4">
-              {hasVictims && <TargetVictimsBlock activity={activity} />}
+            <div className="space-y-4 flex flex-col">
+              {hasVictims && <TargetVictimsBlock activity={activity} className="flex-1" />}
               
               {activity.coordinationNotes ? (
-                <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white p-3.5 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-background">
+                <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white p-3.5 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-background flex-shrink-0">
                   <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
                     <Sparkle className="h-4 w-4" />
                     Ghi chú phối hợp
@@ -2150,9 +2151,9 @@ function ActivityFlowNode({
             </div>
 
             {/* Cột phải: Đội ngũ, Điểm tập kết & Kho bãi (Thực thi) */}
-            <div className="space-y-4">
+            <div className="space-y-4 flex flex-col">
               {activity.suggestedTeam && (
-                <div className="group relative overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white p-4 transition-all hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-950/20 dark:to-background">
+                <div className="group relative overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white p-4 transition-all hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-950/20 dark:to-background flex-1">
                   <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
                     <ShieldCheck className="h-4 w-4" weight="fill" />
                     Đội ngũ đề xuất
@@ -2243,26 +2244,36 @@ function ActivityFlowNode({
 
         {activity.suppliesToCollect &&
           activity.suppliesToCollect.length > 0 && (
-            <div className="ml-9 flex flex-wrap gap-1.5 mt-1">
-              {activity.suppliesToCollect.map((supply, idx) => (
-                <div
-                  key={`${supply.itemId}-${idx}`}
-                  className="supply-tag flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/15 text-sm"
-                >
-                  <Package className="h-4 w-4 text-primary" weight="fill" />
-                  <span className="">{supply.itemName}</span>
-                  <span className="text-primary font-bold">
-                    ×{supply.quantity}
-                  </span>
-                  <span className="">{supply.unit}</span>
-                  {normalizedActivityType === "COLLECT_SUPPLIES" &&
-                    !isReusableSupplyCollection(supply) ? (
-                    <span className="rounded bg-amber-50 px-2 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                      Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
-                    </span>
-                  ) : null}
-                </div>
-              ))}
+            <div className="ml-9 mt-6 border-t border-dashed border-border pt-4">
+              <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                <Package className="h-3.5 w-3.5" />
+                Vật phẩm cần chuẩn bị
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {activity.suppliesToCollect.map((supply, idx) => (
+                  <div
+                    key={`${supply.itemId}-${idx}`}
+                    className="supply-tag flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-primary/[0.03] border border-primary/10 text-[13px] transition-all hover:border-primary/20 hover:bg-primary/[0.05]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Package className="h-4 w-4" weight="fill" />
+                      </div>
+                      <span className="font-bold text-foreground truncate">
+                        {supply.itemName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[14px] font-black text-primary">
+                        ×{supply.quantity}
+                      </span>
+                      <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                        {supply.unit}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
       </div>
@@ -2346,7 +2357,7 @@ function ResourcesBlock({
         {resources.map((res, idx) => (
           <div
             key={idx}
-            className="resource-card flex items-center gap-2.5 p-2.5 rounded-lg border bg-card"
+            className="resource-card flex items-center gap-3 p-3 rounded-xl border bg-card transition-all hover:shadow-sm hover:border-blue-500/30"
           >
             <div className="text-blue-500 dark:text-blue-400 shrink-0">
               {resourceTypeIcons[res.resourceType] || (

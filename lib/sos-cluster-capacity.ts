@@ -21,6 +21,26 @@ export const SOS_CLUSTER_MAX_SIZE_BY_SEVERITY: Record<
   Low: 4,
 };
 
+export const SOS_PRIORITY_TO_CLUSTER_SEVERITY: Record<
+  Priority,
+  ClusterSeverityLevel
+> = {
+  P1: "Critical",
+  P2: "High",
+  P3: "Medium",
+  P4: "Low",
+};
+
+export const CLUSTER_SEVERITY_TO_SOS_PRIORITY: Record<
+  ClusterSeverityLevel,
+  Priority
+> = {
+  Critical: "P1",
+  High: "P2",
+  Medium: "P3",
+  Low: "P4",
+};
+
 type ClusterCapacityInput = Pick<
   SOSClusterEntity,
   "severityLevel" | "sosRequestCount" | "sosRequestIds"
@@ -30,6 +50,25 @@ export function getSOSClusterMaxSizeBySeverity(
   severityLevel: ClusterSeverityLevel,
 ): number {
   return SOS_CLUSTER_MAX_SIZE_BY_SEVERITY[severityLevel] ?? 3;
+}
+
+export function getSOSPriorityForClusterSeverity(
+  severityLevel: ClusterSeverityLevel,
+): Priority {
+  return CLUSTER_SEVERITY_TO_SOS_PRIORITY[severityLevel] ?? "P3";
+}
+
+export function getClusterSeverityForSOSPriority(
+  priority: Priority,
+): ClusterSeverityLevel {
+  return SOS_PRIORITY_TO_CLUSTER_SEVERITY[priority] ?? "Medium";
+}
+
+export function isSOSPriorityCompatibleWithClusterSeverity(
+  priority: Priority,
+  severityLevel: ClusterSeverityLevel,
+): boolean {
+  return getClusterSeverityForSOSPriority(priority) === severityLevel;
 }
 
 export function getSOSClusterRequestCount(
