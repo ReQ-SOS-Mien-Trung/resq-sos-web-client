@@ -288,13 +288,22 @@ const ITEMS_NEEDED_LABELS: Record<string, { label: string; icon: string }> = {
   FIRST_AID_KIT: { label: "Bộ sơ cứu", icon: "ph:first-aid-kit" },
   MEDICAL_SUPPLIES: { label: "Vật phẩm y tế", icon: "ph:pill" },
   BANDAGES: { label: "Băng gạc", icon: "uil:band-aid" },
-  BLOOD_CLOTTING_AGENTS: { label: "Thuốc cầm máu", icon: "healthicons:medicine-bottle-outline" },
+  BLOOD_CLOTTING_AGENTS: {
+    label: "Thuốc cầm máu",
+    icon: "healthicons:medicine-bottle-outline",
+  },
   LIFE_JACKET: { label: "Áo phao", icon: "ph:lifebuoy" },
   RESCUE_BOAT: { label: "Xuồng cứu hộ", icon: "ph:boat" },
   ROPE: { label: "Dây thừng", icon: "game-icons:rope-coil" },
   RESCUE_EQUIPMENT: { label: "Thiết bị cứu hộ", icon: "ion:help-buoy-outline" },
-  FIRE_EXTINGUISHER: { label: "Bình chữa cháy", icon: "fluent-emoji-high-contrast:fire-extinguisher" },
-  PROTECTIVE_GEAR: { label: "Đồ bảo hộ", icon: "fluent-emoji-high-contrast:rescue-workers-helmet" },
+  FIRE_EXTINGUISHER: {
+    label: "Bình chữa cháy",
+    icon: "fluent-emoji-high-contrast:fire-extinguisher",
+  },
+  PROTECTIVE_GEAR: {
+    label: "Đồ bảo hộ",
+    icon: "fluent-emoji-high-contrast:rescue-workers-helmet",
+  },
   TRANSPORT_VEHICLE: { label: "Phương tiện vận chuyển", icon: "ph:ambulance" },
   STRETCHER: { label: "Cáng cứu thương", icon: "uil:stretcher" },
 };
@@ -2018,18 +2027,6 @@ const SOSDetailsPanel = ({
           <div>
             <h4 className="text-base tracking-tighter font-semibold mb-2 flex items-center gap-2">
               Nội dung cầu cứu
-              {(() => {
-                const match = sosRequest.message?.match(/\[([^\]]+)\]/);
-                if (!match) return null;
-                return (
-                  <Badge
-                    variant="destructive"
-                    className="font-medium text-sm px-2 py-1.5 tracking-tighter rounded"
-                  >
-                    {match[1]}
-                  </Badge>
-                );
-              })()}
             </h4>
             <div className="bg-muted/30 rounded-lg p-4 border shadow-sm">
               {sosRequest.address && (

@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect, memo } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+  memo,
+  type ComponentType,
+} from "react";
+import gsap from "gsap";
 import { useQuery } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { RescuePlanPanelProps } from "@/type";
@@ -161,8 +170,35 @@ import {
   FirstAid,
   ForkKnife,
   WarehouseIcon,
+  Truck,
+  Eye,
+  Sparkle,
+  Brain,
+  Camera,
+  UserFocus,
 } from "@phosphor-icons/react";
 import { Icon } from "@iconify/react";
+
+/* ═══ Activity icon map ═══ */
+const activityIconMap: Record<
+  string,
+  ComponentType<{ className?: string; weight?: string }>
+> = {
+  COLLECT_SUPPLIES: Package,
+  DELIVER_SUPPLIES: Truck,
+  RESCUE: (props) => (
+    <Icon icon="fluent-emoji-high-contrast:rescue-workers-helmet" {...props} />
+  ),
+  MEDICAL_AID: FirstAid,
+  EVACUATE: Users,
+  ASSESS: Eye,
+  COORDINATE: TreeStructure,
+  RETURN_SUPPLIES: ArrowsClockwise,
+  RETURN_ASSEMBLY_POINT: MapPin,
+  RETURN_TO_ASSEMBLY_POINT: MapPin,
+  RETURN_ASSEMBLY: MapPin,
+  MIXED: Sparkle,
+};
 
 // Extract lat/lng from activity description text
 // Matches patterns like "17.214, 106.785" or "17.2195,106.792"
@@ -802,68 +838,40 @@ function ActivityExecutionMeta({
   const executionModeLabel = formatExecutionModeLabel(activity.executionMode);
   const requiredTeamCount = getRequiredTeamCount(activity);
   const warningMessage = getActivityExecutionWarning(activity);
-  const destinationLabel =
-    trimToNull(activity.destinationName) ??
-    formatCoordinateLabel(
-      activity.destinationLatitude,
-      activity.destinationLongitude,
-    );
 
   if (
     !executionModeLabel &&
     requiredTeamCount === 0 &&
     activity.sosRequestId == null &&
     activity.depotId == null &&
-    !destinationLabel &&
     !warningMessage
   ) {
     return null;
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div className={cn("flex flex-wrap gap-2", className)}>
+      {requiredTeamCount > 0 ? (
+        <Badge className="h-7 border-emerald-200/50 bg-emerald-50/80 px-2.5 text-[13px] font-semibold text-emerald-700 backdrop-blur-sm dark:border-emerald-800/30 dark:bg-emerald-900/30 dark:text-emerald-300">
+          <Users className="mr-1.5 h-3.5 w-3.5" weight="bold" />
+          {requiredTeamCount} đội cần hỗ trợ
+        </Badge>
+      ) : null}
       {activity.sosRequestId != null ? (
-        <Badge variant="outline" className="h-5 px-1.5 text-sm">
+        <Badge className="h-7 border-rose-200/50 bg-rose-50/80 px-2.5 text-[13px] font-semibold text-rose-700 backdrop-blur-sm dark:border-rose-800/30 dark:bg-rose-900/30 dark:text-rose-300">
+          <MapPin className="mr-1.5 h-3.5 w-3.5" weight="fill" />
           SOS #{activity.sosRequestId}
         </Badge>
       ) : null}
       {activity.depotId != null ? (
-        <Badge
-          variant="outline"
-          className="h-5 border-amber-200 bg-amber-50 px-1.5 text-sm text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300"
-        >
+        <Badge className="h-7 border-amber-300/50 bg-amber-50/80 px-2.5 text-[13px] font-semibold text-amber-700 backdrop-blur-sm dark:border-amber-700/30 dark:bg-amber-900/30 dark:text-amber-300">
+          <WarehouseIcon className="mr-1.5 h-3.5 w-3.5" weight="fill" />
           Kho #{activity.depotId}
         </Badge>
       ) : null}
-      {destinationLabel ? (
-        <Badge
-          variant="outline"
-          className="h-5 border-blue-200 bg-blue-50 px-1.5 text-sm text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
-        >
-          Điểm đến: {destinationLabel}
-        </Badge>
-      ) : null}
-      {executionModeLabel ? (
-        <Badge
-          variant="outline"
-          className="h-5 border-indigo-200 bg-indigo-50 px-1.5 text-sm text-indigo-700 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300"
-        >
-          {executionModeLabel}
-        </Badge>
-      ) : null}
-      {requiredTeamCount > 0 ? (
-        <Badge
-          variant="outline"
-          className="h-5 border-emerald-200 bg-emerald-50 px-1.5 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300"
-        >
-          {requiredTeamCount} đội cần
-        </Badge>
-      ) : null}
       {warningMessage ? (
-        <Badge
-          variant="outline"
-          className="h-5 border-amber-300 bg-amber-50 px-1.5 text-sm font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-        >
+        <Badge className="h-7 border-amber-300/50 bg-amber-50/80 px-2.5 text-[13px] font-semibold text-amber-700 backdrop-blur-sm dark:border-amber-700/30 dark:bg-amber-900/30 dark:text-amber-300">
+          <Warning className="mr-1.5 h-3.5 w-3.5" weight="fill" />
           Chưa gán đội
         </Badge>
       ) : null}
@@ -901,24 +909,26 @@ function ActivityExecutionWarningBlock({
 
 function CoordinationNotesBlock({
   activity,
+  className,
 }: {
-  activity: Pick<
-    ClusterSuggestedActivity,
-    "coordinationGroupKey" | "coordinationNotes"
-  >;
+  activity: Pick<ClusterSuggestedActivity, "coordinationNotes">;
+  className?: string;
 }) {
   const notes = trimToNull(activity.coordinationNotes);
   if (!notes) return null;
 
   return (
-    <div className="mt-2 rounded-md border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-2 dark:border-indigo-800/50 dark:bg-indigo-950/20">
-      <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-        Phối hợp
-        {activity.coordinationGroupKey
-          ? `: ${activity.coordinationGroupKey}`
-          : ""}
+    <div
+      className={cn(
+        "rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white p-3.5 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-background",
+        className,
+      )}
+    >
+      <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+        <Sparkle className="h-4 w-4" />
+        Ghi chú phối hợp
       </p>
-      <p className="mt-0.5 text-sm leading-relaxed text-indigo-700/85 dark:text-indigo-200/85">
+      <p className="text-[13px] font-medium leading-relaxed text-indigo-900/80 dark:text-indigo-200/80">
         {notes}
       </p>
     </div>
@@ -927,126 +937,92 @@ function CoordinationNotesBlock({
 
 function TargetVictimsBlock({
   activity,
-  compact = false,
   className,
+  compact = false,
 }: {
   activity: Pick<
     ClusterSuggestedActivity,
     "targetVictimSummary" | "targetVictims" | "sosRequestId"
   >;
-  compact?: boolean;
   className?: string;
+  compact?: boolean;
 }) {
   const victims = Array.isArray(activity.targetVictims)
     ? activity.targetVictims
     : [];
   const fallbackSummary = buildVictimFallbackSummary(activity);
 
-  if (victims.length === 0 && !fallbackSummary) {
-    return null;
-  }
+  if (victims.length === 0 && !fallbackSummary) return null;
 
   return (
     <div
       className={cn(
-        "rounded-md border border-rose-200/70 bg-rose-50/60 px-2.5 py-2 dark:border-rose-800/40 dark:bg-rose-950/20",
+        "group relative overflow-hidden rounded-xl border border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-white/50 p-3 transition-all hover:shadow-md dark:border-rose-800/30 dark:from-rose-950/20 dark:to-background",
         className,
       )}
     >
-      <p className="flex items-center gap-1 text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-        <Users className="h-3.5 w-3.5" weight="fill" />
+      <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+        <Users className="h-4 w-4" weight="fill" />
         Đối tượng cần hỗ trợ
       </p>
-
       {victims.length === 0 ? (
-        <p className="mt-1 text-sm leading-relaxed text-rose-700/85 dark:text-rose-200/85">
+        <p className="text-[13px] font-medium leading-relaxed text-rose-700/85 dark:text-rose-200/85">
           {fallbackSummary}
         </p>
       ) : (
-        <div className={cn("mt-1.5", compact ? "space-y-1" : "space-y-1.5")}>
+        <div className="space-y-2">
           {victims.map((victim, index) => {
+            const medicalIssues = getVictimMedicalIssues(victim);
             const personTypeLabel = victim.personType
               ? getPersonTypeLabel(victim.personType)
               : "Nạn nhân";
             const severityLabel = formatVictimSeverityLabel(victim.severity);
-            const medicalIssues = getVictimMedicalIssues(victim);
             const phone = trimToNull(victim.personPhone);
-            const diet = trimToNull(victim.specialDietDescription);
-            const clothingGender = trimToNull(victim.clothingGender);
-            const needsClothing = victim.clothingNeeded === true;
 
             return (
               <div
                 key={`${victim.personId ?? "victim"}-${index}`}
-                className="rounded border border-rose-100 bg-background/90 px-2 py-1.5 text-sm shadow-sm dark:border-rose-900/50"
+                className="rounded-lg border border-rose-100/50 bg-background/80 p-2.5 shadow-sm dark:border-rose-900/30"
               >
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex min-w-0 items-center gap-1 font-semibold text-foreground">
-                    <User className="h-3.5 w-3.5 shrink-0 text-rose-500" />
-                    <span className="truncate">
-                      {getVictimDisplayName(victim)}
-                    </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-sm font-bold text-foreground">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
+                      <User className="h-3 w-3" weight="bold" />
+                    </div>
+                    {getVictimDisplayName(victim)}
                   </span>
-                  <Badge variant="outline" className="h-5 px-1.5 text-sm">
+                  <Badge className="bg-muted/50 px-1.5 py-0 text-[11px] font-bold text-muted-foreground">
                     {personTypeLabel}
                   </Badge>
                   {victim.isInjured ? (
                     <Badge
-                      variant="outline"
-                      className="h-5 border-red-200 bg-red-50 px-1.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300"
+                      variant="destructive"
+                      className="bg-rose-500/10 px-1.5 py-0 text-[11px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
                     >
-                      Bị thương{severityLabel ? `: ${severityLabel}` : ""}
-                    </Badge>
-                  ) : severityLabel ? (
-                    <Badge variant="outline" className="h-5 px-1.5 text-sm">
-                      {severityLabel}
+                      BỊ THƯƠNG
+                      {severityLabel ? `: ${severityLabel.toUpperCase()}` : ""}
                     </Badge>
                   ) : null}
                   {phone ? (
-                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
                       <Phone className="h-3 w-3" />
                       {phone}
                     </span>
                   ) : null}
                 </div>
-
-                {!compact && medicalIssues.length > 0 ? (
-                  <div className="mt-1 flex flex-wrap gap-1">
+                {!compact && medicalIssues.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {medicalIssues.slice(0, 4).map((issue) => (
-                      <Badge
+                      <span
                         key={issue}
-                        variant="outline"
-                        className="h-5 border-red-200 bg-red-50 px-1.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300"
+                        className="inline-flex items-center rounded-md bg-rose-50/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
                       >
                         <FirstAid className="mr-1 h-3 w-3" weight="fill" />
                         {getMedicalIssueLabel(issue)}
-                      </Badge>
+                      </span>
                     ))}
-                    {medicalIssues.length > 4 ? (
-                      <Badge variant="outline" className="h-5 px-1.5 text-sm">
-                        +{medicalIssues.length - 4}
-                      </Badge>
-                    ) : null}
                   </div>
-                ) : null}
-
-                {!compact && (diet || needsClothing) ? (
-                  <div className="mt-1 flex flex-wrap gap-1 text-sm text-muted-foreground">
-                    {diet ? (
-                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
-                        Chế độ ăn: {diet}
-                      </span>
-                    ) : null}
-                    {needsClothing ? (
-                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
-                        Cần quần áo
-                        {clothingGender
-                          ? ` (${getClothingGenderLabel(clothingGender)})`
-                          : ""}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
+                )}
               </div>
             );
           })}
@@ -5093,6 +5069,48 @@ function getTeamAssignmentStatusMeta(status: string | null | undefined): {
     };
   }
 
+  if (
+    normalizedStatus === "completed" ||
+    normalizedStatus === "succeed" ||
+    normalizedStatus === "success"
+  ) {
+    return {
+      label: "Hoàn thành",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+    };
+  }
+
+  if (
+    normalizedStatus === "completedwaitingreport" ||
+    normalizedStatus === "completed_waiting_report"
+  ) {
+    return {
+      label: "Hoàn thành – Chờ báo cáo",
+      className:
+        "bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700",
+    };
+  }
+
+  if (normalizedStatus === "reported") {
+    return {
+      label: "Đã báo cáo",
+      className:
+        "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-700",
+    };
+  }
+
+  if (
+    normalizedStatus === "waitingreport" ||
+    normalizedStatus === "waiting_report"
+  ) {
+    return {
+      label: "Chờ báo cáo",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
   return {
     label: status || "Chưa rõ",
     className:
@@ -7899,6 +7917,23 @@ const MissionTeamRoutePreview = ({
   );
 };
 
+// ── AI Origin Node ──
+function AiOriginNode() {
+  return (
+    <div className="flex items-center gap-3 mb-0">
+      <div className="w-10 h-10 shrink-0 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+        <Brain className="h-4 w-4 text-primary" weight="fill" />
+      </div>
+      <div>
+        <span className="text-base font-bold text-primary">AI Engine</span>
+        <p className="text-sm font-medium mb-0.5 text-muted-foreground">
+          Bắt đầu thực thi kế hoạch
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Card hiển thị 1 AI suggestion đã lưu ──
 const SuggestionCard = ({
   suggestion,
@@ -7999,12 +8034,11 @@ const SuggestionCard = ({
           suggestion.responseTimeMs > 0 ? (
             <span>{(suggestion.responseTimeMs / 1000).toFixed(1)}s</span>
           ) : null}
-          <span>
-            Tin cậy:{" "}
-            {typeof suggestion.confidenceScore === "number"
-              ? `${(suggestion.confidenceScore * 100).toFixed(0)}%`
-              : "N/A"}
-          </span>
+          {typeof suggestion.confidenceScore === "number" ? (
+            <span>
+              Tin cậy: {(suggestion.confidenceScore * 100).toFixed(0)}%
+            </span>
+          ) : null}
         </div>
 
         {hasSystemWarnings ? (
@@ -8131,166 +8165,285 @@ const SuggestionCard = ({
             ) : null}
 
             {allActivities.length > 0 ? (
-              <div className="space-y-1.5">
-                {allActivities.map((act, aIdx) => {
-                  const config =
-                    activityTypeConfig[act.activityType] ||
-                    activityTypeConfig["ASSESS"];
-                  return (
-                    <div
-                      key={aIdx}
-                      className="flex items-start gap-2 px-2 py-1.5 rounded-md border bg-background"
-                    >
-                      <div
-                        className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5",
-                          config.bgColor,
-                          config.color,
-                        )}
-                      >
-                        {act.step}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-sm font-semibold px-1.5 py-0 h-5",
-                              config.color,
-                              config.bgColor,
-                              "border-transparent",
+              <div className="relative mt-4">
+                <AiOriginNode />
+                <div className="ml-12 mt-4 space-y-0">
+                  {allActivities.map((act, aIdx) => {
+                    const normalizedActivityType = (act.activityType ?? "")
+                      .trim()
+                      .toUpperCase();
+                    const config =
+                      activityTypeConfig[act.activityType] ||
+                      activityTypeConfig[normalizedActivityType] ||
+                      activityTypeConfig["ASSESS"];
+                    const Icon =
+                      activityIconMap[act.activityType] ||
+                      activityIconMap[normalizedActivityType] ||
+                      Sparkle;
+
+                    const isDepotStep =
+                      normalizedActivityType === "COLLECT_SUPPLIES" ||
+                      act.depotName !== null;
+                    const isSosStep =
+                      normalizedActivityType === "RESCUE" ||
+                      normalizedActivityType === "MEDICAL_AID" ||
+                      normalizedActivityType === "EVACUATE";
+
+                    const hasVictims =
+                      (Array.isArray(act.targetVictims) &&
+                        act.targetVictims.length > 0) ||
+                      !!buildVictimFallbackSummary(act);
+
+                    return (
+                      <div key={aIdx} className="relative">
+                        {/* Timeline Line */}
+                        <div className="absolute -left-7 top-0 h-full w-[2px] bg-primary/10" />
+
+                        <div
+                          className={cn(
+                            "relative border rounded-xl p-4 mb-4 transition-all hover:shadow-md",
+                            isDepotStep &&
+                              "border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/[0.04]",
+                            isSosStep &&
+                              "border-red-500/20 bg-red-50/50 dark:bg-red-500/[0.03]",
+                            !isDepotStep && !isSosStep && "border bg-card",
+                          )}
+                        >
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="relative w-8 h-8 shrink-0">
+                              <svg
+                                viewBox="0 0 28 28"
+                                className="w-full h-full"
+                              >
+                                <polygon
+                                  points="14,1 26,7.5 26,20.5 14,27 2,20.5 2,7.5"
+                                  fill={
+                                    isDepotStep
+                                      ? "rgba(245,158,11,0.2)"
+                                      : isSosStep
+                                        ? "rgba(239,68,68,0.15)"
+                                        : "rgba(249,115,22,0.1)"
+                                  }
+                                  stroke={
+                                    isDepotStep
+                                      ? "rgba(245,158,11,0.6)"
+                                      : isSosStep
+                                        ? "rgba(239,68,68,0.5)"
+                                        : "rgba(249,115,22,0.4)"
+                                  }
+                                  strokeWidth="1"
+                                />
+                              </svg>
+                              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-primary">
+                                {act.step}
+                              </span>
+                            </div>
+                            <Badge
+                              className={cn(
+                                "text-sm px-2 h-7 border font-bold",
+                                config.bgColor,
+                                config.color,
+                                "border-current/20",
+                              )}
+                            >
+                              <Icon className="h-4 w-4 mr-1" weight="fill" />
+                              {config.label}
+                            </Badge>
+                            {act.estimatedTime && (
+                              <span className="text-sm font-medium flex items-center gap-1 ml-auto text-muted-foreground">
+                                <Clock className="h-4 w-4" />
+                                {act.estimatedTime}
+                              </span>
                             )}
-                          >
-                            {config.label}
-                          </Badge>
-                          {act.estimatedTime ? (
-                            <span className="text-sm text-muted-foreground flex items-center gap-0.5">
-                              <Clock className="h-2.5 w-2.5" />
-                              {act.estimatedTime}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-sm text-foreground/80 mt-0.5 leading-relaxed">
-                          {act.description}
-                        </p>
-                        <ActivityExecutionMeta
-                          activity={act}
-                          className="mt-1"
-                        />
-                        <ActivityExecutionWarningBlock activity={act} compact />
-                        <TargetVictimsBlock
-                          activity={act}
-                          compact
-                          className="mt-1.5"
-                        />
-                        <CoordinationNotesBlock activity={act} />
-                        {act.destinationName ? (
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            Điểm đến: {act.destinationName}
-                          </p>
-                        ) : null}
-                        {act.suggestedTeam ? (
-                          <div className="mt-1.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15 px-2 py-1.5">
-                            <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                              <ShieldCheck className="h-3 w-3" weight="fill" />
-                              Đội đề xuất
-                            </p>
-                            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
-                              {act.suggestedTeam.teamName ||
-                                (act.suggestedTeam.teamId
-                                  ? `Đội #${act.suggestedTeam.teamId}`
-                                  : "Đội chưa đặt tên")}
-                            </p>
-                            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
-                              {`Loại: ${formatTeamTypeLabel(act.suggestedTeam.teamType)}`}
-                              {act.suggestedTeam.contactPhone
-                                ? ` • SĐT: ${act.suggestedTeam.contactPhone}`
-                                : ""}
-                              {act.suggestedTeam.estimatedEtaMinutes != null
-                                ? ` • Thời gian dự kiến đến: ${act.suggestedTeam.estimatedEtaMinutes} phút`
-                                : ""}
-                            </p>
-                            {act.suggestedTeam.reason ? (
-                              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
-                                Lý do: {act.suggestedTeam.reason}
-                              </p>
-                            ) : null}
-                            {act.suggestedTeam.assemblyPointName ? (
-                              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
-                                Điểm tập kết đội:{" "}
-                                {act.suggestedTeam.assemblyPointName}
-                              </p>
-                            ) : null}
                           </div>
-                        ) : null}
-                        {act.assemblyPointName ||
-                        (act.assemblyPointLatitude != null &&
-                          act.assemblyPointLongitude != null) ? (
-                          <div className="mt-1 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15 px-2 py-1.5">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1 shrink-0">
-                                <MapPin className="h-3 w-3" weight="fill" />
-                                Điểm tập kết hoạt động
-                              </p>
-                              <div className="text-right min-w-0">
-                                {act.assemblyPointName ? (
-                                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 truncate">
-                                    {act.assemblyPointName}
-                                  </p>
-                                ) : null}
-                                {formatCoordinateLabel(
-                                  act.assemblyPointLatitude,
-                                  act.assemblyPointLongitude,
-                                ) ? (
-                                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80">
-                                    Tọa độ:{" "}
-                                    {formatCoordinateLabel(
-                                      act.assemblyPointLatitude,
-                                      act.assemblyPointLongitude,
-                                    )}
-                                  </p>
-                                ) : null}
+
+                          <p className="text-sm leading-relaxed font-bold mb-4 pl-0">
+                            {act.description}
+                          </p>
+
+                          <div className="space-y-4">
+                            <ActivityExecutionMeta
+                              activity={act}
+                              className="mb-2"
+                            />
+
+                            <div
+                              className={cn(
+                                "grid gap-4 items-start",
+                                hasVictims
+                                  ? "grid-cols-1 lg:grid-cols-2"
+                                  : "grid-cols-1",
+                              )}
+                            >
+                              <div className="space-y-4 flex flex-col">
+                                {hasVictims && (
+                                  <TargetVictimsBlock
+                                    activity={act}
+                                    className="flex-1"
+                                  />
+                                )}
+                                <CoordinationNotesBlock activity={act} />
+                              </div>
+
+                              <div className="space-y-4 flex flex-col">
+                                {act.suggestedTeam && (
+                                  <div className="group relative overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white p-4 transition-all hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-950/20 dark:to-background flex-1">
+                                    <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                                      <ShieldCheck
+                                        className="h-4 w-4"
+                                        weight="fill"
+                                      />
+                                      Đội ngũ đề xuất
+                                    </p>
+                                    <div className="space-y-2">
+                                      <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                                        {act.suggestedTeam.teamName ||
+                                          (act.suggestedTeam.teamId
+                                            ? `Đội #${act.suggestedTeam.teamId}`
+                                            : "Đội chưa đặt tên")}
+                                      </p>
+                                      <div className="grid grid-cols-1 gap-1.5 text-[13px] font-medium text-emerald-800/80 dark:text-emerald-200/70">
+                                        <div className="flex items-center gap-2">
+                                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                          Loại:{" "}
+                                          {formatTeamTypeLabel(
+                                            act.suggestedTeam.teamType,
+                                          )}
+                                        </div>
+                                        {act.suggestedTeam.contactPhone && (
+                                          <div className="flex items-center gap-2">
+                                            <Phone className="h-3.5 w-3.5" />
+                                            SĐT:{" "}
+                                            {act.suggestedTeam.contactPhone}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {(act.assemblyPointName ||
+                                  (act.assemblyPointLatitude != null &&
+                                    act.assemblyPointLongitude != null)) && (
+                                  <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/40 to-white p-3.5 dark:border-blue-800/30 dark:from-blue-950/20 dark:to-background">
+                                    <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                                      <MapPin
+                                        className="h-4 w-4"
+                                        weight="fill"
+                                      />
+                                      Điểm tập kết
+                                    </p>
+                                    <div className="space-y-1">
+                                      {act.assemblyPointName && (
+                                        <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                                          {act.assemblyPointName}
+                                        </p>
+                                      )}
+                                      {act.assemblyPointLatitude != null &&
+                                        act.assemblyPointLongitude != null && (
+                                          <p className="text-[12px] font-mono font-medium text-blue-600/60 dark:text-blue-400/60">
+                                            COORD:{" "}
+                                            {act.assemblyPointLatitude.toFixed(
+                                              5,
+                                            )}
+                                            ,{" "}
+                                            {act.assemblyPointLongitude.toFixed(
+                                              5,
+                                            )}
+                                          </p>
+                                        )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {act.depotName && (
+                                  <div className="group relative overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50/40 to-white p-4 transition-all hover:shadow-md dark:border-sky-800/30 dark:from-sky-950/20 dark:to-background">
+                                    <div className="flex items-start gap-3">
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400">
+                                        <WarehouseIcon
+                                          className="h-5 w-5"
+                                          weight="fill"
+                                        />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-bold uppercase tracking-widest text-sky-600/70 dark:text-sky-400/70">
+                                          Địa điểm tiếp nhận
+                                        </p>
+                                        <h4 className="mt-0.5 text-[14px] font-bold text-sky-900 dark:text-sky-100">
+                                          {act.depotName}
+                                        </h4>
+                                        {act.depotAddress && (
+                                          <p className="mt-1 text-[13px] font-medium leading-relaxed text-sky-700/70 dark:text-sky-300/60">
+                                            {act.depotAddress}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        ) : null}
-                        {act.suppliesToCollect &&
-                        act.suppliesToCollect.length > 0 ? (
-                          <div className="mt-1 space-y-0.5">
-                            {act.suppliesToCollect.map((supply, sIdx) => {
-                              const showSupplyBuffer =
-                                act.activityType === "COLLECT_SUPPLIES" &&
-                                !isReusableSupplyCollection(supply);
 
-                              return (
-                                <div
-                                  key={sIdx}
-                                  className="flex items-center gap-1.5 text-sm text-blue-700 dark:text-blue-400"
-                                >
-                                  <Package className="h-3 w-3 shrink-0" />
-                                  <span className="font-medium">
-                                    {getSupplyDisplayName(supply)}
-                                  </span>
-                                  <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
-                                    {supply.quantity} {supply.unit}
-                                  </span>
-                                  {showSupplyBuffer ? (
-                                    <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                                      Dự trù{" "}
-                                      {formatSupplyBufferPercent(
-                                        supply.bufferRatio,
-                                      )}
-                                    </span>
-                                  ) : null}
+                            {act.suppliesToCollect &&
+                              act.suppliesToCollect.length > 0 && (
+                                <div className="mt-2 border-t border-dashed border-border pt-4">
+                                  <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                                    <Package className="h-3.5 w-3.5" />
+                                    Vật phẩm cần chuẩn bị
+                                  </p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    {act.suppliesToCollect.map(
+                                      (supply, sIdx) => {
+                                        const showSupplyBuffer =
+                                          act.activityType ===
+                                            "COLLECT_SUPPLIES" &&
+                                          !isReusableSupplyCollection(supply);
+
+                                        return (
+                                          <div
+                                            key={`${supply.itemId}-${sIdx}`}
+                                            className="supply-tag flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-primary/[0.03] border border-primary/10 text-[13px] transition-all hover:border-primary/20 hover:bg-primary/[0.05]"
+                                          >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                <Package
+                                                  className="h-4 w-4"
+                                                  weight="fill"
+                                                />
+                                              </div>
+                                              <span className="font-bold text-foreground truncate">
+                                                {getSupplyDisplayName(supply)}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <span className="text-[14px] font-black text-primary">
+                                                ×{supply.quantity}
+                                              </span>
+                                              <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                                                {supply.unit}
+                                              </span>
+                                              {showSupplyBuffer ? (
+                                                <span className="rounded bg-amber-50 px-1 text-[11px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                                  Dự trù{" "}
+                                                  {formatSupplyBufferPercent(
+                                                    supply.bufferRatio,
+                                                  )}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                          </div>
+                                        );
+                                      },
+                                    )}
+                                  </div>
                                 </div>
-                              );
-                            })}
+                              )}
                           </div>
-                        ) : null}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-border/70 px-2.5 py-3 text-sm text-muted-foreground">
@@ -12036,41 +12189,6 @@ const RescuePlanPanel = ({
                                                                 <div className="space-y-1.5">
                                                                   {teamsForStep.map(
                                                                     (team) => {
-                                                                      const teamStatusMeta =
-                                                                        getTeamAssignmentStatusMeta(
-                                                                          team.status,
-                                                                        );
-                                                                      const rescueTeamStatusMeta =
-                                                                        getRescueTeamStatusMeta(
-                                                                          team.teamStatus,
-                                                                          rescueTeamStatusLabelsByKey,
-                                                                        );
-                                                                      const normalizedAssignmentStatus =
-                                                                        (
-                                                                          team.status ??
-                                                                          ""
-                                                                        )
-                                                                          .trim()
-                                                                          .toLowerCase()
-                                                                          .replaceAll(
-                                                                            "_",
-                                                                            "",
-                                                                          )
-                                                                          .replaceAll(
-                                                                            " ",
-                                                                            "",
-                                                                          );
-                                                                      const normalizedRescueTeamStatus =
-                                                                        normalizeRescueTeamStatusKey(
-                                                                          team.teamStatus,
-                                                                        );
-                                                                      const shouldShowRescueTeamStatusBadge =
-                                                                        Boolean(
-                                                                          team.teamStatus,
-                                                                        ) &&
-                                                                        normalizedRescueTeamStatus !==
-                                                                          normalizedAssignmentStatus;
-
                                                                       return (
                                                                         <div
                                                                           key={
@@ -12110,31 +12228,6 @@ const RescuePlanPanel = ({
                                                                                   team.teamType,
                                                                                 )}
                                                                               </span>
-                                                                            )}
-                                                                            <Badge
-                                                                              variant="outline"
-                                                                              className={cn(
-                                                                                "h-5 px-1.5 text-sm font-semibold",
-                                                                                teamStatusMeta.className,
-                                                                              )}
-                                                                            >
-                                                                              {
-                                                                                teamStatusMeta.label
-                                                                              }
-                                                                            </Badge>
-                                                                            {shouldShowRescueTeamStatusBadge && (
-                                                                              <Badge
-                                                                                variant="outline"
-                                                                                className={cn(
-                                                                                  "h-5 px-1.5 text-sm font-semibold",
-                                                                                  rescueTeamStatusMeta.className,
-                                                                                )}
-                                                                              >
-                                                                                Đội:{" "}
-                                                                                {
-                                                                                  rescueTeamStatusMeta.label
-                                                                                }
-                                                                              </Badge>
                                                                             )}
                                                                             {typeof team.memberCount ===
                                                                               "number" && (
@@ -12322,6 +12415,76 @@ const RescuePlanPanel = ({
                                                                     )}
                                                                   </div>
                                                                 ) : null}
+                                                              </div>
+                                                            )}
+
+                                                            {activityReportImageUrl && (
+                                                              <div className="mt-2.5 p-2.5 bg-amber-50/50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30">
+                                                                <button
+                                                                  type="button"
+                                                                  className="flex w-full items-center justify-between gap-2 text-left"
+                                                                  aria-expanded={
+                                                                    isReportImageExpanded
+                                                                  }
+                                                                  onClick={() =>
+                                                                    toggleMissionReportImageExpansion(
+                                                                      mission.id,
+                                                                      activity.id,
+                                                                    )
+                                                                  }
+                                                                >
+                                                                  <span className="text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                                                    <Camera
+                                                                      className="h-3.5 w-3.5"
+                                                                      weight="fill"
+                                                                    />
+                                                                    Ảnh báo cáo
+                                                                    từ cứu hộ
+                                                                    viên
+                                                                  </span>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className="h-5 px-1.5 text-sm border-amber-200 bg-amber-100/70 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                                                  >
+                                                                    {isReportImageExpanded ? (
+                                                                      <CaretUp className="h-3 w-3" />
+                                                                    ) : (
+                                                                      <CaretDown className="h-3 w-3" />
+                                                                    )}
+                                                                  </Badge>
+                                                                </button>
+
+                                                                {isReportImageExpanded && (
+                                                                  <div className="mt-2.5">
+                                                                    <div
+                                                                      className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted cursor-zoom-in group"
+                                                                      onClick={() =>
+                                                                        setActiveMissionReportImage(
+                                                                          {
+                                                                            src: activityReportImageUrl,
+                                                                            step: activity.step,
+                                                                            activityLabel:
+                                                                              config.label,
+                                                                          },
+                                                                        )
+                                                                      }
+                                                                    >
+                                                                      <img
+                                                                        src={
+                                                                          activityReportImageUrl
+                                                                        }
+                                                                        alt={`Báo cáo bước ${activity.step}`}
+                                                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                                      />
+                                                                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                                        <UserFocus
+                                                                          className="h-8 w-8 text-white drop-shadow-md"
+                                                                          weight="fill"
+                                                                        />
+                                                                      </div>
+                                                                    </div>
+                                                                  </div>
+                                                                )}
                                                               </div>
                                                             )}
                                                           </div>
@@ -12557,7 +12720,8 @@ const RescuePlanPanel = ({
                                           ? "border-red-400 bg-red-50/30 dark:border-red-800 dark:bg-red-950/10"
                                           : group.matchedSOS?.priority === "P2"
                                             ? "border-orange-400 bg-orange-50/30 dark:border-orange-800 dark:bg-orange-950/10"
-                                            : group.matchedSOS?.priority === "P3"
+                                            : group.matchedSOS?.priority ===
+                                                "P3"
                                               ? "border-amber-400 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/10"
                                               : "border-border bg-card"),
                                     dragOverGroupId === group.id &&
@@ -12857,8 +13021,6 @@ const RescuePlanPanel = ({
                                             }
                                             onDragEnd={handleDragEnd}
                                           >
-
-
                                             <div
                                               className={cn(
                                                 "space-y-3 rounded-xl border-2 bg-card p-4 transition-all shadow-sm",
@@ -12875,868 +13037,882 @@ const RescuePlanPanel = ({
                                                   "border-primary ring-2 ring-primary/20",
                                               )}
                                             >
-                                            <div className="flex items-center gap-2">
-                                              <div
-                                                className={cn(
-                                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black shadow-xs",
-                                                  hasActivityError
-                                                    ? "bg-red-500 text-white"
-                                                    : [config.bgColor, config.color],
-                                                )}
-                                              >
-                                                {idx + 1}
-                                              </div>
-                                              <div
-                                                draggable={
-                                                  !lockGeneralActivityEdits &&
-                                                  stepDragHandleId ===
-                                                    activity._id
-                                                }
-                                                onPointerDown={() => {
-                                                  if (
-                                                    lockGeneralActivityEdits
-                                                  ) {
-                                                    return;
-                                                  }
-
-                                                  armStepDragHandle(
-                                                    activity._id,
-                                                  );
-                                                }}
-                                                onPointerUp={
-                                                  releaseStepDragHandle
-                                                }
-                                                onPointerCancel={
-                                                  releaseStepDragHandle
-                                                }
-                                                onDragStart={() => {
-                                                  if (
-                                                    lockGeneralActivityEdits
-                                                  ) {
-                                                    return;
-                                                  }
-
-                                                  handleDragStart(idx);
-                                                }}
-                                                onDragEnd={handleDragEnd}
-                                                className={cn(
-                                                  "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
-                                                  lockGeneralActivityEdits
-                                                    ? "cursor-not-allowed opacity-30"
-                                                    : "cursor-grab hover:bg-muted hover:text-foreground active:cursor-grabbing",
-                                                )}
-                                              >
-                                                <DotsSixVertical
-                                                  className="h-4 w-4"
-                                                  weight="bold"
-                                                />
-                                              </div>
-                                              {isManual ? (
-                                                <Select
-                                                  value={activity.activityType}
-                                                  onValueChange={(value) =>
-                                                    updateEditActivity(
-                                                      activity._id,
-                                                      "activityType",
-                                                      value,
-                                                    )
-                                                  }
-                                                  disabled={
-                                                    lockGeneralActivityEdits
-                                                  }
-                                                >
-                                                  <SelectTrigger className="h-7 w-35 text-sm font-semibold">
-                                                    <SelectValue />
-                                                  </SelectTrigger>
-                                                  <SelectContent className="z-1200">
-                                                    {Object.entries(
-                                                      activityTypeConfig,
-                                                    )
-                                                      .filter(
-                                                        ([key]) =>
-                                                          key !==
-                                                            "RETURN_TO_ASSEMBLY_POINT" &&
-                                                          key !==
-                                                            "RETURN_ASSEMBLY",
-                                                      )
-                                                      .map(([key, cfg]) => (
-                                                        <SelectItem
-                                                          key={key}
-                                                          value={key}
-                                                          className="text-sm"
-                                                        >
-                                                          {cfg.label}
-                                                        </SelectItem>
-                                                      ))}
-                                                  </SelectContent>
-                                                </Select>
-                                              ) : (
-                                                <Badge
-                                                  variant="outline"
+                                              <div className="flex items-center gap-2">
+                                                <div
                                                   className={cn(
-                                                    "h-6 border-transparent px-2 py-0 text-sm font-semibold",
+                                                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black shadow-xs",
                                                     hasActivityError
-                                                      ? "border-red-200 bg-red-100 text-red-700 dark:border-red-800/60 dark:bg-red-900/25 dark:text-red-300"
+                                                      ? "bg-red-500 text-white"
                                                       : [
-                                                          config.color,
                                                           config.bgColor,
+                                                          config.color,
                                                         ],
                                                   )}
                                                 >
-                                                  {config.label}
-                                                </Badge>
-                                              )}
-                                              {activityError ? (
-                                                <Badge
-                                                  variant="outline"
-                                                  className="h-6 border-red-200 bg-red-100 px-2 text-sm font-semibold text-red-700 dark:border-red-800/60 dark:bg-red-900/25 dark:text-red-300"
-                                                >
-                                                  <Warning
-                                                    className="mr-1 h-3.5 w-3.5"
-                                                    weight="fill"
-                                                  />
-                                                  Lỗi
-                                                </Badge>
-                                              ) : null}
-                                              {!activityError &&
-                                              hasSupplyBalanceIssues ? (
-                                                <Badge
-                                                  variant="outline"
-                                                  className="h-6 border-amber-300 bg-amber-100 px-2 text-sm font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/25 dark:text-amber-300"
-                                                >
-                                                  <Warning
-                                                    className="mr-1 h-3.5 w-3.5"
-                                                    weight="fill"
-                                                  />
-                                                  Lệch vật phẩm
-                                                </Badge>
-                                              ) : null}
-                                              <div className="flex-1" />
-                                              <div className="flex items-center gap-0.5">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className="h-6 w-6"
-                                                  onClick={() =>
-                                                    moveEditActivity(idx, -1)
+                                                  {idx + 1}
+                                                </div>
+                                                <div
+                                                  draggable={
+                                                    !lockGeneralActivityEdits &&
+                                                    stepDragHandleId ===
+                                                      activity._id
                                                   }
-                                                  disabled={
-                                                    idx === 0 ||
-                                                    lockGeneralActivityEdits
-                                                  }
-                                                >
-                                                  <CaretUp className="h-3 w-3" />
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className="h-6 w-6"
-                                                  onClick={() =>
-                                                    moveEditActivity(idx, 1)
-                                                  }
-                                                  disabled={
-                                                    idx ===
-                                                      editActivities.length -
-                                                        1 ||
-                                                    lockGeneralActivityEdits
-                                                  }
-                                                >
-                                                  <CaretDown className="h-3 w-3" />
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className="h-6 w-6 text-muted-foreground hover:text-red-500"
-                                                  onClick={() =>
-                                                    handleRemoveActivityWithConfirm(
-                                                      activity,
-                                                      idx + 1,
-                                                    )
-                                                  }
-                                                  disabled={
-                                                    lockGeneralActivityEdits
-                                                  }
-                                                >
-                                                  <Trash className="h-3 w-3" />
-                                                </Button>
-                                              </div>
-                                            </div>
+                                                  onPointerDown={() => {
+                                                    if (
+                                                      lockGeneralActivityEdits
+                                                    ) {
+                                                      return;
+                                                    }
 
-                                            {activityError ? (
-                                              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800/60 dark:bg-red-950/20">
-                                                <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-                                                  {getEditActivityErrorLabel(
-                                                    activityError.matchedBy,
+                                                    armStepDragHandle(
+                                                      activity._id,
+                                                    );
+                                                  }}
+                                                  onPointerUp={
+                                                    releaseStepDragHandle
+                                                  }
+                                                  onPointerCancel={
+                                                    releaseStepDragHandle
+                                                  }
+                                                  onDragStart={() => {
+                                                    if (
+                                                      lockGeneralActivityEdits
+                                                    ) {
+                                                      return;
+                                                    }
+
+                                                    handleDragStart(idx);
+                                                  }}
+                                                  onDragEnd={handleDragEnd}
+                                                  className={cn(
+                                                    "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
+                                                    lockGeneralActivityEdits
+                                                      ? "cursor-not-allowed opacity-30"
+                                                      : "cursor-grab hover:bg-muted hover:text-foreground active:cursor-grabbing",
                                                   )}
-                                                </p>
-                                                <p className="mt-1 text-sm leading-relaxed text-red-700/90 dark:text-red-300/90">
-                                                  {activityError.message}
-                                                </p>
+                                                >
+                                                  <DotsSixVertical
+                                                    className="h-4 w-4"
+                                                    weight="bold"
+                                                  />
+                                                </div>
+                                                {isManual ? (
+                                                  <Select
+                                                    value={
+                                                      activity.activityType
+                                                    }
+                                                    onValueChange={(value) =>
+                                                      updateEditActivity(
+                                                        activity._id,
+                                                        "activityType",
+                                                        value,
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      lockGeneralActivityEdits
+                                                    }
+                                                  >
+                                                    <SelectTrigger className="h-7 w-35 text-sm font-semibold">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-1200">
+                                                      {Object.entries(
+                                                        activityTypeConfig,
+                                                      )
+                                                        .filter(
+                                                          ([key]) =>
+                                                            key !==
+                                                              "RETURN_TO_ASSEMBLY_POINT" &&
+                                                            key !==
+                                                              "RETURN_ASSEMBLY",
+                                                        )
+                                                        .map(([key, cfg]) => (
+                                                          <SelectItem
+                                                            key={key}
+                                                            value={key}
+                                                            className="text-sm"
+                                                          >
+                                                            {cfg.label}
+                                                          </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                ) : (
+                                                  <Badge
+                                                    variant="outline"
+                                                    className={cn(
+                                                      "h-6 border-transparent px-2 py-0 text-sm font-semibold",
+                                                      hasActivityError
+                                                        ? "border-red-200 bg-red-100 text-red-700 dark:border-red-800/60 dark:bg-red-900/25 dark:text-red-300"
+                                                        : [
+                                                            config.color,
+                                                            config.bgColor,
+                                                          ],
+                                                    )}
+                                                  >
+                                                    {config.label}
+                                                  </Badge>
+                                                )}
+                                                {activityError ? (
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="h-6 border-red-200 bg-red-100 px-2 text-sm font-semibold text-red-700 dark:border-red-800/60 dark:bg-red-900/25 dark:text-red-300"
+                                                  >
+                                                    <Warning
+                                                      className="mr-1 h-3.5 w-3.5"
+                                                      weight="fill"
+                                                    />
+                                                    Lỗi
+                                                  </Badge>
+                                                ) : null}
+                                                {!activityError &&
+                                                hasSupplyBalanceIssues ? (
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="h-6 border-amber-300 bg-amber-100 px-2 text-sm font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/25 dark:text-amber-300"
+                                                  >
+                                                    <Warning
+                                                      className="mr-1 h-3.5 w-3.5"
+                                                      weight="fill"
+                                                    />
+                                                    Lệch vật phẩm
+                                                  </Badge>
+                                                ) : null}
+                                                <div className="flex-1" />
+                                                <div className="flex items-center gap-0.5">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6"
+                                                    onClick={() =>
+                                                      moveEditActivity(idx, -1)
+                                                    }
+                                                    disabled={
+                                                      idx === 0 ||
+                                                      lockGeneralActivityEdits
+                                                    }
+                                                  >
+                                                    <CaretUp className="h-3 w-3" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6"
+                                                    onClick={() =>
+                                                      moveEditActivity(idx, 1)
+                                                    }
+                                                    disabled={
+                                                      idx ===
+                                                        editActivities.length -
+                                                          1 ||
+                                                      lockGeneralActivityEdits
+                                                    }
+                                                  >
+                                                    <CaretDown className="h-3 w-3" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-muted-foreground hover:text-red-500"
+                                                    onClick={() =>
+                                                      handleRemoveActivityWithConfirm(
+                                                        activity,
+                                                        idx + 1,
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      lockGeneralActivityEdits
+                                                    }
+                                                  >
+                                                    <Trash className="h-3 w-3" />
+                                                  </Button>
+                                                </div>
                                               </div>
-                                            ) : null}
 
-                                            {lockGeneralActivityEdits ? (
-                                              <div className="rounded-lg border border-amber-300/80 bg-amber-50/80 px-3 py-2 dark:border-amber-700/60 dark:bg-amber-950/20">
-                                                <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-300">
-                                                  {isReturnAssemblyPointActivity
-                                                    ? canUpdateReturnAssemblyPointWhenOngoing
-                                                      ? "Bước đang OnGoing, chỉ cho phép cập nhật điểm tập kết quay về khi có sự cố tại điểm tập kết hiện tại."
-                                                      : "Bước quay về điểm tập kết chỉ được cập nhật khi activity ở trạng thái Planned hoặc OnGoing."
-                                                    : `Chỉ có thể cập nhật activity Planned. Bước này hiện ở trạng thái ${activity._missionStatus || "không xác định"}.`}
-                                                </p>
+                                              {activityError ? (
+                                                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800/60 dark:bg-red-950/20">
+                                                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                                                    {getEditActivityErrorLabel(
+                                                      activityError.matchedBy,
+                                                    )}
+                                                  </p>
+                                                  <p className="mt-1 text-sm leading-relaxed text-red-700/90 dark:text-red-300/90">
+                                                    {activityError.message}
+                                                  </p>
+                                                </div>
+                                              ) : null}
+
+                                              {lockGeneralActivityEdits ? (
+                                                <div className="rounded-lg border border-amber-300/80 bg-amber-50/80 px-3 py-2 dark:border-amber-700/60 dark:bg-amber-950/20">
+                                                  <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-300">
+                                                    {isReturnAssemblyPointActivity
+                                                      ? canUpdateReturnAssemblyPointWhenOngoing
+                                                        ? "Bước đang OnGoing, chỉ cho phép cập nhật điểm tập kết quay về khi có sự cố tại điểm tập kết hiện tại."
+                                                        : "Bước quay về điểm tập kết chỉ được cập nhật khi activity ở trạng thái Planned hoặc OnGoing."
+                                                      : `Chỉ có thể cập nhật activity Planned. Bước này hiện ở trạng thái ${activity._missionStatus || "không xác định"}.`}
+                                                  </p>
+                                                </div>
+                                              ) : null}
+
+                                              <div className="bg-muted/10 dark:bg-muted/5 p-2.5 rounded-lg border border-border/20 space-y-1.5">
+                                                <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 flex items-center gap-1.5">
+                                                  Mô tả chi tiết
+                                                </Label>
+                                                {isManual ? (
+                                                  <textarea
+                                                    value={activity.description}
+                                                    onChange={(event) =>
+                                                      updateEditActivity(
+                                                        activity._id,
+                                                        "description",
+                                                        event.target.value,
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      lockGeneralActivityEdits
+                                                    }
+                                                    placeholder="Mô tả hoạt động..."
+                                                    rows={2}
+                                                    className={cn(
+                                                      "mt-1 w-full resize-none rounded-md border bg-background px-3 py-1.5 text-sm leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                                      hasActivityError
+                                                        ? "border-red-200 bg-red-50/40 dark:border-red-800/60 dark:bg-red-950/10"
+                                                        : "border-input",
+                                                    )}
+                                                  />
+                                                ) : (
+                                                  <p
+                                                    className={cn(
+                                                      "mt-1 rounded-md border px-3 py-1.5 text-sm leading-relaxed",
+                                                      hasActivityError
+                                                        ? "border-red-200 bg-red-50 text-red-700/90 dark:border-red-800/60 dark:bg-red-950/15 dark:text-red-200"
+                                                        : "border-transparent bg-muted/40 text-foreground/80",
+                                                    )}
+                                                  >
+                                                    {activity.description}
+                                                  </p>
+                                                )}
                                               </div>
-                                            ) : null}
 
-                                            <div className="bg-muted/10 dark:bg-muted/5 p-2.5 rounded-lg border border-border/20 space-y-1.5">
-                                              <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 flex items-center gap-1.5">
-                                                Mô tả chi tiết
-                                              </Label>
-                                              {isManual ? (
-                                                <textarea
-                                                  value={activity.description}
+                                              <ActivityExecutionMeta
+                                                activity={activity}
+                                                className="mt-1"
+                                              />
+                                              <ActivityExecutionWarningBlock
+                                                activity={activity}
+                                                compact
+                                              />
+                                              <TargetVictimsBlock
+                                                activity={activity}
+                                                compact
+                                              />
+                                              <CoordinationNotesBlock
+                                                activity={activity}
+                                              />
+
+                                              <div className="space-y-1">
+                                                <Label className="block min-h-5 text-sm uppercase tracking-wider text-muted-foreground">
+                                                  Thời gian ước tính
+                                                </Label>
+                                                <Input
+                                                  value={activity.estimatedTime}
                                                   onChange={(event) =>
                                                     updateEditActivity(
                                                       activity._id,
-                                                      "description",
+                                                      "estimatedTime",
                                                       event.target.value,
                                                     )
                                                   }
                                                   disabled={
                                                     lockGeneralActivityEdits
                                                   }
-                                                  placeholder="Mô tả hoạt động..."
-                                                  rows={2}
-                                                  className={cn(
-                                                    "mt-1 w-full resize-none rounded-md border bg-background px-3 py-1.5 text-sm leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                                                    hasActivityError
-                                                      ? "border-red-200 bg-red-50/40 dark:border-red-800/60 dark:bg-red-950/10"
-                                                      : "border-input",
-                                                  )}
+                                                  placeholder="VD: 30 phút"
+                                                  className="h-10 w-full text-sm"
                                                 />
-                                              ) : (
-                                                <p
-                                                  className={cn(
-                                                    "mt-1 rounded-md border px-3 py-1.5 text-sm leading-relaxed",
-                                                    hasActivityError
-                                                      ? "border-red-200 bg-red-50 text-red-700/90 dark:border-red-800/60 dark:bg-red-950/15 dark:text-red-200"
-                                                      : "border-transparent bg-muted/40 text-foreground/80",
-                                                  )}
-                                                >
-                                                  {activity.description}
-                                                </p>
-                                              )}
-                                            </div>
+                                              </div>
 
-                                            <ActivityExecutionMeta
-                                              activity={activity}
-                                              className="mt-1"
-                                            />
-                                            <ActivityExecutionWarningBlock
-                                              activity={activity}
-                                              compact
-                                            />
-                                            <TargetVictimsBlock
-                                              activity={activity}
-                                              compact
-                                            />
-                                            <CoordinationNotesBlock
-                                              activity={activity}
-                                            />
-
-                                            <div className="space-y-1">
-                                              <Label className="block min-h-5 text-sm uppercase tracking-wider text-muted-foreground">
-                                                Thời gian ước tính
-                                              </Label>
-                                              <Input
-                                                value={activity.estimatedTime}
-                                                onChange={(event) =>
-                                                  updateEditActivity(
-                                                    activity._id,
-                                                    "estimatedTime",
-                                                    event.target.value,
-                                                  )
-                                                }
-                                                disabled={
-                                                  lockGeneralActivityEdits
-                                                }
-                                                placeholder="VD: 30 phút"
-                                                className="h-10 w-full text-sm"
-                                              />
-                                            </div>
-
-                                            {canEditReturnAssemblyPoint ? (
-                                              <div className="space-y-1 rounded-lg border border-sky-200/80 bg-sky-50/70 p-2.5 dark:border-sky-700/60 dark:bg-sky-900/20">
-                                                <Label className="block min-h-5 text-sm font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-                                                  Điểm tập kết quay về
-                                                </Label>
-                                                <Select
-                                                  value={
-                                                    selectedAssemblyPointValue ||
-                                                    undefined
-                                                  }
-                                                  onValueChange={(value) =>
-                                                    updateEditActivityAssemblyPoint(
-                                                      activity._id,
-                                                      value,
-                                                    )
-                                                  }
-                                                >
-                                                  <SelectTrigger className="h-9 bg-white/90 text-sm dark:bg-sky-950/25">
-                                                    <SelectValue
-                                                      placeholder={
-                                                        isAssemblyPointsLoading ||
-                                                        isAssemblyPointMetadataLoading
-                                                          ? "Đang tải điểm tập kết..."
-                                                          : "Chọn điểm tập kết quay về"
-                                                      }
-                                                    />
-                                                  </SelectTrigger>
-                                                  <SelectContent className="z-1200">
-                                                    {hasValidAssemblyPointId &&
-                                                    !selectedAssemblyPointInOptions ? (
-                                                      <SelectItem
-                                                        value={
-                                                          selectedAssemblyPointValue
+                                              {canEditReturnAssemblyPoint ? (
+                                                <div className="space-y-1 rounded-lg border border-sky-200/80 bg-sky-50/70 p-2.5 dark:border-sky-700/60 dark:bg-sky-900/20">
+                                                  <Label className="block min-h-5 text-sm font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                                                    Điểm tập kết quay về
+                                                  </Label>
+                                                  <Select
+                                                    value={
+                                                      selectedAssemblyPointValue ||
+                                                      undefined
+                                                    }
+                                                    onValueChange={(value) =>
+                                                      updateEditActivityAssemblyPoint(
+                                                        activity._id,
+                                                        value,
+                                                      )
+                                                    }
+                                                  >
+                                                    <SelectTrigger className="h-9 bg-white/90 text-sm dark:bg-sky-950/25">
+                                                      <SelectValue
+                                                        placeholder={
+                                                          isAssemblyPointsLoading ||
+                                                          isAssemblyPointMetadataLoading
+                                                            ? "Đang tải điểm tập kết..."
+                                                            : "Chọn điểm tập kết quay về"
                                                         }
-                                                        className="text-sm"
-                                                      >
-                                                        {
-                                                          selectedAssemblyPointLabel
-                                                        }{" "}
-                                                        (đang chọn)
-                                                      </SelectItem>
-                                                    ) : null}
-
-                                                    {assemblyPointOptions.map(
-                                                      (point) => (
+                                                      />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-1200">
+                                                      {hasValidAssemblyPointId &&
+                                                      !selectedAssemblyPointInOptions ? (
                                                         <SelectItem
-                                                          key={point.id}
-                                                          value={String(
-                                                            point.id,
-                                                          )}
+                                                          value={
+                                                            selectedAssemblyPointValue
+                                                          }
                                                           className="text-sm"
                                                         >
-                                                          {point.name}
+                                                          {
+                                                            selectedAssemblyPointLabel
+                                                          }{" "}
+                                                          (đang chọn)
                                                         </SelectItem>
-                                                      ),
-                                                    )}
-                                                  </SelectContent>
-                                                </Select>
-                                                {activity.assemblyPointName ? (
-                                                  <p className="text-sm text-sky-700/80 dark:text-sky-300/80">
-                                                    Hiện tại:{" "}
-                                                    {activity.assemblyPointName}
-                                                  </p>
-                                                ) : null}
-                                                {formatCoordinateLabel(
-                                                  activity.assemblyPointLatitude,
-                                                  activity.assemblyPointLongitude,
-                                                ) ? (
-                                                  <p className="text-sm text-sky-700/70 dark:text-sky-300/70">
-                                                    Tọa độ:{" "}
-                                                    {formatCoordinateLabel(
-                                                      activity.assemblyPointLatitude,
-                                                      activity.assemblyPointLongitude,
-                                                    )}
-                                                  </p>
-                                                ) : null}
-                                                {isSelectedAssemblyPointRestricted ? (
-                                                  <p className="rounded-md border border-red-300 bg-red-50 px-2.5 py-2 text-sm leading-relaxed text-red-700 dark:border-red-800/60 dark:bg-red-950/20 dark:text-red-300">
-                                                    Cảnh báo: Điểm tập kết đang
-                                                    ở trạng thái{" "}
-                                                    {
-                                                      selectedAssemblyPointStatusLabel
-                                                    }
-                                                    . Điều phối viên nên chọn
-                                                    điểm tập kết khác hoặc điều
-                                                    chỉnh đội quay về để đảm bảo
-                                                    an toàn.
-                                                  </p>
-                                                ) : null}
-                                                {canEditReturnAssemblyPoint ? (
-                                                  <p className="text-sm leading-relaxed text-sky-700/80 dark:text-sky-300/80">
-                                                    {canUpdateReturnAssemblyPointWhenOngoing
-                                                      ? "Bước đang OnGoing nên chỉ cho phép đổi điểm tập kết quay về để xử lý sự cố tại điểm hiện tại."
-                                                      : "Bạn có thể cập nhật điểm tập kết quay về cho bước này."}
-                                                  </p>
-                                                ) : null}
-                                              </div>
-                                            ) : null}
+                                                      ) : null}
 
-                                            <div
-                                              className={cn(
-                                                "rounded-lg border p-2.5",
-                                                hasActivityError
-                                                  ? "border-red-200 bg-red-50/60 dark:border-red-800/60 dark:bg-red-950/15"
-                                                  : "border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-700/50 dark:bg-emerald-900/15",
-                                              )}
-                                            >
-                                              <div className="mb-2">
-                                                <p
-                                                  className={cn(
-                                                    "text-sm font-bold uppercase tracking-wider",
-                                                    hasActivityError
-                                                      ? "text-red-700 dark:text-red-300"
-                                                      : "text-emerald-700 dark:text-emerald-300",
-                                                  )}
-                                                >
-                                                  Điều phối đội cứu hộ
-                                                </p>
-                                              </div>
+                                                      {assemblyPointOptions.map(
+                                                        (point) => (
+                                                          <SelectItem
+                                                            key={point.id}
+                                                            value={String(
+                                                              point.id,
+                                                            )}
+                                                            className="text-sm"
+                                                          >
+                                                            {point.name}
+                                                          </SelectItem>
+                                                        ),
+                                                      )}
+                                                    </SelectContent>
+                                                  </Select>
+                                                  {activity.assemblyPointName ? (
+                                                    <p className="text-sm text-sky-700/80 dark:text-sky-300/80">
+                                                      Hiện tại:{" "}
+                                                      {
+                                                        activity.assemblyPointName
+                                                      }
+                                                    </p>
+                                                  ) : null}
+                                                  {formatCoordinateLabel(
+                                                    activity.assemblyPointLatitude,
+                                                    activity.assemblyPointLongitude,
+                                                  ) ? (
+                                                    <p className="text-sm text-sky-700/70 dark:text-sky-300/70">
+                                                      Tọa độ:{" "}
+                                                      {formatCoordinateLabel(
+                                                        activity.assemblyPointLatitude,
+                                                        activity.assemblyPointLongitude,
+                                                      )}
+                                                    </p>
+                                                  ) : null}
+                                                  {isSelectedAssemblyPointRestricted ? (
+                                                    <p className="rounded-md border border-red-300 bg-red-50 px-2.5 py-2 text-sm leading-relaxed text-red-700 dark:border-red-800/60 dark:bg-red-950/20 dark:text-red-300">
+                                                      Cảnh báo: Điểm tập kết
+                                                      đang ở trạng thái{" "}
+                                                      {
+                                                        selectedAssemblyPointStatusLabel
+                                                      }
+                                                      . Điều phối viên nên chọn
+                                                      điểm tập kết khác hoặc
+                                                      điều chỉnh đội quay về để
+                                                      đảm bảo an toàn.
+                                                    </p>
+                                                  ) : null}
+                                                  {canEditReturnAssemblyPoint ? (
+                                                    <p className="text-sm leading-relaxed text-sky-700/80 dark:text-sky-300/80">
+                                                      {canUpdateReturnAssemblyPointWhenOngoing
+                                                        ? "Bước đang OnGoing nên chỉ cho phép đổi điểm tập kết quay về để xử lý sự cố tại điểm hiện tại."
+                                                        : "Bạn có thể cập nhật điểm tập kết quay về cho bước này."}
+                                                    </p>
+                                                  ) : null}
+                                                </div>
+                                              ) : null}
 
-                                              <div>
-                                                <Select
-                                                  value={
-                                                    selectedTeamValue ||
-                                                    undefined
-                                                  }
-                                                  onValueChange={(value) =>
-                                                    handleSelectNearbyTeamForActivity(
-                                                      activity._id,
-                                                      value,
-                                                    )
-                                                  }
-                                                  disabled={
-                                                    isAutoManagedTeamStep ||
-                                                    isTeamEditingLocked
-                                                  }
-                                                >
-                                                  <SelectTrigger
+                                              <div
+                                                className={cn(
+                                                  "rounded-lg border p-2.5",
+                                                  hasActivityError
+                                                    ? "border-red-200 bg-red-50/60 dark:border-red-800/60 dark:bg-red-950/15"
+                                                    : "border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-700/50 dark:bg-emerald-900/15",
+                                                )}
+                                              >
+                                                <div className="mb-2">
+                                                  <p
                                                     className={cn(
-                                                      "h-9 bg-white/90 text-sm dark:bg-emerald-950/25",
-                                                      (isAutoManagedTeamStep ||
-                                                        isTeamEditingLocked) &&
-                                                        "cursor-not-allowed opacity-80",
+                                                      "text-sm font-bold uppercase tracking-wider",
+                                                      hasActivityError
+                                                        ? "text-red-700 dark:text-red-300"
+                                                        : "text-emerald-700 dark:text-emerald-300",
                                                     )}
                                                   >
-                                                    <SelectValue
-                                                      placeholder={
-                                                        isNearbyTeamsByClusterLoading
-                                                          ? "Đang tải đội gần cụm SOS..."
-                                                          : isAutoManagedTeamStep
-                                                            ? "Đội được tự đồng bộ"
-                                                            : isTeamEditingLocked
-                                                              ? "Đội bị khóa khi cập nhật nhiệm vụ đã tạo"
-                                                              : "Chọn đội cứu hộ"
-                                                      }
-                                                    />
-                                                  </SelectTrigger>
-                                                  <SelectContent className="z-1200">
-                                                    {hasValidSuggestedTeamId &&
-                                                    !selectedTeamInNearbyOptions ? (
-                                                      <SelectItem
-                                                        value={
-                                                          selectedTeamValue
-                                                        }
-                                                        className="text-sm"
-                                                      >
-                                                        {
-                                                          selectedTeamDisplayName
-                                                        }{" "}
-                                                        (đang chọn)
-                                                      </SelectItem>
-                                                    ) : null}
+                                                    Điều phối đội cứu hộ
+                                                  </p>
+                                                </div>
 
-                                                    {activityNearbyTeams.map(
-                                                      (team) => (
+                                                <div>
+                                                  <Select
+                                                    value={
+                                                      selectedTeamValue ||
+                                                      undefined
+                                                    }
+                                                    onValueChange={(value) =>
+                                                      handleSelectNearbyTeamForActivity(
+                                                        activity._id,
+                                                        value,
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      isAutoManagedTeamStep ||
+                                                      isTeamEditingLocked
+                                                    }
+                                                  >
+                                                    <SelectTrigger
+                                                      className={cn(
+                                                        "h-9 bg-white/90 text-sm dark:bg-emerald-950/25",
+                                                        (isAutoManagedTeamStep ||
+                                                          isTeamEditingLocked) &&
+                                                          "cursor-not-allowed opacity-80",
+                                                      )}
+                                                    >
+                                                      <SelectValue
+                                                        placeholder={
+                                                          isNearbyTeamsByClusterLoading
+                                                            ? "Đang tải đội gần cụm SOS..."
+                                                            : isAutoManagedTeamStep
+                                                              ? "Đội được tự đồng bộ"
+                                                              : isTeamEditingLocked
+                                                                ? "Đội bị khóa khi cập nhật nhiệm vụ đã tạo"
+                                                                : "Chọn đội cứu hộ"
+                                                        }
+                                                      />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-1200">
+                                                      {hasValidSuggestedTeamId &&
+                                                      !selectedTeamInNearbyOptions ? (
                                                         <SelectItem
-                                                          key={team.id}
-                                                          value={String(
-                                                            team.id,
-                                                          )}
+                                                          value={
+                                                            selectedTeamValue
+                                                          }
                                                           className="text-sm"
                                                         >
-                                                          {team.name} •{" "}
-                                                          {formatDistanceKmLabel(
-                                                            team.distanceKm,
-                                                          )}
+                                                          {
+                                                            selectedTeamDisplayName
+                                                          }{" "}
+                                                          (đang chọn)
                                                         </SelectItem>
-                                                      ),
-                                                    )}
+                                                      ) : null}
 
-                                                    {!isAutoManagedTeamStep &&
-                                                    !isTeamEditingLocked ? (
-                                                      <SelectItem
-                                                        value={
-                                                          CLEAR_ACTIVITY_TEAM_VALUE
-                                                        }
-                                                        className="text-sm text-rose-700"
-                                                      >
-                                                        Bỏ gán đội cho bước này
-                                                      </SelectItem>
-                                                    ) : null}
-                                                  </SelectContent>
-                                                </Select>
+                                                      {activityNearbyTeams.map(
+                                                        (team) => (
+                                                          <SelectItem
+                                                            key={team.id}
+                                                            value={String(
+                                                              team.id,
+                                                            )}
+                                                            className="text-sm"
+                                                          >
+                                                            {team.name} •{" "}
+                                                            {formatDistanceKmLabel(
+                                                              team.distanceKm,
+                                                            )}
+                                                          </SelectItem>
+                                                        ),
+                                                      )}
+
+                                                      {!isAutoManagedTeamStep &&
+                                                      !isTeamEditingLocked ? (
+                                                        <SelectItem
+                                                          value={
+                                                            CLEAR_ACTIVITY_TEAM_VALUE
+                                                          }
+                                                          className="text-sm text-rose-700"
+                                                        >
+                                                          Bỏ gán đội cho bước
+                                                          này
+                                                        </SelectItem>
+                                                      ) : null}
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+
+                                                {isReturnSuppliesActivity ? (
+                                                  <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                                    Bước Hoàn trả vật phẩm được
+                                                    tự động gán cùng đội đã thu
+                                                    gom vật phẩm và không thể
+                                                    thay đổi thủ công.
+                                                  </p>
+                                                ) : null}
+
+                                                {isReturnAssemblyPointActivity ? (
+                                                  <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                                    Bước quay về điểm tập kết
+                                                    được tự động gán cùng đội
+                                                    thực thi trước đó và không
+                                                    thể thay đổi thủ công.
+                                                  </p>
+                                                ) : null}
+
+                                                {isTeamEditingLocked ? (
+                                                  <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                                    Cập nhật nhiệm vụ đã tạo
+                                                    không cho phép đổi đội cứu
+                                                    hộ ở bước này.
+                                                  </p>
+                                                ) : null}
                                               </div>
 
-                                              {isReturnSuppliesActivity ? (
-                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                                                  Bước Hoàn trả vật phẩm được tự
-                                                  động gán cùng đội đã thu gom
-                                                  vật phẩm và không thể thay đổi
-                                                  thủ công.
-                                                </p>
-                                              ) : null}
-
-                                              {isReturnAssemblyPointActivity ? (
-                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                                                  Bước quay về điểm tập kết được
-                                                  tự động gán cùng đội thực thi
-                                                  trước đó và không thể thay đổi
-                                                  thủ công.
-                                                </p>
-                                              ) : null}
-
-                                              {isTeamEditingLocked ? (
-                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                                                  Cập nhật nhiệm vụ đã tạo không
-                                                  cho phép đổi đội cứu hộ ở bước
-                                                  này.
-                                                </p>
-                                              ) : null}
-                                            </div>
-
-                                            {isSupplyStep(
-                                              activity.activityType,
-                                            ) ? (
-                                              <div
-                                                className="mt-1"
-                                                onDragOver={(event) => {
-                                                  if (
-                                                    isAutoManagedSupplyStep ||
-                                                    lockGeneralActivityEdits
-                                                  ) {
-                                                    return;
-                                                  }
-                                                  if (
-                                                    event.dataTransfer.types.includes(
-                                                      "application/inventory-item",
-                                                    )
-                                                  ) {
-                                                    event.preventDefault();
-                                                    event.stopPropagation();
-                                                    event.currentTarget.classList.add(
+                                              {isSupplyStep(
+                                                activity.activityType,
+                                              ) ? (
+                                                <div
+                                                  className="mt-1"
+                                                  onDragOver={(event) => {
+                                                    if (
+                                                      isAutoManagedSupplyStep ||
+                                                      lockGeneralActivityEdits
+                                                    ) {
+                                                      return;
+                                                    }
+                                                    if (
+                                                      event.dataTransfer.types.includes(
+                                                        "application/inventory-item",
+                                                      )
+                                                    ) {
+                                                      event.preventDefault();
+                                                      event.stopPropagation();
+                                                      event.currentTarget.classList.add(
+                                                        "border-blue-400",
+                                                        "bg-blue-100/50",
+                                                      );
+                                                    }
+                                                  }}
+                                                  onDragLeave={(event) => {
+                                                    event.currentTarget.classList.remove(
                                                       "border-blue-400",
                                                       "bg-blue-100/50",
                                                     );
-                                                  }
-                                                }}
-                                                onDragLeave={(event) => {
-                                                  event.currentTarget.classList.remove(
-                                                    "border-blue-400",
-                                                    "bg-blue-100/50",
-                                                  );
-                                                }}
-                                                onDrop={(event) => {
-                                                  event.preventDefault();
-                                                  event.stopPropagation();
-                                                  event.currentTarget.classList.remove(
-                                                    "border-blue-400",
-                                                    "bg-blue-100/50",
-                                                  );
-                                                  if (
-                                                    lockGeneralActivityEdits
-                                                  ) {
-                                                    toast.info(
-                                                      "Chỉ có thể chỉnh sửa vật phẩm ở activity Planned.",
+                                                  }}
+                                                  onDrop={(event) => {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    event.currentTarget.classList.remove(
+                                                      "border-blue-400",
+                                                      "bg-blue-100/50",
                                                     );
-                                                    return;
-                                                  }
-                                                  if (isAutoManagedSupplyStep) {
-                                                    toast.info(
-                                                      "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
-                                                    );
-                                                    return;
-                                                  }
-                                                  const data =
-                                                    event.dataTransfer.getData(
-                                                      "application/inventory-item",
-                                                    );
-                                                  if (data) {
-                                                    try {
-                                                      const item =
-                                                        JSON.parse(data);
-                                                      handleAddSupply(
-                                                        activity._id,
-                                                        item,
+                                                    if (
+                                                      lockGeneralActivityEdits
+                                                    ) {
+                                                      toast.info(
+                                                        "Chỉ có thể chỉnh sửa vật phẩm ở activity Planned.",
                                                       );
-                                                    } catch {
-                                                      // Ignore invalid drag payload.
+                                                      return;
                                                     }
-                                                  }
-                                                }}
-                                              >
-                                                <div className="flex justify-end">
-                                                  <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 gap-1.5 px-2 text-sm text-muted-foreground"
-                                                    onClick={() =>
-                                                      toggleEditSupplyExpansion(
-                                                        activity._id,
-                                                        defaultSupplyExpanded,
-                                                      )
+                                                    if (
+                                                      isAutoManagedSupplyStep
+                                                    ) {
+                                                      toast.info(
+                                                        "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
+                                                      );
+                                                      return;
                                                     }
-                                                  >
-                                                    <Package className="h-3.5 w-3.5" />
-                                                    Vật phẩm
-                                                    <CaretDown
+                                                    const data =
+                                                      event.dataTransfer.getData(
+                                                        "application/inventory-item",
+                                                      );
+                                                    if (data) {
+                                                      try {
+                                                        const item =
+                                                          JSON.parse(data);
+                                                        handleAddSupply(
+                                                          activity._id,
+                                                          item,
+                                                        );
+                                                      } catch {
+                                                        // Ignore invalid drag payload.
+                                                      }
+                                                    }
+                                                  }}
+                                                >
+                                                  <div className="flex justify-end">
+                                                    <Button
+                                                      type="button"
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      className="h-8 gap-1.5 px-2 text-sm text-muted-foreground"
+                                                      onClick={() =>
+                                                        toggleEditSupplyExpansion(
+                                                          activity._id,
+                                                          defaultSupplyExpanded,
+                                                        )
+                                                      }
+                                                    >
+                                                      <Package className="h-3.5 w-3.5" />
+                                                      Vật phẩm
+                                                      <CaretDown
+                                                        className={cn(
+                                                          "h-4 w-4 transition-transform",
+                                                          isSupplyExpanded &&
+                                                            "rotate-180",
+                                                        )}
+                                                      />
+                                                    </Button>
+                                                  </div>
+
+                                                  {isSupplyExpanded ? (
+                                                    <div
                                                       className={cn(
-                                                        "h-4 w-4 transition-transform",
-                                                        isSupplyExpanded &&
-                                                          "rotate-180",
+                                                        "rounded-xl border-2 border-dashed px-3 py-2 transition-colors",
+                                                        hasActivityError
+                                                          ? "border-red-200 bg-red-50/60 dark:border-red-800/60 dark:bg-red-950/15"
+                                                          : hasSupplyBalanceIssues
+                                                            ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-950/15"
+                                                            : "border-blue-200 bg-blue-50/30 dark:border-blue-800/40 dark:bg-blue-900/10",
+                                                        isReturnSuppliesActivity &&
+                                                          "border-blue-300/70 bg-blue-100/40 dark:bg-blue-900/15",
                                                       )}
-                                                    />
-                                                  </Button>
-                                                </div>
-
-                                                {isSupplyExpanded ? (
-                                                  <div
-                                                    className={cn(
-                                                      "rounded-xl border-2 border-dashed px-3 py-2 transition-colors",
-                                                      hasActivityError
-                                                        ? "border-red-200 bg-red-50/60 dark:border-red-800/60 dark:bg-red-950/15"
-                                                        : hasSupplyBalanceIssues
-                                                          ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-950/15"
-                                                          : "border-blue-200 bg-blue-50/30 dark:border-blue-800/40 dark:bg-blue-900/10",
-                                                      isReturnSuppliesActivity &&
-                                                        "border-blue-300/70 bg-blue-100/40 dark:bg-blue-900/15",
-                                                    )}
-                                                  >
-                                                    {hasSupplyBalanceIssues &&
-                                                    primarySupplyBalanceIssue ? (
-                                                      <button
-                                                        type="button"
-                                                        className="mb-2 w-full rounded-lg border border-amber-300/80 bg-amber-100/80 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
-                                                        onClick={() =>
-                                                          handleQuickFixSupplyIssue(
-                                                            primarySupplyBalanceIssue,
-                                                          )
-                                                        }
-                                                      >
-                                                        <p className="flex items-center gap-1.5 font-semibold">
-                                                          <Warning
-                                                            className="h-3.5 w-3.5 shrink-0"
-                                                            weight="fill"
-                                                          />
-                                                          Cân đối vật phẩm chưa
-                                                          khớp
-                                                        </p>
-                                                        <p className="mt-1 leading-relaxed">
-                                                          {
-                                                            primarySupplyBalanceIssue.message
+                                                    >
+                                                      {hasSupplyBalanceIssues &&
+                                                      primarySupplyBalanceIssue ? (
+                                                        <button
+                                                          type="button"
+                                                          className="mb-2 w-full rounded-lg border border-amber-300/80 bg-amber-100/80 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                                                          onClick={() =>
+                                                            handleQuickFixSupplyIssue(
+                                                              primarySupplyBalanceIssue,
+                                                            )
                                                           }
-                                                        </p>
-                                                        {supplyBalanceIssues.length >
-                                                        1 ? (
-                                                          <p className="mt-1 text-sm opacity-80">
-                                                            +
-                                                            {supplyBalanceIssues.length -
-                                                              1}{" "}
-                                                            cảnh báo tương tự
+                                                        >
+                                                          <p className="flex items-center gap-1.5 font-semibold">
+                                                            <Warning
+                                                              className="h-3.5 w-3.5 shrink-0"
+                                                              weight="fill"
+                                                            />
+                                                            Cân đối vật phẩm
+                                                            chưa khớp
                                                           </p>
-                                                        ) : null}
-                                                        <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold">
-                                                          <ArrowsClockwise
-                                                            className="h-3.5 w-3.5"
-                                                            weight="bold"
-                                                          />
-                                                          Tự sửa vật phẩm
-                                                        </span>
-                                                      </button>
-                                                    ) : null}
+                                                          <p className="mt-1 leading-relaxed">
+                                                            {
+                                                              primarySupplyBalanceIssue.message
+                                                            }
+                                                          </p>
+                                                          {supplyBalanceIssues.length >
+                                                          1 ? (
+                                                            <p className="mt-1 text-sm opacity-80">
+                                                              +
+                                                              {supplyBalanceIssues.length -
+                                                                1}{" "}
+                                                              cảnh báo tương tự
+                                                            </p>
+                                                          ) : null}
+                                                          <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold">
+                                                            <ArrowsClockwise
+                                                              className="h-3.5 w-3.5"
+                                                              weight="bold"
+                                                            />
+                                                            Tự sửa vật phẩm
+                                                          </span>
+                                                        </button>
+                                                      ) : null}
 
-                                                    {isReturnSuppliesActivity ? (
-                                                      <p className="mb-1.5 text-sm leading-relaxed text-blue-700/80 dark:text-blue-300/80">
-                                                        Bước hoàn trả sẽ tự đồng
-                                                        bộ vật phẩm tái sử dụng
-                                                        từ bước tiếp nhận vật
-                                                        phẩm cùng kho và cùng
-                                                        đội.
-                                                      </p>
-                                                    ) : null}
+                                                      {isReturnSuppliesActivity ? (
+                                                        <p className="mb-1.5 text-sm leading-relaxed text-blue-700/80 dark:text-blue-300/80">
+                                                          Bước hoàn trả sẽ tự
+                                                          đồng bộ vật phẩm tái
+                                                          sử dụng từ bước tiếp
+                                                          nhận vật phẩm cùng kho
+                                                          và cùng đội.
+                                                        </p>
+                                                      ) : null}
 
-                                                    {isSupplyExpanded ? (
-                                                      activity.suppliesToCollect &&
-                                                      activity.suppliesToCollect
-                                                        .length > 0 ? (
-                                                        <div className="space-y-1">
-                                                          {activity.suppliesToCollect.map(
-                                                            (supply, sIdx) => {
-                                                              const isReusable =
-                                                                isReusableSupplyCollection(
-                                                                  supply,
-                                                                );
-                                                              const showBufferInput =
-                                                                isCollectSuppliesActivity &&
-                                                                !isReusable;
+                                                      {isSupplyExpanded ? (
+                                                        activity.suppliesToCollect &&
+                                                        activity
+                                                          .suppliesToCollect
+                                                          .length > 0 ? (
+                                                          <div className="space-y-1">
+                                                            {activity.suppliesToCollect.map(
+                                                              (
+                                                                supply,
+                                                                sIdx,
+                                                              ) => {
+                                                                const isReusable =
+                                                                  isReusableSupplyCollection(
+                                                                    supply,
+                                                                  );
+                                                                const showBufferInput =
+                                                                  isCollectSuppliesActivity &&
+                                                                  !isReusable;
 
-                                                              const supplyDisplay =
-                                                                buildSupplyDisplayItem(
-                                                                  activity.activityType,
-                                                                  {
-                                                                    ...supply,
-                                                                    quantity:
-                                                                      toFiniteNumber(
-                                                                        supply.quantity,
-                                                                      ) ?? 0,
-                                                                    unit: normalizeSupplyUnit(
-                                                                      supply.unit,
-                                                                    ),
-                                                                  },
-                                                                );
-
-                                                              return (
-                                                                <div
-                                                                  key={sIdx}
-                                                                  className="space-y-1"
-                                                                >
-                                                                  <div
-                                                                    className={cn(
-                                                                      showBufferInput
-                                                                        ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
-                                                                        : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
-                                                                      hasActivityError
-                                                                        ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
-                                                                        : "bg-background",
-                                                                    )}
-                                                                  >
-                                                                    <div className="flex min-w-0 items-center gap-1.5">
-                                                                      <Package
-                                                                        className={cn(
-                                                                          "h-3 w-3 shrink-0",
-                                                                          hasActivityError
-                                                                            ? "text-red-500"
-                                                                            : "text-blue-500",
-                                                                        )}
-                                                                      />
-                                                                      <span
-                                                                        className={cn(
-                                                                          "truncate font-medium",
-                                                                          hasActivityError
-                                                                            ? "text-red-700 dark:text-red-200"
-                                                                            : "text-foreground",
-                                                                        )}
-                                                                        title={
-                                                                          supplyDisplay.name ||
-                                                                          "Vật phẩm chưa rõ tên"
-                                                                        }
-                                                                      >
-                                                                        {supplyDisplay.name ||
-                                                                          "Vật phẩm chưa rõ tên"}
-                                                                      </span>
-                                                                    </div>
-                                                                    <Input
-                                                                      type="number"
-                                                                      min={0}
-                                                                      value={
-                                                                        Number.isNaN(
+                                                                const supplyDisplay =
+                                                                  buildSupplyDisplayItem(
+                                                                    activity.activityType,
+                                                                    {
+                                                                      ...supply,
+                                                                      quantity:
+                                                                        toFiniteNumber(
                                                                           supply.quantity,
-                                                                        )
-                                                                          ? ""
-                                                                          : supply.quantity
-                                                                      }
-                                                                      onChange={(
-                                                                        event,
-                                                                      ) =>
-                                                                        handleUpdateSupplyQuantity(
-                                                                          activity._id,
-                                                                          sIdx,
-                                                                          parseInt(
-                                                                            event
-                                                                              .target
-                                                                              .value,
-                                                                          ),
-                                                                        )
-                                                                      }
-                                                                      disabled={
-                                                                        isAutoManagedSupplyStep ||
-                                                                        lockGeneralActivityEdits
-                                                                      }
-                                                                      className="h-6 w-full px-1 text-center text-sm"
-                                                                    />
-                                                                    <span className="text-right text-sm text-muted-foreground">
-                                                                      {normalizeSupplyUnit(
+                                                                        ) ?? 0,
+                                                                      unit: normalizeSupplyUnit(
                                                                         supply.unit,
+                                                                      ),
+                                                                    },
+                                                                  );
+
+                                                                return (
+                                                                  <div
+                                                                    key={sIdx}
+                                                                    className="space-y-1"
+                                                                  >
+                                                                    <div
+                                                                      className={cn(
+                                                                        showBufferInput
+                                                                          ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
+                                                                          : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
+                                                                        hasActivityError
+                                                                          ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
+                                                                          : "bg-background",
                                                                       )}
-                                                                    </span>
-                                                                    {showBufferInput ? (
-                                                                      <div className="relative min-w-0">
-                                                                        <Input
-                                                                          type="number"
-                                                                          min={
-                                                                            0
-                                                                          }
-                                                                          max={
-                                                                            100
-                                                                          }
-                                                                          step={
-                                                                            1
-                                                                          }
-                                                                          value={getSupplyBufferPercentInputValue(
-                                                                            supply.bufferRatio,
+                                                                    >
+                                                                      <div className="flex min-w-0 items-center gap-1.5">
+                                                                        <Package
+                                                                          className={cn(
+                                                                            "h-3 w-3 shrink-0",
+                                                                            hasActivityError
+                                                                              ? "text-red-500"
+                                                                              : "text-blue-500",
                                                                           )}
-                                                                          onChange={(
-                                                                            event,
-                                                                          ) =>
-                                                                            handleUpdateSupplyBufferRatio(
-                                                                              activity._id,
-                                                                              sIdx,
-                                                                              parseFloat(
-                                                                                event
-                                                                                  .target
-                                                                                  .value,
-                                                                              ),
-                                                                            )
-                                                                          }
-                                                                          disabled={
-                                                                            lockGeneralActivityEdits
-                                                                          }
-                                                                          title="Dự trù (%)"
-                                                                          className="h-6 w-full pr-4 pl-1 text-center text-sm"
                                                                         />
-                                                                        <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                                                                          %
+                                                                        <span
+                                                                          className={cn(
+                                                                            "truncate font-medium",
+                                                                            hasActivityError
+                                                                              ? "text-red-700 dark:text-red-200"
+                                                                              : "text-foreground",
+                                                                          )}
+                                                                          title={
+                                                                            supplyDisplay.name ||
+                                                                            "Vật phẩm chưa rõ tên"
+                                                                          }
+                                                                        >
+                                                                          {supplyDisplay.name ||
+                                                                            "Vật phẩm chưa rõ tên"}
                                                                         </span>
                                                                       </div>
-                                                                    ) : null}
-                                                                    <Button
-                                                                      variant="ghost"
-                                                                      size="icon"
-                                                                      className="h-5 w-5 text-muted-foreground hover:text-red-500"
-                                                                      onClick={() =>
-                                                                        handleRemoveSupplyWithConfirm(
-                                                                          activity._id,
-                                                                          sIdx,
-                                                                          supplyDisplay.name,
-                                                                        )
-                                                                      }
-                                                                      disabled={
-                                                                        isAutoManagedSupplyStep ||
-                                                                        lockGeneralActivityEdits
-                                                                      }
-                                                                    >
-                                                                      <X className="h-3 w-3" />
-                                                                    </Button>
+                                                                      <Input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        value={
+                                                                          Number.isNaN(
+                                                                            supply.quantity,
+                                                                          )
+                                                                            ? ""
+                                                                            : supply.quantity
+                                                                        }
+                                                                        onChange={(
+                                                                          event,
+                                                                        ) =>
+                                                                          handleUpdateSupplyQuantity(
+                                                                            activity._id,
+                                                                            sIdx,
+                                                                            parseInt(
+                                                                              event
+                                                                                .target
+                                                                                .value,
+                                                                            ),
+                                                                          )
+                                                                        }
+                                                                        disabled={
+                                                                          isAutoManagedSupplyStep ||
+                                                                          lockGeneralActivityEdits
+                                                                        }
+                                                                        className="h-6 w-full px-1 text-center text-sm"
+                                                                      />
+                                                                      <span className="text-right text-sm text-muted-foreground">
+                                                                        {normalizeSupplyUnit(
+                                                                          supply.unit,
+                                                                        )}
+                                                                      </span>
+                                                                      {showBufferInput ? (
+                                                                        <div className="relative min-w-0">
+                                                                          <Input
+                                                                            type="number"
+                                                                            min={
+                                                                              0
+                                                                            }
+                                                                            max={
+                                                                              100
+                                                                            }
+                                                                            step={
+                                                                              1
+                                                                            }
+                                                                            value={getSupplyBufferPercentInputValue(
+                                                                              supply.bufferRatio,
+                                                                            )}
+                                                                            onChange={(
+                                                                              event,
+                                                                            ) =>
+                                                                              handleUpdateSupplyBufferRatio(
+                                                                                activity._id,
+                                                                                sIdx,
+                                                                                parseFloat(
+                                                                                  event
+                                                                                    .target
+                                                                                    .value,
+                                                                                ),
+                                                                              )
+                                                                            }
+                                                                            disabled={
+                                                                              lockGeneralActivityEdits
+                                                                            }
+                                                                            title="Dự trù (%)"
+                                                                            className="h-6 w-full pr-4 pl-1 text-center text-sm"
+                                                                          />
+                                                                          <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                                                                            %
+                                                                          </span>
+                                                                        </div>
+                                                                      ) : null}
+                                                                      <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 text-muted-foreground hover:text-red-500"
+                                                                        onClick={() =>
+                                                                          handleRemoveSupplyWithConfirm(
+                                                                            activity._id,
+                                                                            sIdx,
+                                                                            supplyDisplay.name,
+                                                                          )
+                                                                        }
+                                                                        disabled={
+                                                                          isAutoManagedSupplyStep ||
+                                                                          lockGeneralActivityEdits
+                                                                        }
+                                                                      >
+                                                                        <X className="h-3 w-3" />
+                                                                      </Button>
+                                                                    </div>
                                                                   </div>
-                                                                </div>
-                                                              );
-                                                            },
-                                                          )}
-                                                        </div>
-                                                      ) : (
-                                                        <p className="py-1 text-center text-sm text-muted-foreground/60">
-                                                          {isAutoManagedSupplyStep
-                                                            ? "Vật phẩm tái sử dụng sẽ tự đồng bộ từ bước tiếp nhận vật phẩm cùng kho và cùng đội."
-                                                            : "Kéo vật phẩm từ kho bên phải vào đây"}
-                                                        </p>
-                                                      )
-                                                    ) : null}
-                                                  </div>
-                                                ) : null}
-                                              </div>
-                                            ) : null}
+                                                                );
+                                                              },
+                                                            )}
+                                                          </div>
+                                                        ) : (
+                                                          <p className="py-1 text-center text-sm text-muted-foreground/60">
+                                                            {isAutoManagedSupplyStep
+                                                              ? "Vật phẩm tái sử dụng sẽ tự đồng bộ từ bước tiếp nhận vật phẩm cùng kho và cùng đội."
+                                                              : "Kéo vật phẩm từ kho bên phải vào đây"}
+                                                          </p>
+                                                        )
+                                                      ) : null}
+                                                    </div>
+                                                  ) : null}
+                                                </div>
+                                              ) : null}
                                             </div>
                                           </div>
                                         );
@@ -15036,6 +15212,29 @@ const RescuePlanPanel = ({
                     : "Đồng ý tạo nhiệm vụ"}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={Boolean(activeMissionReportImage)}
+          onOpenChange={handleMissionReportImageViewerOpenChange}
+        >
+          <DialogContent className="max-w-5xl p-0 overflow-hidden border-none bg-transparent shadow-none">
+            {activeMissionReportImage && (
+              <div className="relative group flex items-center justify-center min-h-[400px]">
+                <div className="absolute top-4 left-4 z-10 flex flex-col gap-1">
+                  <Badge className="bg-black/60 text-white border-none backdrop-blur-md px-3 py-1.5 text-base font-bold tracking-tighter">
+                    Bước {activeMissionReportImage.step}:{" "}
+                    {activeMissionReportImage.activityLabel}
+                  </Badge>
+                </div>
+                <img
+                  src={activeMissionReportImage.src}
+                  alt="Báo cáo chi tiết"
+                  className="w-full h-auto max-h-[90vh] object-contain rounded-xl shadow-2xl ring-1 ring-white/10"
+                />
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

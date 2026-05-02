@@ -39,9 +39,11 @@ export function supplyBufferPercentToRatio(value: unknown): number {
   return Math.min(100, Math.max(0, parsed)) / 100;
 }
 
-export function getSupplyBufferPercentInputValue(value: unknown): number | string {
-  const ratio = normalizeSupplyBufferRatio(value);
-  if (ratio === null || Number.isNaN(ratio)) return "";
+export function getSupplyBufferPercentInputValue(
+  value: unknown,
+): number | string {
+  const ratio = resolveSupplyBufferRatio(value);
+  if (Number.isNaN(ratio)) return "";
   return Number((ratio * 100).toFixed(2));
 }
 
