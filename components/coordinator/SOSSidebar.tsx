@@ -514,7 +514,9 @@ function getClusterPriorityMismatchMessage(
   } chỉ nhận SOS mức ${PRIORITY_LABELS[expectedPriority]}. Không thể thêm ${preview}${suffix}.`;
 }
 
-function getClusterDropBlockedMessage(cluster: SOSClusterEntity): string | null {
+function getClusterDropBlockedMessage(
+  cluster: SOSClusterEntity,
+): string | null {
   const clusterStatus = resolveClusterStatus(cluster);
 
   if (clusterStatus === "Pending" || clusterStatus === "Suggested") {
@@ -723,6 +725,8 @@ const SOSSidebar = ({
   onSosSortChange,
   clusterSort = "time:desc",
   onClusterSortChange,
+  clusterViewMode = "active",
+  onClusterViewModeChange,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState<SidebarTabValue>("incoming");
   const [manualTabSelectionKey, setManualTabSelectionKey] = useState<
@@ -1191,7 +1195,8 @@ const SOSSidebar = ({
     (s) => getSOSStatusBucket(getSOSEffectiveStatus(s)) === "active",
   );
 
-  const displayPendingCount = apiStatusCounts?.pending ?? pendingRequests.length;
+  const displayPendingCount =
+    apiStatusCounts?.pending ?? pendingRequests.length;
   const displayActiveCount = apiStatusCounts?.active ?? assignedRequests.length;
 
   const availableRescuers = rescuers.filter((r) => r.status === "AVAILABLE");
@@ -1332,6 +1337,16 @@ const SOSSidebar = ({
     shouldIncludeCompletedClusters,
     sosStatusById,
   ]);
+
+  const completedClusters = useMemo(() => {
+    return [...clusterDataSource]
+      .filter((cluster) => resolveClusterStatus(cluster) === "Completed")
+      .sort(
+        (a, b) => getTimestamp(b.lastUpdatedAt) - getTimestamp(a.lastUpdatedAt),
+      );
+  }, [clusterDataSource]);
+
+  const isCompletedMode = clusterViewMode === "completed";
 
   const filteredActiveClusters = useMemo(() => {
     const selectedClusterStatusSet = new Set(selectedClusterStatuses);
@@ -1652,7 +1667,14 @@ const SOSSidebar = ({
               value="clusters"
               className="h-10 rounded-xl px-3 text-[15px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
             >
-              Cụm SOS
+              <span className="flex items-center gap-1.5">
+                Cụm SOS
+                {completedClusters.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-4.5 h-4.5 rounded-full bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    {completedClusters.length}
+                  </span>
+                )}
+              </span>
             </DroppableTabsTrigger>
           </TabsList>
 
@@ -1664,82 +1686,82 @@ const SOSSidebar = ({
             <div className="border-b bg-background/80 px-3 pb-3 pt-1 space-y-2">
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                <Icon
-                  icon="ph:magnifying-glass"
-                  className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  value={sosRequestId}
-                  onChange={(event) => {
-                    onSosRequestIdChange?.(event.target.value);
-                  }}
-                  placeholder="Tìm theo SOS ID"
-                  className="h-9 pl-8 pr-8 text-[14px]"
-                />
-                {sosRequestId.trim().length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
-                    onClick={() => {
-                      onSosRequestIdChange?.("");
+                  <Icon
+                    icon="ph:magnifying-glass"
+                    className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    value={sosRequestId}
+                    onChange={(event) => {
+                      onSosRequestIdChange?.(event.target.value);
                     }}
-                    aria-label="Xóa tìm kiếm SOS"
-                  >
-                    <Icon icon="ph:x" className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
+                    placeholder="Tìm theo SOS ID"
+                    className="h-9 pl-8 pr-8 text-[14px]"
+                  />
+                  {sosRequestId.trim().length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                      onClick={() => {
+                        onSosRequestIdChange?.("");
+                      }}
+                      aria-label="Xóa tìm kiếm SOS"
+                    >
+                      <Icon icon="ph:x" className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : null}
+                </div>
+
+                <Popover open={sosSortOpen} onOpenChange={setSosSortOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      title="Sắp xếp SOS"
+                    >
+                      <ArrowsDownUp className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-1.5" align="end">
+                    <div className="mb-1.5 px-2 py-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Sắp xếp SOS
+                    </div>
+                    {SORT_OPTIONS.map((option) => {
+                      const checked = sosSort === option.key;
+                      const Icon = option.icon;
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => {
+                            onSosSortChange?.(option.key);
+                            setSosSortOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60",
+                            checked && "bg-muted/80 font-medium",
+                          )}
+                        >
+                          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="flex-1">{option.label}</span>
+                          {checked && (
+                            <Check
+                              className="h-3.5 w-3.5 text-primary"
+                              weight="bold"
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </PopoverContent>
+                </Popover>
               </div>
 
-              <Popover open={sosSortOpen} onOpenChange={setSosSortOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    title="Sắp xếp SOS"
-                  >
-                    <ArrowsDownUp className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-1.5" align="end">
-                  <div className="mb-1.5 px-2 py-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Sắp xếp SOS
-                  </div>
-                  {SORT_OPTIONS.map((option) => {
-                    const checked = sosSort === option.key;
-                    const Icon = option.icon;
-
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => {
-                          onSosSortChange?.(option.key);
-                          setSosSortOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60",
-                          checked && "bg-muted/80 font-medium",
-                        )}
-                      >
-                        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="flex-1">{option.label}</span>
-                        {checked && (
-                          <Check
-                            className="h-3.5 w-3.5 text-primary"
-                            weight="bold"
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <div
                   className={cn(
                     "grid flex-1 items-center gap-1.5",
@@ -2058,40 +2080,40 @@ const SOSSidebar = ({
                             {/* Evaluation Scores Section */}
                             {sos.evaluation?.aiAnalyses &&
                               sos.evaluation.aiAnalyses.length > 0 && (
-                              <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
-                                {sos.evaluation.aiAnalyses &&
-                                  sos.evaluation.aiAnalyses.length > 0 && (
-                                    <>
-                                      <div
-                                        className={cn(
-                                          "flex items-center gap-1.5 min-w-0",
-                                          sos.evaluation.aiAnalyses[0]
-                                            .agreesWithRuleBase === false &&
-                                            "text-amber-600 dark:text-amber-400",
-                                        )}
-                                        title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
-                                      >
-                                        <Brain
-                                          className="h-3.5 w-3.5 shrink-0"
-                                          weight="fill"
-                                        />
-                                        <span className="text-[11px] font-bold uppercase tracking-tight">
-                                          AI:
-                                        </span>
-                                        <span className="text-[12px] font-mono font-bold">
-                                          {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(
-                                            1,
+                                <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
+                                  {sos.evaluation.aiAnalyses &&
+                                    sos.evaluation.aiAnalyses.length > 0 && (
+                                      <>
+                                        <div
+                                          className={cn(
+                                            "flex items-center gap-1.5 min-w-0",
+                                            sos.evaluation.aiAnalyses[0]
+                                              .agreesWithRuleBase === false &&
+                                              "text-amber-600 dark:text-amber-400",
                                           )}
-                                        </span>
-                                        {sos.evaluation.aiAnalyses[0]
-                                          .agreesWithRuleBase === false && (
-                                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                        )}
-                                      </div>
-                                    </>
-                                  )}
-                              </div>
-                            )}
+                                          title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                                        >
+                                          <Brain
+                                            className="h-3.5 w-3.5 shrink-0"
+                                            weight="fill"
+                                          />
+                                          <span className="text-[11px] font-bold uppercase tracking-tight">
+                                            AI:
+                                          </span>
+                                          <span className="text-[12px] font-mono font-bold">
+                                            {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(
+                                              1,
+                                            )}
+                                          </span>
+                                          {sos.evaluation.aiAnalyses[0]
+                                            .agreesWithRuleBase === false && (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                </div>
+                              )}
                           </div>
                           <div className="px-3 py-2 border-t border-inherit space-y-1.5">
                             {canCreateClusterFromSOS(sos) ? (
@@ -2210,9 +2232,50 @@ const SOSSidebar = ({
             className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
           >
             <div className="h-full min-h-0 flex-1 overflow-y-auto">
+              {/* View Mode Toggle */}
+              <div className="px-3 pt-3 pb-0">
+                <div className="flex rounded-xl border border-border/60 bg-muted/30 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => onClusterViewModeChange?.("active")}
+                    className={cn(
+                      "flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold tracking-tight transition-all",
+                      !isCompletedMode
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Hoạt động
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onClusterViewModeChange?.("completed")}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold tracking-tight transition-all",
+                      isCompletedMode
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Đã xong
+                    {completedClusters.length > 0 && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center justify-center min-w-4.5 h-4.5 rounded-full px-1 text-[10px] font-bold leading-none",
+                          isCompletedMode
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {completedClusters.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
               <div className="px-3 pb-3 space-y-3">
                 {/* Auto-cluster all nearby groups button */}
-                {autoClusters.length > 0 && (
+                {!isCompletedMode && autoClusters.length > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -2240,7 +2303,7 @@ const SOSSidebar = ({
                 )}
 
                 {/* Existing backend clusters */}
-                {shouldShowBackendClusterControls && (
+                {!isCompletedMode && shouldShowBackendClusterControls && (
                   <>
                     <div className="space-y-2">
                       <div className="text-base tracking-tighter font-semibold">
@@ -2914,45 +2977,45 @@ const SOSSidebar = ({
                                             {sos.evaluation?.aiAnalyses &&
                                               sos.evaluation.aiAnalyses.length >
                                                 0 && (
-                                              <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
-                                                {sos.evaluation.aiAnalyses &&
-                                                  sos.evaluation.aiAnalyses
-                                                    .length > 0 && (
-                                                    <>
-                                                      <div
-                                                        className={cn(
-                                                          "flex items-center gap-1.5 min-w-0",
-                                                          sos.evaluation
+                                                <div className="flex items-center gap-3 mt-2 py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 border border-border/40">
+                                                  {sos.evaluation.aiAnalyses &&
+                                                    sos.evaluation.aiAnalyses
+                                                      .length > 0 && (
+                                                      <>
+                                                        <div
+                                                          className={cn(
+                                                            "flex items-center gap-1.5 min-w-0",
+                                                            sos.evaluation
+                                                              .aiAnalyses[0]
+                                                              .agreesWithRuleBase ===
+                                                              false &&
+                                                              "text-amber-600 dark:text-amber-400",
+                                                          )}
+                                                          title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
+                                                        >
+                                                          <Brain
+                                                            className="h-3.5 w-3.5 shrink-0"
+                                                            weight="fill"
+                                                          />
+                                                          <span className="text-[11px] font-bold uppercase tracking-tight">
+                                                            AI:
+                                                          </span>
+                                                          <span className="text-[12px] font-mono font-bold">
+                                                            {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(
+                                                              1,
+                                                            )}
+                                                          </span>
+                                                          {sos.evaluation
                                                             .aiAnalyses[0]
                                                             .agreesWithRuleBase ===
-                                                            false &&
-                                                            "text-amber-600 dark:text-amber-400",
-                                                        )}
-                                                        title={`AI Phân tích: ${sos.evaluation.aiAnalyses[0].explanation}`}
-                                                      >
-                                                        <Brain
-                                                          className="h-3.5 w-3.5 shrink-0"
-                                                          weight="fill"
-                                                        />
-                                                        <span className="text-[11px] font-bold uppercase tracking-tight">
-                                                          AI:
-                                                        </span>
-                                                        <span className="text-[12px] font-mono font-bold">
-                                                          {sos.evaluation.aiAnalyses[0].suggestedPriorityScore.toFixed(
-                                                            1,
+                                                            false && (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
                                                           )}
-                                                        </span>
-                                                        {sos.evaluation
-                                                          .aiAnalyses[0]
-                                                          .agreesWithRuleBase ===
-                                                          false && (
-                                                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                                        )}
-                                                      </div>
-                                                    </>
-                                                  )}
-                                              </div>
-                                            )}
+                                                        </div>
+                                                      </>
+                                                    )}
+                                                </div>
+                                              )}
                                           </div>
                                         );
                                       })
@@ -3021,7 +3084,7 @@ const SOSSidebar = ({
                   </>
                 )}
 
-                {autoClusters.length > 0 && (
+                {!isCompletedMode && autoClusters.length > 0 && (
                   <>
                     <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                       Gợi ý gom cụm ({autoClusters.length})
@@ -3128,9 +3191,87 @@ const SOSSidebar = ({
                   </>
                 )}
 
-                {!hasClusterFiltersApplied &&
-                activeClusters.length === 0 &&
-                autoClusters.length === 0 ? (
+                {isCompletedMode ? (
+                  completedClusters.length > 0 ? (
+                    completedClusters.map((cluster) => {
+                      const clusterRequestCount =
+                        getSOSClusterRequestCount(cluster);
+                      return (
+                        <div
+                          key={cluster.id}
+                          className="rounded-xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-900/5 overflow-hidden"
+                        >
+                          <div className="px-3 py-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-1.5 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <TreeStructure
+                                    className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                                    weight="fill"
+                                  />
+                                  <span className="text-[15px] font-semibold">
+                                    Cụm #{cluster.id}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-[13px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
+                                      CLUSTER_SEVERITY_BADGE_CLASS_BY_SEVERITY[
+                                        cluster.severityLevel
+                                      ],
+                                    )}
+                                  >
+                                    {
+                                      CLUSTER_SEVERITY_LABELS[
+                                        cluster.severityLevel
+                                      ]
+                                    }
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[13px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0 text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/30"
+                                  >
+                                    Đã hoàn thành
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    <TimeElapsed
+                                      date={new Date(cluster.lastUpdatedAt)}
+                                    />
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    {clusterRequestCount} SOS
+                                  </span>
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 shrink-0 text-[13px] px-2.5 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                                onClick={() => onViewClusterPlan?.(cluster.id)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Xem nhiệm vụ
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-[15px]">Chưa có cụm nào hoàn thành</p>
+                    </div>
+                  )
+                ) : !hasClusterFiltersApplied &&
+                  activeClusters.length === 0 &&
+                  autoClusters.length === 0 ? (
                   <div className="text-center text-muted-foreground py-8">
                     <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p className="text-[15px]">Chưa có cụm SOS nào</p>

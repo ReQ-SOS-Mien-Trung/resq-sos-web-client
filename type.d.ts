@@ -1023,6 +1023,8 @@ export interface SOSSidebarProps {
   onSosSortChange?: (sort: string) => void;
   clusterSort?: string;
   onClusterSortChange?: (sort: string) => void;
+  clusterViewMode?: "active" | "completed";
+  onClusterViewModeChange?: (mode: "active" | "completed") => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
