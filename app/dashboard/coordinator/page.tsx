@@ -293,9 +293,7 @@ function compareAutoClusterCandidates(
 function getPriorityMismatchMessage(requests: SOSRequest[]): string | null {
   const uniquePriorities = Array.from(
     new Set(requests.map((request) => request.priority)),
-  ).sort(
-    (left, right) => SOS_PRIORITY_ORDER[left] - SOS_PRIORITY_ORDER[right],
-  );
+  ).sort((left, right) => SOS_PRIORITY_ORDER[left] - SOS_PRIORITY_ORDER[right]);
 
   if (uniquePriorities.length <= 1) {
     return null;
@@ -353,8 +351,7 @@ function buildAutoClusters(
       continue;
     }
 
-    const maxClusterSize =
-      SOS_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
+    const maxClusterSize = SOS_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
 
     // P1: không gom thêm, chỉ tạo cụm 1 mình
     if (maxClusterSize <= 1) {
@@ -392,10 +389,7 @@ function buildAutoClusters(
         selectedNeighbors = neighborsWithinRadius;
       }
 
-      if (
-        hasFoundNeighbor &&
-        selectedNeighbors.length >= maxClusterSize - 1
-      ) {
+      if (hasFoundNeighbor && selectedNeighbors.length >= maxClusterSize - 1) {
         break;
       }
     }
@@ -717,6 +711,9 @@ const CoordinatorDashboardContent = () => {
   >([]);
   const [sosSort, setSosSort] = useState<string>("time:desc");
   const [clusterSort, setClusterSort] = useState<string>("time:desc");
+  const [clusterViewMode, setClusterViewMode] = useState<
+    "active" | "completed"
+  >("active");
   const [sosRequestIdSearch, setSosRequestIdSearch] = useState<string>("");
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
@@ -1666,9 +1663,7 @@ const CoordinatorDashboardContent = () => {
     (sosIds: string[]) => {
       const pendingRequests = sosIds
         .map((id) => actionSOSById.get(normalizeSOSId(id)))
-        .filter(
-          (sos): sos is SOSRequest => !!sos && sos.status === "PENDING",
-        );
+        .filter((sos): sos is SOSRequest => !!sos && sos.status === "PENDING");
       const ids = pendingRequests.map((sos) => Number(sos.id)).filter(Boolean);
       if (ids.length === 0) return;
 
@@ -1716,9 +1711,7 @@ const CoordinatorDashboardContent = () => {
     (sosIds: string[]) => {
       const pendingRequests = sosIds
         .map((id) => actionSOSById.get(normalizeSOSId(id)))
-        .filter(
-          (sos): sos is SOSRequest => !!sos && sos.status === "PENDING",
-        );
+        .filter((sos): sos is SOSRequest => !!sos && sos.status === "PENDING");
       const ids = pendingRequests.map((sos) => Number(sos.id)).filter(Boolean);
       if (ids.length === 0) return;
 
@@ -2240,10 +2233,11 @@ const CoordinatorDashboardContent = () => {
               onSosSortChange={setSosSort}
               clusterSort={clusterSort}
               onClusterSortChange={setClusterSort}
+              clusterViewMode={clusterViewMode}
+              onClusterViewModeChange={setClusterViewMode}
             />
           </div>
         </aside>
-
 
         {/* Map Container */}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
