@@ -3,6 +3,7 @@ import type {
   AllocateDisbursementRequest,
   CampaignMetadata,
   CampaignStatusMetadata,
+  DisbursementSourceTypeMetadata,
   GetCampaignSpendingParams,
   GetCampaignSpendingResponse,
   GetCampaignsParams,
@@ -22,6 +23,19 @@ export async function allocateDisbursement(
   payload: AllocateDisbursementRequest,
 ): Promise<void> {
   await api.post("/finance/disbursements/allocate", payload);
+}
+
+/**
+ * Lấy danh sách nguồn cấp quỹ dùng cho lựa chọn nguồn rút tiền
+ * GET /finance/disbursements/metadata/source-types
+ */
+export async function getDisbursementSourceTypes(): Promise<
+  DisbursementSourceTypeMetadata[]
+> {
+  const { data } = await api.get(
+    "/finance/disbursements/metadata/source-types",
+  );
+  return data;
 }
 
 /**
