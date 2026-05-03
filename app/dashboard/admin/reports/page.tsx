@@ -94,6 +94,7 @@ import { useInventoryCategories } from "@/services/inventory/hooks";
 import {
   useCampaigns,
   useAllocateDisbursement,
+  useDisbursementSourceTypes,
 } from "@/services/campaign_disbursement";
 import {
   useDepotFundTransactions,
@@ -424,6 +425,7 @@ export default function FundingRequestsPage() {
 
   // Allocate modal
   const [allocateOpen, setAllocateOpen] = useState(false);
+  const [allocateSourceType, setAllocateSourceType] = useState("Campaign");
   const [allocateCampaignId, setAllocateCampaignId] = useState("");
   const [allocateDepotId, setAllocateDepotId] = useState("");
   const [allocateAmount, setAllocateAmount] = useState("");
@@ -458,6 +460,15 @@ export default function FundingRequestsPage() {
     () => campaignsData?.items ?? [],
     [campaignsData],
   );
+  const { data: disbursementSourceTypes = [] } = useDisbursementSourceTypes();
+  const allocateSourceOptions = useMemo(() => {
+    const orderedKeys = ["Campaign", "SystemFund"];
+    return disbursementSourceTypes
+      .filter((sourceType) => orderedKeys.includes(sourceType.key))
+      .sort(
+        (a, b) => orderedKeys.indexOf(a.key) - orderedKeys.indexOf(b.key),
+      );
+  }, [disbursementSourceTypes]);
   const { data: categoriesData } = useInventoryCategories();
   const depotTxSearch = useMemo(
     () => depotTxSearchInput.trim(),
@@ -707,8 +718,13 @@ export default function FundingRequestsPage() {
   const endItem = paged.length === 0 ? 0 : startItem + paged.length - 1;
 
   // Allocate handler
+  const isCampaignAllocateSource = allocateSourceType === "Campaign";
+  const hasValidAllocateSource = allocateSourceOptions.some(
+    (sourceType) => sourceType.key === allocateSourceType,
+  );
   const isAllocateValid =
-    allocateCampaignId.trim() !== "" &&
+    hasValidAllocateSource &&
+    (!isCampaignAllocateSource || allocateCampaignId.trim() !== "") &&
     allocateDepotId !== "" &&
     allocateAmount.trim() !== "" &&
     Number(allocateAmount) > 0 &&
@@ -721,7 +737,10 @@ export default function FundingRequestsPage() {
     }
     allocate(
       {
-        fundCampaignId: Number(allocateCampaignId),
+        sourceType: allocateSourceType,
+        ...(isCampaignAllocateSource
+          ? { fundCampaignId: Number(allocateCampaignId) }
+          : {}),
         depotId: Number(allocateDepotId),
         amount: Number(allocateAmount),
         purpose: allocatePurpose.trim(),
@@ -730,6 +749,7 @@ export default function FundingRequestsPage() {
         onSuccess: () => {
           toast.success("Cấp quỹ thành công!");
           setAllocateOpen(false);
+          setAllocateSourceType("Campaign");
           setAllocateCampaignId("");
           setAllocateDepotId("");
           setAllocateAmount("");
@@ -2118,7 +2138,6 @@ export default function FundingRequestsPage() {
                                 className={`text-sm font-bold text-right ${isIn ? "text-emerald-600" : "text-rose-600"
                                   }`}
                               >
-                                {isIn ? "+" : ""}
                                 {formatMoney(tx.amount)}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground text-right whitespace-nowrap">
@@ -2362,6 +2381,7 @@ export default function FundingRequestsPage() {
         onOpenChange={(open) => {
           if (!open) {
             setAllocateOpen(false);
+            setAllocateSourceType("Campaign");
             setAllocateCampaignId("");
             setAllocateDepotId("");
             setAllocateAmount("");
@@ -2380,55 +2400,105 @@ export default function FundingRequestsPage() {
                   Cấp quỹ cho kho
                 </DialogTitle>
                 <DialogDescription className="tracking-tighter">
-                  Phân bổ ngân sách từ chiến dịch quỹ cho các kho
+                  Phân bổ ngân sách từ quỹ chiến dịch hoặc quỹ hệ thống cho các kho
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Campaign */}
+            {/* Source type */}
             <div>
               <label className="text-sm font-medium tracking-tighter mb-2 flex items-center gap-1.5">
                 <PiggyBankIcon size={20} weight="regular" />
-                Chiến dịch quỹ (nguồn rút tiền)
+                Nguồn cấp quỹ
               </label>
-              <Select
-                value={allocateCampaignId}
-                onValueChange={setAllocateCampaignId}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn chiến dịch quỹ..." />
-                </SelectTrigger>
-                <SelectContent
-                  disablePortal
-                  position="popper"
-                  className="w-[--radix-select-trigger-width] z-200"
-                >
-                  {activeCampaigns.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      <div className="flex items-center justify-between w-full gap-3">
-                        <span className="truncate">{c.name}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {c.status !== "Active" && (
-                            <span className="text-sm tracking-tighter text-muted-foreground">
-                              [{c.status}]
-                            </span>
-                          )}
-                          <span className="text-sm font-semibold text-emerald-600">
-                            {formatMoney(c.currentBalance)}
-                          </span>
-                        </div>
+              <div className="grid grid-cols-2 gap-2">
+                {allocateSourceOptions.map((sourceType) => {
+                  const isCampaignSource = sourceType.key === "Campaign";
+                  const isSelected = allocateSourceType === sourceType.key;
+                  const label = isCampaignSource
+                    ? "Quỹ chiến dịch"
+                    : "Quỹ hệ thống";
+
+                  return (
+                    <button
+                      key={sourceType.key}
+                      type="button"
+                      onClick={() => {
+                        setAllocateSourceType(sourceType.key);
+                        if (!isCampaignSource) {
+                          setAllocateCampaignId("");
+                        }
+                      }}
+                      className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                        isSelected
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-950/5"
+                          : "border-border bg-background text-foreground hover:border-emerald-200 hover:bg-emerald-50/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isCampaignSource ? (
+                          <PiggyBankIcon size={18} weight="bold" />
+                        ) : (
+                          <Money size={18} weight="bold" />
+                        )}
+                        <span className="text-sm font-semibold tracking-tighter">
+                          {label}
+                        </span>
                       </div>
-                    </SelectItem>
-                  ))}
-                  {activeCampaigns.length === 0 && (
-                    <div className="px-3 py-4 text-center text-sm tracking-tighter text-muted-foreground">
-                      Không có chiến dịch quỹ nào
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
+                      <p className="mt-1 text-xs tracking-tighter text-muted-foreground">
+                        {sourceType.value}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {isCampaignAllocateSource && (
+              <div>
+                <label className="text-sm font-medium tracking-tighter mb-2 flex items-center gap-1.5">
+                  <PiggyBankIcon size={20} weight="regular" />
+                  Chiến dịch quỹ
+                </label>
+                <Select
+                  value={allocateCampaignId}
+                  onValueChange={setAllocateCampaignId}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn chiến dịch quỹ..." />
+                  </SelectTrigger>
+                  <SelectContent
+                    disablePortal
+                    position="popper"
+                    className="w-[--radix-select-trigger-width] z-200"
+                  >
+                    {activeCampaigns.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        <div className="flex items-center justify-between w-full gap-3">
+                          <span className="truncate">{c.name}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {c.status !== "Active" && (
+                              <span className="text-sm tracking-tighter text-muted-foreground">
+                                [{c.status}]
+                              </span>
+                            )}
+                            <span className="text-sm font-semibold text-emerald-600">
+                              {formatMoney(c.currentBalance)}
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    {activeCampaigns.length === 0 && (
+                      <div className="px-3 py-4 text-center text-sm tracking-tighter text-muted-foreground">
+                        Không có chiến dịch quỹ nào
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Depot */}
             <div>
@@ -2500,6 +2570,7 @@ export default function FundingRequestsPage() {
               variant="outline"
               onClick={() => {
                 setAllocateOpen(false);
+                setAllocateSourceType("Campaign");
                 setAllocateCampaignId("");
                 setAllocateDepotId("");
                 setAllocateAmount("");

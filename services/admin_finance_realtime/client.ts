@@ -15,6 +15,7 @@ import {
   ADMIN_FINANCE_REALTIME_EVENTS,
   ADMIN_FINANCE_REALTIME_METHODS,
   FundingRequestRealtimeUpdate,
+  SystemFundUpdate,
 } from "./type";
 import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
@@ -22,6 +23,7 @@ type FundingRequestUpdateHandler = (
   payload: FundingRequestRealtimeUpdate,
 ) => void;
 type ChartInvalidationHandler = (payload: ChartInvalidation) => void;
+type SystemFundUpdateHandler = (payload: SystemFundUpdate) => void;
 
 const STOP_DEBOUNCE_MS = 1200;
 
@@ -32,10 +34,12 @@ class AdminFinanceRealtimeClient {
   private depotFundChartSubscriptions = new Map<number, number>();
   private campaignFundFlowSubscriptions = new Map<number, number>();
   private fundingRequestListSubscribers = 0;
+  private systemFundSubscribers = 0;
   private isReceiveEventBound = false;
   private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
   private startPromise: Promise<void> | null = null;
   private chartInvalidationListeners = new Set<ChartInvalidationHandler>();
+  private systemFundUpdateListeners = new Set<SystemFundUpdateHandler>();
   private updateListeners = new Set<FundingRequestUpdateHandler>();
 
   private clearPendingStop(): void {
@@ -55,7 +59,8 @@ class AdminFinanceRealtimeClient {
         this.fundingRequestListSubscribers > 0 ||
         this.detailSubscriptions.size > 0 ||
         this.depotFundChartSubscriptions.size > 0 ||
-        this.campaignFundFlowSubscriptions.size > 0
+        this.campaignFundFlowSubscriptions.size > 0 ||
+        this.systemFundSubscribers > 0
       ) {
         return;
       }
@@ -159,6 +164,14 @@ class AdminFinanceRealtimeClient {
           );
         },
       );
+      this.connection.on(
+        ADMIN_FINANCE_REALTIME_EVENTS.ReceiveSystemFundUpdate,
+        (payload: SystemFundUpdate) => {
+          this.systemFundUpdateListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
       this.isReceiveEventBound = true;
     }
 
@@ -194,6 +207,12 @@ class AdminFinanceRealtimeClient {
         connection.invoke(
           ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequests,
         ),
+      );
+    }
+
+    if (this.systemFundSubscribers > 0) {
+      tasks.push(
+        connection.invoke(ADMIN_FINANCE_REALTIME_METHODS.SubscribeSystemFund),
       );
     }
 
@@ -320,6 +339,32 @@ class AdminFinanceRealtimeClient {
       this.chartInvalidationListeners.delete(handler);
       this.scheduleStop();
     };
+  }
+
+  onSystemFundUpdate(handler: SystemFundUpdateHandler): () => void {
+    this.systemFundUpdateListeners.add(handler);
+    return () => {
+      this.systemFundUpdateListeners.delete(handler);
+      this.scheduleStop();
+    };
+  }
+
+  async subscribeSystemFund(): Promise<void> {
+    this.systemFundSubscribers += 1;
+
+    if (this.systemFundSubscribers > 1) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_FINANCE_REALTIME_METHODS.SubscribeSystemFund,
+    );
+  }
+
+  async unsubscribeSystemFund(): Promise<void> {
+    this.systemFundSubscribers = Math.max(0, this.systemFundSubscribers - 1);
+
+    if (this.systemFundSubscribers > 0) return;
+
+    this.scheduleStop();
   }
 
   async subscribeFundingRequests(): Promise<void> {

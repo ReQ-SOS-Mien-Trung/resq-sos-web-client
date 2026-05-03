@@ -1,11 +1,20 @@
 /* ── Disbursement Types ── */
 
 export type DisbursementType = "AdminAllocation" | "FundingRequestApproval";
+export type DisbursementSourceType = "Campaign" | "SystemFund" | string;
+
+/* ── GET /finance/disbursements/metadata/source-types ── */
+
+export interface DisbursementSourceTypeMetadata {
+  key: DisbursementSourceType;
+  value: string;
+}
 
 /* ── POST /finance/disbursements/allocate ── */
 
 export interface AllocateDisbursementRequest {
-  fundCampaignId: number;
+  sourceType: DisbursementSourceType;
+  fundCampaignId?: number;
   depotId: number;
   amount: number;
   purpose: string;
