@@ -116,6 +116,7 @@ import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { useSosClusterGroupingConfig } from "@/services/config/hooks";
+import { PRIORITY_LABELS } from "@/lib/priority";
 
 // ── Lazy-loaded map components ──
 
@@ -208,6 +209,13 @@ function compareSOSIds(leftId: string, rightId: string): number {
   return leftId.localeCompare(rightId);
 }
 
+function normalizeSOSId(id: string | number): string {
+  const normalized = String(id).trim();
+  const numericId = Number(normalized);
+
+  return Number.isFinite(numericId) ? String(numericId) : normalized;
+}
+
 function compareSOSSeeds(left: SOSRequest, right: SOSRequest): number {
   const priorityDelta =
     SOS_PRIORITY_ORDER[left.priority] - SOS_PRIORITY_ORDER[right.priority];
@@ -282,6 +290,29 @@ function compareAutoClusterCandidates(
   return compareSOSIds(left.request.id, right.request.id);
 }
 
+function getPriorityMismatchMessage(requests: SOSRequest[]): string | null {
+  const uniquePriorities = Array.from(
+    new Set(requests.map((request) => request.priority)),
+  ).sort((left, right) => SOS_PRIORITY_ORDER[left] - SOS_PRIORITY_ORDER[right]);
+
+  if (uniquePriorities.length <= 1) {
+    return null;
+  }
+
+  const breakdown = uniquePriorities
+    .map((priority) => {
+      const ids = requests
+        .filter((request) => request.priority === priority)
+        .map((request) => `SOS ${request.id}`)
+        .join(", ");
+
+      return `${PRIORITY_LABELS[priority]}: ${ids}`;
+    })
+    .join("; ");
+
+  return `Không thể gom SOS khác mức độ ưu tiên. ${breakdown}.`;
+}
+
 /** Build client-side auto-clusters using config-driven incremental radius scans. */
 function buildAutoClusters(
   sosRequests: SOSRequest[],
@@ -320,8 +351,7 @@ function buildAutoClusters(
       continue;
     }
 
-    const maxClusterSize =
-      SOS_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
+    const maxClusterSize = SOS_CLUSTER_MAX_SIZE_BY_PRIORITY[seed.priority] ?? 3;
 
     // P1: không gom thêm, chỉ tạo cụm 1 mình
     if (maxClusterSize <= 1) {
@@ -337,7 +367,9 @@ function buildAutoClusters(
       const neighborsWithinRadius = pending
         .filter(
           (candidate) =>
-            candidate.id !== seed.id && !clusteredIds.has(candidate.id),
+            candidate.id !== seed.id &&
+            candidate.priority === seed.priority &&
+            !clusteredIds.has(candidate.id),
         )
         .map((candidate) => ({
           request: candidate,
@@ -357,10 +389,7 @@ function buildAutoClusters(
         selectedNeighbors = neighborsWithinRadius;
       }
 
-      if (
-        hasFoundNeighbor &&
-        selectedNeighbors.length >= maxClusterSize - 1
-      ) {
+      if (hasFoundNeighbor && selectedNeighbors.length >= maxClusterSize - 1) {
         break;
       }
     }
@@ -460,7 +489,7 @@ const MapLegend = () => {
     <div className="absolute bottom-6 left-6 z-[40] pointer-events-auto select-none flex flex-col items-start gap-3">
       {/* Legend Panel */}
       {isOpen && (
-        <div className="bg-background/90 backdrop-blur-md border border-border/60 shadow-2xl rounded-2xl p-3.5 flex flex-col gap-3.5 min-w-[180px] animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="bg-background border border-border/60 shadow-2xl rounded-2xl p-3.5 flex flex-col gap-3.5 min-w-[180px] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center justify-between px-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
               Chú thích
@@ -615,7 +644,7 @@ const MapLegend = () => {
           "w-10 h-10 rounded-full flex items-center justify-center shadow-xl border transition-all duration-300 hover:scale-105 active:scale-95 group",
           isOpen
             ? "bg-primary text-primary-foreground border-primary"
-            : "bg-background/95 backdrop-blur-md text-foreground border-border/60",
+            : "bg-background text-foreground border-border/60",
         )}
         title={isOpen ? "Đóng chú thích" : "Xem chú thích bản đồ"}
       >
@@ -682,6 +711,9 @@ const CoordinatorDashboardContent = () => {
   >([]);
   const [sosSort, setSosSort] = useState<string>("time:desc");
   const [clusterSort, setClusterSort] = useState<string>("time:desc");
+  const [clusterViewMode, setClusterViewMode] = useState<
+    "active" | "completed"
+  >("active");
   const [sosRequestIdSearch, setSosRequestIdSearch] = useState<string>("");
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
@@ -917,6 +949,23 @@ const CoordinatorDashboardContent = () => {
     () => mapSOSRequestEntitiesToSOS(sidebarSosData?.items ?? []),
     [sidebarSosData],
   );
+
+  const actionSOSById = useMemo(() => {
+    const byId = new Map<string, SOSRequest>();
+
+    for (const sos of sosRequests) {
+      byId.set(normalizeSOSId(sos.id), sos);
+    }
+
+    for (const sos of sidebarSOSRequests) {
+      const key = normalizeSOSId(sos.id);
+      if (!byId.has(key)) {
+        byId.set(key, sos);
+      }
+    }
+
+    return byId;
+  }, [sidebarSOSRequests, sosRequests]);
 
   useEffect(() => {
     if (!selectedSOS) {
@@ -1216,16 +1265,24 @@ const CoordinatorDashboardContent = () => {
     });
   }, [teamIncidents]);
 
-  // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
+  // ─── Sidebar auto-collapse when RescuePlanPanel or LocationDetailsPanel opens ───
   useEffect(() => {
-    if (rescuePlanOpen) {
+    if (rescuePlanOpen || locationPanelOpen) {
       sidebarBeforeRescuePlanRef.current = sidebarOpen;
       setSidebarOpen(false);
-    } else {
+    } else if (!rescuePlanOpen && !locationPanelOpen) {
       setSidebarOpen(sidebarBeforeRescuePlanRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rescuePlanOpen]);
+  }, [rescuePlanOpen, locationPanelOpen]);
+
+  // ─── Auto-hide detail panels when AI Stream opens ───
+  useEffect(() => {
+    if (aiStreamOpen && !aiStreamMinimized) {
+      setSOSDetailOpen(false);
+      setLocationPanelOpen(false);
+    }
+  }, [aiStreamOpen, aiStreamMinimized]);
 
   // ─── URL → State: Restore selection from URL on initial load ───
   useEffect(() => {
@@ -1544,15 +1601,20 @@ const CoordinatorDashboardContent = () => {
     (clusterGroups: SOSRequest[][]) => {
       const validClusterGroups = clusterGroups
         .map((group) =>
-          group
-            .filter((s) => s.status === "PENDING")
-            .map((s) => Number(s.id))
-            .filter(Boolean),
+          group.filter((s) => s.status === "PENDING" && Boolean(Number(s.id))),
         )
-        .filter((ids) => ids.length > 0);
+        .filter((group) => group.length > 0);
 
       if (validClusterGroups.length === 0) {
         toast.error("Không còn SOS chờ xử lý để gom cụm.");
+        return;
+      }
+
+      const mixedPriorityError = validClusterGroups
+        .map(getPriorityMismatchMessage)
+        .find((message): message is string => message != null);
+      if (mixedPriorityError) {
+        toast.error(mixedPriorityError);
         return;
       }
 
@@ -1560,7 +1622,9 @@ const CoordinatorDashboardContent = () => {
       let failed = 0;
       const total = validClusterGroups.length;
 
-      validClusterGroups.forEach((ids) => {
+      validClusterGroups.forEach((group) => {
+        const ids = group.map((s) => Number(s.id)).filter(Boolean);
+
         createCluster(
           { sosRequestIds: ids },
           {
@@ -1597,12 +1661,17 @@ const CoordinatorDashboardContent = () => {
 
   const handleProcessClusterOnly = useCallback(
     (sosIds: string[]) => {
-      const pendingIds = sosIds.filter((id) => {
-        const sos = sosRequests.find((s) => s.id === id);
-        return sos?.status === "PENDING";
-      });
-      const ids = pendingIds.map(Number).filter(Boolean);
+      const pendingRequests = sosIds
+        .map((id) => actionSOSById.get(normalizeSOSId(id)))
+        .filter((sos): sos is SOSRequest => !!sos && sos.status === "PENDING");
+      const ids = pendingRequests.map((sos) => Number(sos.id)).filter(Boolean);
       if (ids.length === 0) return;
+
+      const priorityError = getPriorityMismatchMessage(pendingRequests);
+      if (priorityError) {
+        toast.error(priorityError);
+        return;
+      }
 
       const clusterIdx = autoClusters.findIndex((cluster) =>
         sosIds.every((id) => cluster.some((s) => s.id === id)),
@@ -1635,17 +1704,22 @@ const CoordinatorDashboardContent = () => {
         },
       );
     },
-    [sosRequests, autoClusters, createCluster, markSOSRequestsAsClustered],
+    [actionSOSById, autoClusters, createCluster, markSOSRequestsAsClustered],
   );
 
   const handleProcessSOS = useCallback(
     (sosIds: string[]) => {
-      const pendingIds = sosIds.filter((id) => {
-        const sos = sosRequests.find((s) => s.id === id);
-        return sos?.status === "PENDING";
-      });
-      const ids = pendingIds.map(Number).filter(Boolean);
+      const pendingRequests = sosIds
+        .map((id) => actionSOSById.get(normalizeSOSId(id)))
+        .filter((sos): sos is SOSRequest => !!sos && sos.status === "PENDING");
+      const ids = pendingRequests.map((sos) => Number(sos.id)).filter(Boolean);
       if (ids.length === 0) return;
+
+      const priorityError = getPriorityMismatchMessage(pendingRequests);
+      if (priorityError) {
+        toast.error(priorityError);
+        return;
+      }
 
       const clusterIdx = autoClusters.findIndex((cluster) =>
         sosIds.every((id) => cluster.some((s) => s.id === id)),
@@ -1684,7 +1758,7 @@ const CoordinatorDashboardContent = () => {
       );
     },
     [
-      sosRequests,
+      actionSOSById,
       autoClusters,
       createCluster,
       aiStream,
@@ -2159,10 +2233,11 @@ const CoordinatorDashboardContent = () => {
               onSosSortChange={setSosSort}
               clusterSort={clusterSort}
               onClusterSortChange={setClusterSort}
+              clusterViewMode={clusterViewMode}
+              onClusterViewModeChange={setClusterViewMode}
             />
           </div>
         </aside>
-
 
         {/* Map Container */}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -2215,12 +2290,12 @@ const CoordinatorDashboardContent = () => {
                 {/* Create SOS Button */}
                 <Button
                   size="lg"
-                  className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
+                  className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105 will-change-transform"
                   onClick={() => {
                     router.push("/dashboard/coordinator/create-sos");
                   }}
                 >
-                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <span className="absolute inset-0 w-full h-full bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer-slide_2s_infinite] pointer-events-none" />
                   <Phone className="w-5 h-5 animate-bounce" weight="fill" />
                   <span className="tracking-wide">TẠO YÊU CẦU SOS</span>
                 </Button>

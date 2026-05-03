@@ -41,8 +41,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useDepotInventory } from "@/services/inventory/hooks";
-import type { InventoryItemEntity } from "@/services/inventory/type";
+import { useMyDepotQuantityByCategory } from "@/services/inventory/hooks";
+
 import { vi } from "date-fns/locale";
 import {
   X,
@@ -52,7 +52,7 @@ import {
   Phone,
   EnvelopeSimple,
   Package,
-  Users,
+  PencilSimple,
   Hash,
   Info,
   CalendarBlank,
@@ -60,6 +60,13 @@ import {
   CaretUp,
   ArrowsClockwise,
   WarningCircle,
+  Drop,
+  FirstAid,
+  TShirt,
+  Wrench,
+  House,
+  Cube,
+  Users,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { AxiosError } from "axios";
@@ -75,7 +82,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Panel width
 const PANEL_WIDTH = 420;
-const INVENTORY_PAGE_SIZE = 10;
+
 
 const assemblyTeamTypeLabel: Record<string, string> = {
   Rescue: "Cứu hộ",
@@ -312,156 +319,21 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
   return parsed ?? fallback;
 }
 
-function readNumericFromObject(
-  source: Record<string, unknown> | null | undefined,
-  keys: readonly string[],
-): number | null {
-  if (!source) return null;
-
-  for (const key of keys) {
-    const value = parseFiniteNumber(source[key]);
-    if (value !== null) return value;
-  }
-
-  return null;
-}
-
-function getBackendInventorySummary(inventoryData: unknown): {
-  totalStock: number | null;
-  reservedStock: number | null;
-  availableStock: number | null;
-} {
-  const root =
-    inventoryData && typeof inventoryData === "object"
-      ? (inventoryData as Record<string, unknown>)
-      : null;
-  const summary =
-    root && typeof root.summary === "object" && root.summary !== null
-      ? (root.summary as Record<string, unknown>)
-      : null;
-
-  const totalKeys = [
-    "totalQuantity",
-    "totalStock",
-    "totalInventoryQuantity",
-    "sumQuantity",
-    "tongSoLuong",
-    "tongTon",
-    "tongTonKho",
-  ] as const;
-  const reservedKeys = [
-    "totalReservedQuantity",
-    "reservedStock",
-    "reservedQuantity",
-    "reservedForMissionQuantity",
-    "sumReservedQuantity",
-    "tongSoLuongDaGiuCho",
-    "tongDaGiuCho",
-  ] as const;
-  const availableKeys = [
-    "totalAvailableQuantity",
-    "availableStock",
-    "availableQuantity",
-    "sumAvailableQuantity",
-    "tongSoLuongKhaDung",
-    "tongKhaDung",
-  ] as const;
-
-  return {
-    totalStock:
-      readNumericFromObject(summary, totalKeys) ??
-      readNumericFromObject(root, totalKeys),
-    reservedStock:
-      readNumericFromObject(summary, reservedKeys) ??
-      readNumericFromObject(root, reservedKeys),
-    availableStock:
-      readNumericFromObject(summary, availableKeys) ??
-      readNumericFromObject(root, availableKeys),
-  };
-}
-
-function isReusableItemType(value: unknown): boolean {
-  const normalized = String(value ?? "")
-    .trim()
-    .toLowerCase();
-
-  return (
-    normalized === "reusable" ||
-    normalized.includes("tai su dung") ||
-    normalized.includes("tái sử dụng")
-  );
-}
-
-function getInventoryItemTypeLabel(item: InventoryItemEntity): string {
-  return isReusableItemType(item.itemType) ? "Tái sử dụng" : "Tiêu thụ";
-}
-
-function getInventoryQuantities(item: InventoryItemEntity): {
-  total: number;
-  reserved: number;
-  available: number;
-} {
-  if (item.itemType === "Reusable") {
-    const total = toFiniteNumber(item.unit, 0);
-    const reserved = toFiniteNumber(
-      item.reservedUnit ??
-        item.totalReservedUnits ??
-        item.reservedForMissionUnit ??
-        item.reservedForMissionUnits,
-      0,
-    );
-    const available = toFiniteNumber(
-      item.availableUnit,
-      Math.max(total - reserved, 0),
-    );
-
-    return { total, reserved, available };
-  }
-
-  const total = toFiniteNumber(item.quantity, 0);
-  const reserved = toFiniteNumber(
-    item.reservedQuantity ??
-      item.totalReservedQuantity ??
-      item.reservedForMissionQuantity,
-    0,
-  );
-  const available = toFiniteNumber(
-    item.availableQuantity,
-    Math.max(total - reserved, 0),
-  );
-
-  return { total, reserved, available };
-}
-
-function summarizeInventoryItems(items: InventoryItemEntity[]): {
-  totalStock: number | null;
-  reservedStock: number | null;
-  availableStock: number | null;
-} {
-  if (!items.length) {
-    return {
-      totalStock: null,
-      reservedStock: null,
-      availableStock: null,
-    };
-  }
-
-  return items.reduce(
-    (summary, item) => {
-      const quantities = getInventoryQuantities(item);
-
-      summary.totalStock += quantities.total;
-      summary.reservedStock += quantities.reserved;
-      summary.availableStock += quantities.available;
-
-      return summary;
-    },
-    {
-      totalStock: 0,
-      reservedStock: 0,
-      availableStock: 0,
-    },
-  );
+function getCategoryIcon(categoryCode: string) {
+  const code = categoryCode.toUpperCase();
+  if (code.includes("FOOD") || code.includes("THUC_PHAM"))
+    return <Package className="h-4 w-4" />;
+  if (code.includes("WATER") || code.includes("NUOC"))
+    return <Drop className="h-4 w-4" />;
+  if (code.includes("MED") || code.includes("Y_TE"))
+    return <FirstAid className="h-4 w-4" />;
+  if (code.includes("CLOTH") || code.includes("QUAN_AO"))
+    return <TShirt className="h-4 w-4" />;
+  if (code.includes("TOOL") || code.includes("CONG_CU"))
+    return <Wrench className="h-4 w-4" />;
+  if (code.includes("SHELTER") || code.includes("CHO_O"))
+    return <House className="h-4 w-4" />;
+  return <Cube className="h-4 w-4" />;
 }
 
 function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
@@ -610,23 +482,21 @@ function DepotDetails({
   depot: DepotEntity;
   onClose: () => void;
 }) {
-  const [inventoryPageNumber, setInventoryPageNumber] = useState(1);
-
   const {
-    data: inventoryData,
-    isLoading: isInventoryLoading,
-    isError: isInventoryError,
-    isFetching: isInventoryFetching,
-    refetch: refetchInventory,
-  } = useDepotInventory({
+    data: categoryData,
+    isLoading: isCategoryLoading,
+    isError: isCategoryError,
+    refetch: refetchCategory,
+  } = useMyDepotQuantityByCategory({
     depotId: depot.id,
-    pageNumber: inventoryPageNumber,
-    pageSize: INVENTORY_PAGE_SIZE,
   });
 
-  const handleRefreshInventory = useCallback(() => {
-    void refetchInventory();
-  }, [refetchInventory]);
+  const hasStock = useMemo(() => {
+    if (!categoryData) return false;
+    return categoryData.some(
+      (cat) => cat.totalConsumableQuantity > 0 || cat.totalReusableUnits > 0,
+    );
+  }, [categoryData]);
 
   const statusConfig = depotStatusConfig[depot.status];
   const StatusIcon = statusConfig.icon;
@@ -649,106 +519,6 @@ function DepotDetails({
           : "bg-green-500";
   const depotImageUrl = depot.imageUrl?.trim() || null;
   const depotManagerName = getDepotManagerDisplayName(depot.manager);
-
-  const backendInventorySummary = useMemo(
-    () => getBackendInventorySummary(inventoryData),
-    [inventoryData],
-  );
-
-  const shouldFetchInventorySummaryFromItems = useMemo(() => {
-    if (!inventoryData?.items?.length) return false;
-
-    const hasCompleteBackendValues =
-      backendInventorySummary.totalStock !== null &&
-      backendInventorySummary.reservedStock !== null &&
-      backendInventorySummary.availableStock !== null;
-
-    if (hasCompleteBackendValues) return false;
-
-    return inventoryData.totalCount > inventoryData.items.length;
-  }, [backendInventorySummary, inventoryData]);
-
-  const inventorySummaryPageSize = useMemo(() => {
-    const totalCount = inventoryData?.totalCount ?? 0;
-    return Math.max(totalCount, INVENTORY_PAGE_SIZE);
-  }, [inventoryData]);
-
-  const { data: inventorySummaryData } = useDepotInventory(
-    {
-      depotId: depot.id,
-      pageNumber: 1,
-      pageSize: inventorySummaryPageSize,
-    },
-    {
-      enabled: shouldFetchInventorySummaryFromItems,
-    },
-  );
-
-  const inventoryItemsForSummary = useMemo(() => {
-    if (!inventoryData?.items?.length) return [];
-
-    if (inventoryData.totalCount <= inventoryData.items.length) {
-      return inventoryData.items;
-    }
-
-    if (
-      inventorySummaryData?.items &&
-      inventorySummaryData.items.length >= inventoryData.totalCount
-    ) {
-      return inventorySummaryData.items;
-    }
-
-    return [];
-  }, [inventoryData, inventorySummaryData]);
-
-  const inventorySummary = useMemo(() => {
-    const hasCompleteBackendValues =
-      backendInventorySummary.totalStock !== null &&
-      backendInventorySummary.reservedStock !== null &&
-      backendInventorySummary.availableStock !== null;
-
-    if (hasCompleteBackendValues) {
-      return {
-        ...backendInventorySummary,
-        hasCompleteValues: true,
-        source: "backend" as const,
-      };
-    }
-
-    const derivedSummary = summarizeInventoryItems(inventoryItemsForSummary);
-    const hasDerivedValues =
-      derivedSummary.totalStock !== null &&
-      derivedSummary.reservedStock !== null &&
-      derivedSummary.availableStock !== null;
-
-    if (hasDerivedValues) {
-      return {
-        ...derivedSummary,
-        hasCompleteValues: true,
-        source: "derived" as const,
-      };
-    }
-
-    return {
-      ...backendInventorySummary,
-      hasCompleteValues: false,
-      source: "incomplete" as const,
-    };
-  }, [backendInventorySummary, inventoryItemsForSummary]);
-
-  const inventoryRange = useMemo(() => {
-    if (!inventoryData || inventoryData.totalCount === 0) {
-      return { start: 0, end: 0 };
-    }
-
-    const start = (inventoryData.pageNumber - 1) * inventoryData.pageSize + 1;
-    const end = Math.min(
-      inventoryData.pageNumber * inventoryData.pageSize,
-      inventoryData.totalCount,
-    );
-
-    return { start, end };
-  }, [inventoryData]);
 
   return (
     <>
@@ -817,24 +587,6 @@ function DepotDetails({
           </Badge>
           <span className="text-xs text-muted-foreground">•</span>
           <span className="text-xs text-muted-foreground">Kho vật phẩm</span>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="px-5 py-3 border-b shrink-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <ActionButton
-            icon={
-              <ArrowsClockwise
-                className={cn("h-5 w-5", isInventoryFetching && "animate-spin")}
-              />
-            }
-            label="Làm mới tồn kho"
-            color="text-[#FF5722]"
-            active={isInventoryFetching}
-            disabled={isInventoryFetching}
-            onClick={handleRefreshInventory}
-          />
         </div>
       </div>
 
@@ -936,145 +688,103 @@ function DepotDetails({
 
         <div className="h-px bg-border mx-5" />
 
-        {/* Inventory from backend */}
-        <div className="px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-semibold">Tồn kho hiện tại</h4>
-            {inventoryData ? (
-              <Badge variant="outline" className="text-xs h-5 px-1.5">
-                {inventoryData.totalCount} loại
+        {/* Stock Status Indicator */}
+        <div className="px-5 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                <Package className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Trạng thái kho</p>
+                <p className="text-xs text-muted-foreground">Sẵn sàng điều phối</p>
+              </div>
+            </div>
+            {isCategoryLoading ? (
+              <Skeleton className="h-6 w-20 rounded-full" />
+            ) : hasStock ? (
+              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-0 px-3 py-1 gap-1.5">
+                <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                Có hàng
               </Badge>
+            ) : (
+              <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-0 px-3 py-1">
+                Trống
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="h-px bg-border mx-5" />
+
+        {/* Inventory Categories Section */}
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-semibold">Phân loại vật phẩm</h4>
+            {categoryData ? (
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                {categoryData.length} danh mục
+              </span>
             ) : null}
           </div>
 
-          {isInventoryLoading ? (
-            <div className="space-y-2">
+          {isCategoryLoading ? (
+            <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, idx) => (
-                <Skeleton key={idx} className="h-12 w-full rounded-lg" />
+                <Skeleton key={idx} className="h-16 w-full rounded-xl" />
               ))}
             </div>
-          ) : isInventoryError ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
-              Không tải được dữ liệu tồn kho.
+          ) : isCategoryError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600 flex items-center gap-2">
+              <WarningCircle className="h-4 w-4" />
+              Không tải được dữ liệu phân loại.
             </div>
-          ) : inventoryData?.items && inventoryData.items.length > 0 ? (
-            <div className="space-y-3">
-              {inventorySummary.hasCompleteValues ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                    <p className="text-xs text-muted-foreground">Tổng tồn</p>
-                    <p className="text-sm font-bold text-slate-800">
-                      {inventorySummary.totalStock?.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
-                    <p className="text-xs text-amber-700">Đã giữ chỗ</p>
-                    <p className="text-sm font-bold text-amber-800">
-                      {inventorySummary.reservedStock?.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                    <p className="text-xs text-emerald-700">Còn khả dụng</p>
-                    <p className="text-sm font-bold text-emerald-800">
-                      {inventorySummary.availableStock?.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-
-              {inventoryData.items.map((item) => {
-                const qty = getInventoryQuantities(item);
+          ) : categoryData && categoryData.length > 0 ? (
+            <div className="grid gap-3">
+              {categoryData.map((category) => {
+                const totalQty = category.totalConsumableQuantity + category.totalReusableUnits;
+                const availQty = category.availableConsumableQuantity + category.availableReusableUnits;
+                
+                if (totalQty === 0) return null;
 
                 return (
                   <div
-                    key={item.itemModelId}
-                    className="rounded-lg border border-border/60 bg-card px-3 py-2"
+                    key={category.categoryId}
+                    className="group relative overflow-hidden rounded-xl border border-border/50 bg-card p-3 transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate">
-                        {item.itemModelName}
-                      </p>
-                      <Badge variant="secondary" className="text-xs shrink-0">
-                        {getInventoryItemTypeLabel(item)}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{item.categoryName}</span>
-                      <span>•</span>
-                      <span>
-                        {item.targetGroups.length > 0
-                          ? item.targetGroups.join(", ")
-                          : "Chưa phân nhóm"}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-3 gap-1.5">
-                      <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                        <p className="text-[11px] text-slate-600">Tổng tồn</p>
-                        <p className="text-sm font-semibold leading-none text-slate-800">
-                          {qty.total.toLocaleString("vi-VN")}
-                        </p>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400 group-hover:bg-slate-100 group-hover:text-[#FF5722] transition-colors">
+                        {getCategoryIcon(category.categoryCode)}
                       </div>
-                      <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                        <p className="text-[11px] text-amber-700">Giữ chỗ</p>
-                        <p className="text-sm font-semibold leading-none text-amber-800">
-                          {qty.reserved.toLocaleString("vi-VN")}
-                        </p>
-                      </div>
-                      <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-                        <p className="text-[11px] text-emerald-700">Khả dụng</p>
-                        <p className="text-sm font-semibold leading-none text-emerald-800">
-                          {qty.available.toLocaleString("vi-VN")}
-                        </p>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold truncate group-hover:text-[#FF5722] transition-colors">
+                            {category.categoryName}
+                          </p>
+                          <span className="text-[11px] font-medium text-muted-foreground">
+                            {availQty.toLocaleString("vi-VN")} sản phẩm
+                          </span>
+                        </div>
+
+
                       </div>
                     </div>
                   </div>
                 );
               })}
-
-              {inventoryData.totalPages > 1 ? (
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2.5 text-xs"
-                    disabled={!inventoryData.hasPreviousPage}
-                    onClick={() =>
-                      setInventoryPageNumber((prev) => Math.max(1, prev - 1))
-                    }
-                  >
-                    Trang trước
-                  </Button>
-
-                  <p className="text-center text-xs text-muted-foreground">
-                    Trang {inventoryData.pageNumber}/{inventoryData.totalPages}
-                    <br />
-                    {inventoryRange.start}-{inventoryRange.end}/
-                    {inventoryData.totalCount} vật phẩm
-                  </p>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2.5 text-xs"
-                    disabled={!inventoryData.hasNextPage}
-                    onClick={() =>
-                      setInventoryPageNumber((prev) =>
-                        Math.min(inventoryData.totalPages, prev + 1),
-                      )
-                    }
-                  >
-                    Trang sau
-                  </Button>
+              
+              {!hasStock && (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center">
+                  <Package className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-500">Kho hiện tại không có hàng</p>
                 </div>
-              ) : null}
+              )}
             </div>
           ) : (
-            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Kho chưa có dữ liệu vật phẩm.
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center">
+              <Package className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-sm text-slate-500">Chưa có dữ liệu phân loại</p>
             </div>
           )}
         </div>

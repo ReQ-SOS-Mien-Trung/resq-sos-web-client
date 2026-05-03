@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
 import { Icon as IconifyIcon } from "@iconify/react";
 import { cn } from "@/lib/utils";
-import { formatSupplyBufferPercent } from "@/lib/supply-buffer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -348,19 +347,22 @@ function ActivityExecutionMeta({
   }
 
   return (
-    <div className="ml-9 mb-2 flex flex-wrap gap-1.5">
-      {executionModeLabel ? (
-        <Badge className="h-6 border border-indigo-200 bg-indigo-50 px-2 text-sm text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300">
-          {executionModeLabel}
-        </Badge>
-      ) : null}
+    <div className="mb-3 flex flex-wrap gap-2">
       {requiredTeamCount > 0 ? (
-        <Badge className="h-6 border border-emerald-200 bg-emerald-50 px-2 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
-          {requiredTeamCount} đội cần
+        <Badge className="h-7 border-emerald-200/50 bg-emerald-50/80 px-2.5 text-[13px] font-semibold text-emerald-700 backdrop-blur-sm dark:border-emerald-800/30 dark:bg-emerald-900/30 dark:text-emerald-300">
+          <Users className="mr-1.5 h-3.5 w-3.5" weight="bold" />
+          {requiredTeamCount} đội cần hỗ trợ
         </Badge>
       ) : null}
+      {activity.sosRequestId && (
+        <Badge className="h-7 border-rose-200/50 bg-rose-50/80 px-2.5 text-[13px] font-semibold text-rose-700 backdrop-blur-sm dark:border-rose-800/30 dark:bg-rose-900/30 dark:text-rose-300">
+          <MapPin className="mr-1.5 h-3.5 w-3.5" weight="fill" />
+          SOS #{activity.sosRequestId}
+        </Badge>
+      )}
       {hasMissingTeam ? (
-        <Badge className="h-6 border border-amber-300 bg-amber-50 px-2 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+        <Badge className="h-7 border-amber-300/50 bg-amber-50/80 px-2.5 text-[13px] font-semibold text-amber-700 backdrop-blur-sm dark:border-amber-700/30 dark:bg-amber-900/30 dark:text-amber-300">
+          <Warning className="mr-1.5 h-3.5 w-3.5" weight="fill" />
           Chưa gán đội
         </Badge>
       ) : null}
@@ -370,11 +372,13 @@ function ActivityExecutionMeta({
 
 function TargetVictimsBlock({
   activity,
+  className,
 }: {
   activity: Pick<
     ClusterSuggestedActivity,
     "targetVictimSummary" | "targetVictims" | "sosRequestId"
   >;
+  className?: string;
 }) {
   const victims = Array.isArray(activity.targetVictims)
     ? activity.targetVictims
@@ -384,17 +388,17 @@ function TargetVictimsBlock({
   if (victims.length === 0 && !fallbackSummary) return null;
 
   return (
-    <div className="ml-9 mb-2 rounded-lg border border-rose-200/70 bg-rose-50/60 p-2 dark:border-rose-800/40 dark:bg-rose-950/20">
-      <p className="flex items-center gap-1 text-sm font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+    <div className={cn("group relative overflow-hidden rounded-xl border border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-white/50 p-3 transition-all hover:shadow-md dark:border-rose-800/30 dark:from-rose-950/20 dark:to-background", className)}>
+      <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
         <Users className="h-4 w-4" weight="fill" />
         Đối tượng cần hỗ trợ
       </p>
       {victims.length === 0 ? (
-        <p className="mt-1 text-sm text-rose-700/85 dark:text-rose-200/85">
+        <p className="text-[13px] font-medium leading-relaxed text-rose-700/85 dark:text-rose-200/85">
           {fallbackSummary}
         </p>
       ) : (
-        <div className="mt-1 flex flex-wrap gap-1.5">
+        <div className="space-y-2">
           {victims.map((victim, index) => {
             const medicalIssues = getVictimMedicalIssues(victim);
             const personTypeLabel = victim.personType
@@ -408,52 +412,54 @@ function TargetVictimsBlock({
             return (
               <div
                 key={`${victim.personId ?? "victim"}-${index}`}
-                className="min-w-0 rounded border border-rose-100 bg-background px-2 py-1 text-sm dark:border-rose-900/50"
+                className="rounded-lg border border-rose-100/50 bg-background/80 p-2.5 shadow-sm dark:border-rose-900/30"
               >
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="inline-flex items-center gap-1 font-semibold">
-                    <User className="h-3 w-3 text-rose-500" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-sm font-bold text-foreground">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
+                      <User className="h-3 w-3" weight="bold" />
+                    </div>
                     {getVictimDisplayName(victim)}
                   </span>
-                  <span className="rounded bg-muted/70 px-1.5 py-0.5 text-muted-foreground">
+                  <Badge className="bg-muted/50 px-1.5 py-0 text-[11px] font-bold text-muted-foreground">
                     {personTypeLabel}
-                  </span>
+                  </Badge>
                   {victim.isInjured ? (
-                    <span className="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-red-700 dark:bg-red-900/25 dark:text-red-300">
-                      Bị thương{severityLabel ? `: ${severityLabel}` : ""}
-                    </span>
+                    <Badge
+                      variant="destructive"
+                      className="bg-rose-500/10 px-1.5 py-0 text-[11px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
+                    >
+                      BỊ THƯƠNG{severityLabel ? `: ${severityLabel.toUpperCase()}` : ""}
+                    </Badge>
                   ) : null}
                   {phone ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
                       <Phone className="h-3 w-3" />
                       {phone}
                     </span>
                   ) : null}
                 </div>
                 {medicalIssues.length > 0 || diet || victim.clothingNeeded ? (
-                  <div className="mt-1 flex flex-wrap gap-1 text-muted-foreground">
-                    {medicalIssues.slice(0, 3).map((issue) => (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {medicalIssues.slice(0, 4).map((issue) => (
                       <span
                         key={issue}
-                        className="rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-900/25 dark:text-red-300"
+                        className="inline-flex items-center rounded-md bg-rose-50/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
                       >
-                        <FirstAid
-                          className="mr-1 inline h-3 w-3"
-                          weight="fill"
-                        />
+                        <FirstAid className="mr-1 h-3 w-3" weight="fill" />
                         {getMedicalIssueLabel(issue)}
                       </span>
                     ))}
                     {diet ? (
-                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
-                        Ăn: {diet}
+                      <span className="rounded-md bg-zinc-100/80 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+                        ĂN: {diet.toUpperCase()}
                       </span>
                     ) : null}
                     {victim.clothingNeeded ? (
-                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
-                        Quần áo
+                      <span className="rounded-md bg-zinc-100/80 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+                        QUẦN ÁO
                         {clothingGender
-                          ? ` (${getClothingGenderLabel(clothingGender)})`
+                          ? ` (${getClothingGenderLabel(clothingGender).toUpperCase()})`
                           : ""}
                       </span>
                     ) : null}
@@ -1783,8 +1789,8 @@ function ActionFlowTimeline({
     <div className="relative">
       <AiOriginNode />
       <div className="ml-12 space-y-0">
-        {activities.slice(0, revealedCount).map((activity) => (
-          <ActivityFlowNode key={activity.step} activity={activity} />
+        {activities.slice(0, revealedCount).map((activity, idx) => (
+          <ActivityFlowNode key={`${activity.step}-${idx}`} activity={activity} />
         ))}
       </div>
       {revealedCount < activities.length && (
@@ -1879,15 +1885,6 @@ function StatsRow({
 
   const stats = [
     {
-      icon: "streamline-ultimate:flag-plain",
-      label: "Ưu tiên",
-      value:
-        typeof result.suggestedPriorityScore === "number"
-          ? result.suggestedPriorityScore.toFixed(1)
-          : "N/A",
-      color: "text-emerald-500",
-    },
-    {
       icon: "carbon:time-filled",
       label: "Thời gian",
       value: result.estimatedDuration || "Chưa rõ",
@@ -1908,13 +1905,13 @@ function StatsRow({
   ];
 
   return (
-    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-4">
+    <div ref={ref} className="grid grid-cols-1 gap-2 md:grid-cols-3">
       {stats.map((s) => {
         const PhosphorIcon = typeof s.icon === "string" ? null : s.icon;
         return (
           <div
             key={s.label}
-            className="stat-hex flex flex-col items-center gap-1 p-3 rounded-xl bg-card border hover:border-primary/20 transition-colors"
+            className="stat-hex h-full flex flex-col items-center justify-center gap-1.5 p-4 rounded-2xl bg-card border hover:border-primary/20 transition-all hover:shadow-md"
           >
             {typeof s.icon === "string" ? (
               <IconifyIcon
@@ -1995,6 +1992,10 @@ function ActivityFlowNode({
     normalizedActivityType === "RESCUE" ||
     normalizedActivityType === "MEDICAL_AID" ||
     normalizedActivityType === "EVACUATE";
+
+  const victims = Array.isArray(activity.targetVictims) ? activity.targetVictims : [];
+  const fallbackSummary = buildVictimFallbackSummary(activity);
+  const hasVictims = victims.length > 0 || !!fallbackSummary;
 
   useEffect(() => {
     if (!nodeRef.current) return;
@@ -2128,133 +2129,151 @@ function ActivityFlowNode({
           {activity.description}
         </p>
 
-        <ActivityExecutionMeta activity={activity} />
-        <TargetVictimsBlock activity={activity} />
-        {activity.coordinationNotes ? (
-          <div className="ml-9 mb-2 rounded-lg border border-indigo-300/40 bg-indigo-50/50 p-2 dark:border-indigo-700/40 dark:bg-indigo-900/15">
-            <p className="text-sm font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              Ghi chú phối hợp
-            </p>
-            <p className="mt-0.5 text-sm leading-relaxed">
-              {activity.coordinationNotes}
-            </p>
-          </div>
-        ) : null}
+        <div className="ml-10">
+          <ActivityExecutionMeta activity={activity} />
 
-        {activity.suggestedTeam && (
-          <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
-            <p className="text-base font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-              <ShieldCheck className="h-3 w-3" weight="fill" />
-              Đội đề xuất
-            </p>
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
-              {activity.suggestedTeam.teamName ||
-                (activity.suggestedTeam.teamId
-                  ? `Đội #${activity.suggestedTeam.teamId}`
-                  : "Đội chưa đặt tên")}
-            </p>
-            <p className="text-sm mt-0.5">
-              {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
-              {activity.suggestedTeam.contactPhone
-                ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
-                : ""}
-              {activity.suggestedTeam.estimatedEtaMinutes != null
-                ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
-                : ""}
-            </p>
-            {activity.suggestedTeam.reason && (
-              <p className="text-sm mt-1 leading-relaxed">
-                Lý do: {activity.suggestedTeam.reason}
-              </p>
-            )}
-            {activity.suggestedTeam.assemblyPointName && (
-              <p className="text-sm mt-0.5 leading-relaxed">
-                Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
-              </p>
-            )}
-          </div>
-        )}
-
-        {(activity.assemblyPointName ||
-          (activity.assemblyPointLatitude != null &&
-            activity.assemblyPointLongitude != null)) && (
-            <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
-                <MapPin className="h-3 w-3" weight="fill" />
-                Điểm tập kết hoạt động
-              </p>
-              {activity.assemblyPointName && (
-                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
-                  {activity.assemblyPointName}
-                </p>
-              )}
-              {activity.assemblyPointLatitude != null &&
-                activity.assemblyPointLongitude != null && (
-                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                    Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
-                    {activity.assemblyPointLongitude.toFixed(4)}
+          <div className={cn("grid gap-4 mt-4 mb-4 items-stretch", hasVictims ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1")}>
+            {/* Cột trái: Nạn nhân & Ghi chú phối hợp (Tạo bối cảnh) */}
+            <div className="space-y-4 flex flex-col">
+              {hasVictims && <TargetVictimsBlock activity={activity} className="flex-1" />}
+              
+              {activity.coordinationNotes ? (
+                <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white p-3.5 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-background flex-shrink-0">
+                  <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                    <Sparkle className="h-4 w-4" />
+                    Ghi chú phối hợp
                   </p>
-                )}
+                  <p className="text-[13px] font-medium leading-relaxed text-indigo-900/80 dark:text-indigo-200/80">
+                    {activity.coordinationNotes}
+                  </p>
+                </div>
+              ) : null}
             </div>
-          )}
 
-        {activity.depotName && (
-          <div className="ml-9 flex items-center gap-2 p-2 rounded-lg bg-blue-50/50 dark:bg-blue-500/[0.06] border border-blue-500/15 mb-2">
-            <div className="relative w-6 h-6 shrink-0">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <WarehouseIcon
-                  className="h-4 w-4 text-blue-500"
-                  weight="fill"
-                />
-              </div>
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate">
-                {activity.depotName}
-              </p>
-            </div>
-            <div className="ml-auto flex items-center gap-0.5">
-              {activity.depotAddress && (
-                <p className="text-sm truncate">{activity.depotAddress}</p>
+            {/* Cột phải: Đội ngũ, Điểm tập kết & Kho bãi (Thực thi) */}
+            <div className="space-y-4 flex flex-col">
+              {activity.suggestedTeam && (
+                <div className="group relative overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white p-4 transition-all hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-950/20 dark:to-background flex-1">
+                  <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                    <ShieldCheck className="h-4 w-4" weight="fill" />
+                    Đội ngũ đề xuất
+                  </p>
+                  <div className="space-y-2.5">
+                    <p className="text-[15px] font-bold text-emerald-900 dark:text-emerald-100">
+                      {activity.suggestedTeam.teamName ||
+                        (activity.suggestedTeam.teamId
+                          ? `Đội #${activity.suggestedTeam.teamId}`
+                          : "Đội chưa đặt tên")}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 text-[13px] font-medium text-emerald-800/80 dark:text-emerald-200/70">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        Loại: {formatTeamTypeLabel(activity.suggestedTeam.teamType)}
+                      </div>
+                      {activity.suggestedTeam.contactPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-3.5 w-3.5" />
+                          SĐT: {activity.suggestedTeam.contactPhone}
+                        </div>
+                      )}
+                      {activity.suggestedTeam.estimatedEtaMinutes != null && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5" />
+                          Thời gian đến: ~{activity.suggestedTeam.estimatedEtaMinutes} phút
+                        </div>
+                      )}
+                    </div>
+                    {activity.suggestedTeam.reason && (
+                      <p className="mt-2 border-t border-emerald-100 pt-2 text-[12px] italic leading-relaxed text-emerald-700/70 dark:border-emerald-900/30 dark:text-emerald-400/60">
+                        "{activity.suggestedTeam.reason}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(activity.assemblyPointName ||
+                (activity.assemblyPointLatitude != null &&
+                  activity.assemblyPointLongitude != null)) && (
+                  <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/40 to-white p-3.5 dark:border-blue-800/30 dark:from-blue-950/20 dark:to-background">
+                    <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                      <MapPin className="h-4 w-4" weight="fill" />
+                      Điểm tập kết
+                    </p>
+                    <div className="space-y-1">
+                      {activity.assemblyPointName && (
+                        <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                          {activity.assemblyPointName}
+                        </p>
+                      )}
+                      {activity.assemblyPointLatitude != null &&
+                        activity.assemblyPointLongitude != null && (
+                          <p className="text-[12px] font-mono font-medium text-blue-600/60 dark:text-blue-400/60">
+                            COORD: {activity.assemblyPointLatitude.toFixed(5)}, {activity.assemblyPointLongitude.toFixed(5)}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                )}
+
+              {activity.depotName && (
+                <div className="group relative overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50/40 to-white p-4 transition-all hover:shadow-md dark:border-sky-800/30 dark:from-sky-950/20 dark:to-background">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400">
+                      <WarehouseIcon className="h-5 w-5" weight="fill" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-sky-600/70 dark:text-sky-400/70">
+                        Địa điểm tiếp nhận
+                      </p>
+                      <h4 className="mt-0.5 text-[15px] font-bold text-sky-900 dark:text-sky-100">
+                        {activity.depotName}
+                      </h4>
+                      {activity.depotAddress && (
+                        <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-sky-700/70 dark:text-sky-300/60">
+                          {activity.depotAddress}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
-        )}
-
-        {activity.sosRequestId && (
-          <div className="ml-9 flex items-center gap-2 mb-2">
-            <MapPin
-              className="h-3.5 w-3.5 text-red-500 shrink-0"
-              weight="fill"
-            />
-            <span className="text-sm font-medium text-red-500">
-              Yêu cầu SOS #{activity.sosRequestId}
-            </span>
-          </div>
-        )}
+        </div>
 
         {activity.suppliesToCollect &&
           activity.suppliesToCollect.length > 0 && (
-            <div className="ml-9 flex flex-wrap gap-1.5 mt-1">
-              {activity.suppliesToCollect.map((supply) => (
-                <div
-                  key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/5 border border-primary/15 text-sm"
-                >
-                  <Package className="h-4 w-4 text-primary" weight="fill" />
-                  <span className="">{supply.itemName}</span>
-                  <span className="text-primary font-bold">
-                    ×{supply.quantity}
-                  </span>
-                  <span className="">{supply.unit}</span>
-                  {normalizedActivityType === "COLLECT_SUPPLIES" &&
-                    !isReusableSupplyCollection(supply) ? (
-                    <span className="rounded bg-amber-50 px-2 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                      Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
-                    </span>
-                  ) : null}
-                </div>
-              ))}
+            <div className="ml-9 mt-6 border-t border-dashed border-border pt-4">
+              <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
+                <Package className="h-3.5 w-3.5" />
+                Vật phẩm cần chuẩn bị
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {activity.suppliesToCollect.map((supply, idx) => (
+                  <div
+                    key={`${supply.itemId}-${idx}`}
+                    className="supply-tag flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-primary/[0.03] border border-primary/10 text-[13px] transition-all hover:border-primary/20 hover:bg-primary/[0.05]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Package className="h-4 w-4" weight="fill" />
+                      </div>
+                      <span className="font-bold text-foreground truncate">
+                        {supply.itemName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[14px] font-black text-primary">
+                        ×{supply.quantity}
+                      </span>
+                      <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                        {supply.unit}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
       </div>
@@ -2338,7 +2357,7 @@ function ResourcesBlock({
         {resources.map((res, idx) => (
           <div
             key={idx}
-            className="resource-card flex items-center gap-2.5 p-2.5 rounded-lg border bg-card"
+            className="resource-card flex items-center gap-3 p-3 rounded-xl border bg-card transition-all hover:shadow-sm hover:border-blue-500/30"
           >
             <div className="text-blue-500 dark:text-blue-400 shrink-0">
               {resourceTypeIcons[res.resourceType] || (
