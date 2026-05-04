@@ -127,6 +127,7 @@ export interface ClusterSupplyCollection {
   expectedReturnUnits?: ClusterSupplyReusableUnit[] | null;
   returnedLotAllocations?: ClusterSupplyLotAllocation[] | null;
   returnedReusableUnits?: ClusterSupplyReusableUnit[] | null;
+  lostReusableUnits?: ClusterSupplyReusableUnit[] | null;
   actualReturnedQuantity?: number | null;
   bufferRatio?: number | null;
   bufferQuantity?: number | null;
@@ -244,6 +245,10 @@ export interface MissionSuggestionEntity {
   suggestedResources: ClusterSuggestedResource[];
   suggestedActivities?: ClusterSuggestedActivity[] | null;
   multiDepotRecommended?: boolean | null;
+  pipelineStatus?: string | null;
+  pipelineFinalResultSource?: string | null;
+  pipelineFailedStage?: string | null;
+  pipelineFailureReason?: string | null;
   suggestionScope: string | null;
   createdAt: string | null;
   activities: MissionSuggestionActivity[];

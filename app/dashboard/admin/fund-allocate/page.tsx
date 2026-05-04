@@ -58,6 +58,7 @@ export default function FundAllocatePage() {
     }
     allocate(
       {
+        sourceType: "Campaign",
         fundCampaignId: Number(fundCampaignId),
         depotId: Number(depotId),
         amount: Number(amount),

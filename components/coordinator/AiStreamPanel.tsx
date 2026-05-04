@@ -89,7 +89,10 @@ const activityIconMap: Record<
   COLLECT_SUPPLIES: Package,
   DELIVER_SUPPLIES: Truck,
   RESCUE: (props) => (
-    <IconifyIcon icon="fluent-emoji-high-contrast:rescue-workers-helmet" {...props} />
+    <IconifyIcon
+      icon="fluent-emoji-high-contrast:rescue-workers-helmet"
+      {...props}
+    />
   ),
   MEDICAL_AID: FirstAid,
   EVACUATE: Users,
@@ -287,12 +290,26 @@ function getVictimDisplayName(victim: ClusterTargetVictim): string {
   return "Nạn nhân";
 }
 
+function resolveVictimName(
+  victim: ClusterTargetVictim,
+  activityVictimSummary: string | null | undefined,
+  totalVictims: number,
+): string {
+  if (totalVictims === 1) {
+    const summary = trimToNull(activityVictimSummary);
+    if (summary) {
+      return summary.replace(/\s*\([^)]*\)$/, "").trim() || summary;
+    }
+  }
+  return getVictimDisplayName(victim);
+}
+
 function getVictimMedicalIssues(victim: ClusterTargetVictim): string[] {
   return Array.isArray(victim.medicalIssues)
     ? victim.medicalIssues.filter(
-      (issue): issue is string =>
-        typeof issue === "string" && issue.trim().length > 0,
-    )
+        (issue): issue is string =>
+          typeof issue === "string" && issue.trim().length > 0,
+      )
     : [];
 }
 
@@ -338,11 +355,7 @@ function ActivityExecutionMeta({
     requiredTeamCount > 0 &&
     !hasSuggestedTeam(activity);
 
-  if (
-    !executionModeLabel &&
-    requiredTeamCount <= 0 &&
-    !hasMissingTeam
-  ) {
+  if (!executionModeLabel && requiredTeamCount <= 0 && !hasMissingTeam) {
     return null;
   }
 
@@ -388,7 +401,12 @@ function TargetVictimsBlock({
   if (victims.length === 0 && !fallbackSummary) return null;
 
   return (
-    <div className={cn("group relative overflow-hidden rounded-xl border border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-white/50 p-3 transition-all hover:shadow-md dark:border-rose-800/30 dark:from-rose-950/20 dark:to-background", className)}>
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-xl border border-rose-200/60 bg-gradient-to-br from-rose-50/40 to-white/50 p-3 transition-all hover:shadow-md dark:border-rose-800/30 dark:from-rose-950/20 dark:to-background",
+        className,
+      )}
+    >
       <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
         <Users className="h-4 w-4" weight="fill" />
         Đối tượng cần hỗ trợ
@@ -419,7 +437,11 @@ function TargetVictimsBlock({
                     <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
                       <User className="h-3 w-3" weight="bold" />
                     </div>
-                    {getVictimDisplayName(victim)}
+                    {resolveVictimName(
+                      victim,
+                      activity.targetVictimSummary,
+                      victims.length,
+                    )}
                   </span>
                   <Badge className="bg-muted/50 px-1.5 py-0 text-[11px] font-bold text-muted-foreground">
                     {personTypeLabel}
@@ -429,7 +451,8 @@ function TargetVictimsBlock({
                       variant="destructive"
                       className="bg-rose-500/10 px-1.5 py-0 text-[11px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
                     >
-                      BỊ THƯƠNG{severityLabel ? `: ${severityLabel.toUpperCase()}` : ""}
+                      BỊ THƯƠNG
+                      {severityLabel ? `: ${severityLabel.toUpperCase()}` : ""}
                     </Badge>
                   ) : null}
                   {phone ? (
@@ -979,24 +1002,24 @@ function FloatingAiStreamButton({
       : latestStatus || status || phaseDescription(phase);
   const toneClasses = error
     ? {
-      icon: "from-rose-500 to-red-500",
-      dot: "bg-rose-500",
-      progress: "from-rose-500 to-red-400",
-      badge: "border-rose-200 bg-rose-50 text-rose-700",
-    }
+        icon: "from-rose-500 to-red-500",
+        dot: "bg-rose-500",
+        progress: "from-rose-500 to-red-400",
+        badge: "border-rose-200 bg-rose-50 text-rose-700",
+      }
     : result
       ? {
-        icon: "from-emerald-500 to-teal-500",
-        dot: "bg-emerald-500",
-        progress: "from-emerald-500 to-teal-400",
-        badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      }
+          icon: "from-emerald-500 to-teal-500",
+          dot: "bg-emerald-500",
+          progress: "from-emerald-500 to-teal-400",
+          badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        }
       : {
-        icon: "from-primary to-orange-500",
-        dot: "bg-primary",
-        progress: "from-primary via-orange-500 to-amber-400",
-        badge: "border-primary/20 bg-primary/10 text-primary",
-      };
+          icon: "from-primary to-orange-500",
+          dot: "bg-primary",
+          progress: "from-primary via-orange-500 to-amber-400",
+          badge: "border-primary/20 bg-primary/10 text-primary",
+        };
   const StatusIcon = error ? Warning : result ? CheckCircle : Brain;
 
   useEffect(() => {
@@ -1790,7 +1813,10 @@ function ActionFlowTimeline({
       <AiOriginNode />
       <div className="ml-12 space-y-0">
         {activities.slice(0, revealedCount).map((activity, idx) => (
-          <ActivityFlowNode key={`${activity.step}-${idx}`} activity={activity} />
+          <ActivityFlowNode
+            key={`${activity.step}-${idx}`}
+            activity={activity}
+          />
         ))}
       </div>
       {revealedCount < activities.length && (
@@ -1838,7 +1864,7 @@ function MissionBanner({
             <Badge className="shrink-0 text-sm bg-primary text-white border-primary hover:bg-primary/90">
               {result.suggestedSeverityLevel
                 ? severityConfig[result.suggestedSeverityLevel]?.label ||
-                result.suggestedSeverityLevel
+                  result.suggestedSeverityLevel
                 : "Chưa rõ mức độ"}
             </Badge>
           </div>
@@ -1977,10 +2003,10 @@ function ActivityFlowNode({
 
   const config = activityTypeConfig[activity.activityType] ||
     activityTypeConfig[normalizedActivityType] || {
-    label: normalizedActivityType || activity.activityType,
-    color: "text-zinc-400",
-    bgColor: "bg-zinc-800",
-  };
+      label: normalizedActivityType || activity.activityType,
+      color: "text-zinc-400",
+      bgColor: "bg-zinc-800",
+    };
   const Icon =
     activityIconMap[activity.activityType] ||
     activityIconMap[normalizedActivityType] ||
@@ -1993,7 +2019,9 @@ function ActivityFlowNode({
     normalizedActivityType === "MEDICAL_AID" ||
     normalizedActivityType === "EVACUATE";
 
-  const victims = Array.isArray(activity.targetVictims) ? activity.targetVictims : [];
+  const victims = Array.isArray(activity.targetVictims)
+    ? activity.targetVictims
+    : [];
   const fallbackSummary = buildVictimFallbackSummary(activity);
   const hasVictims = victims.length > 0 || !!fallbackSummary;
 
@@ -2073,7 +2101,7 @@ function ActivityFlowNode({
         className={cn(
           "relative border rounded-xl p-3 mb-3 transition-all",
           isDepotStep &&
-          "border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/[0.04]",
+            "border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/[0.04]",
           isSosStep && "border-red-500/20 bg-red-50/50 dark:bg-red-500/[0.03]",
           !isDepotStep && !isSosStep && "border bg-card",
         )}
@@ -2125,6 +2153,39 @@ function ActivityFlowNode({
             </span>
           )}
         </div>
+
+        {/* Inline victim name chips */}
+        {victims.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-2 pl-9">
+            {victims.map((v, i) => {
+              const name = resolveVictimName(
+                v,
+                activity.targetVictimSummary,
+                victims.length,
+              );
+              const isCritical =
+                String(v.severity ?? "").toUpperCase() === "CRITICAL";
+              const isHigh = String(v.severity ?? "").toUpperCase() === "HIGH";
+              return (
+                <span
+                  key={`${v.personId ?? "v"}-${i}`}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-bold border",
+                    isCritical
+                      ? "bg-rose-100/80 text-rose-700 border-rose-300/60 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700/40"
+                      : isHigh
+                        ? "bg-orange-100/80 text-orange-700 border-orange-300/60 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700/40"
+                        : "bg-muted/60 text-foreground/70 border-border/60",
+                  )}
+                >
+                  <User className="h-3 w-3" weight="bold" />
+                  {name}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         <p className="text-sm leading-relaxed font-medium mb-2 pl-9">
           {activity.description}
         </p>
@@ -2132,11 +2193,18 @@ function ActivityFlowNode({
         <div className="ml-10">
           <ActivityExecutionMeta activity={activity} />
 
-          <div className={cn("grid gap-4 mt-4 mb-4 items-stretch", hasVictims ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1")}>
+          <div
+            className={cn(
+              "grid gap-4 mt-4 mb-4 items-stretch",
+              hasVictims ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1",
+            )}
+          >
             {/* Cột trái: Nạn nhân & Ghi chú phối hợp (Tạo bối cảnh) */}
             <div className="space-y-4 flex flex-col">
-              {hasVictims && <TargetVictimsBlock activity={activity} className="flex-1" />}
-              
+              {hasVictims && (
+                <TargetVictimsBlock activity={activity} className="flex-1" />
+              )}
+
               {activity.coordinationNotes ? (
                 <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white p-3.5 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-background flex-shrink-0">
                   <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
@@ -2168,7 +2236,8 @@ function ActivityFlowNode({
                     <div className="grid grid-cols-1 gap-2 text-[13px] font-medium text-emerald-800/80 dark:text-emerald-200/70">
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        Loại: {formatTeamTypeLabel(activity.suggestedTeam.teamType)}
+                        Loại:{" "}
+                        {formatTeamTypeLabel(activity.suggestedTeam.teamType)}
                       </div>
                       {activity.suggestedTeam.contactPhone && (
                         <div className="flex items-center gap-2">
@@ -2179,7 +2248,8 @@ function ActivityFlowNode({
                       {activity.suggestedTeam.estimatedEtaMinutes != null && (
                         <div className="flex items-center gap-2">
                           <Clock className="h-3.5 w-3.5" />
-                          Thời gian đến: ~{activity.suggestedTeam.estimatedEtaMinutes} phút
+                          Thời gian đến: ~
+                          {activity.suggestedTeam.estimatedEtaMinutes} phút
                         </div>
                       )}
                     </div>
@@ -2195,26 +2265,27 @@ function ActivityFlowNode({
               {(activity.assemblyPointName ||
                 (activity.assemblyPointLatitude != null &&
                   activity.assemblyPointLongitude != null)) && (
-                  <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/40 to-white p-3.5 dark:border-blue-800/30 dark:from-blue-950/20 dark:to-background">
-                    <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                      <MapPin className="h-4 w-4" weight="fill" />
-                      Điểm tập kết
-                    </p>
-                    <div className="space-y-1">
-                      {activity.assemblyPointName && (
-                        <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
-                          {activity.assemblyPointName}
+                <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/40 to-white p-3.5 dark:border-blue-800/30 dark:from-blue-950/20 dark:to-background">
+                  <p className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                    <MapPin className="h-4 w-4" weight="fill" />
+                    Điểm tập kết
+                  </p>
+                  <div className="space-y-1">
+                    {activity.assemblyPointName && (
+                      <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                        {activity.assemblyPointName}
+                      </p>
+                    )}
+                    {activity.assemblyPointLatitude != null &&
+                      activity.assemblyPointLongitude != null && (
+                        <p className="text-[12px] font-mono font-medium text-blue-600/60 dark:text-blue-400/60">
+                          COORD: {activity.assemblyPointLatitude.toFixed(5)},{" "}
+                          {activity.assemblyPointLongitude.toFixed(5)}
                         </p>
                       )}
-                      {activity.assemblyPointLatitude != null &&
-                        activity.assemblyPointLongitude != null && (
-                          <p className="text-[12px] font-mono font-medium text-blue-600/60 dark:text-blue-400/60">
-                            COORD: {activity.assemblyPointLatitude.toFixed(5)}, {activity.assemblyPointLongitude.toFixed(5)}
-                          </p>
-                        )}
-                    </div>
                   </div>
-                )}
+                </div>
+              )}
 
               {activity.depotName && (
                 <div className="group relative overflow-hidden rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50/40 to-white p-4 transition-all hover:shadow-md dark:border-sky-800/30 dark:from-sky-950/20 dark:to-background">
@@ -2424,37 +2495,37 @@ function WarningsBlock({
       )}
       {(result.needsAdditionalDepot ||
         (result.supplyShortages?.length ?? 0) > 0) && (
-          <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/6 border border-sky-500/15">
-            <Storefront
-              className="h-4 w-4 text-sky-500 dark:text-sky-400 shrink-0 mt-0.5"
-              weight="fill"
-            />
-            <div>
-              <p className="text-sm font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-0.5">
-                Thiếu vật phẩm / cần thêm kho
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/6 border border-sky-500/15">
+          <Storefront
+            className="h-4 w-4 text-sky-500 dark:text-sky-400 shrink-0 mt-0.5"
+            weight="fill"
+          />
+          <div>
+            <p className="text-sm font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-0.5">
+              Thiếu vật phẩm / cần thêm kho
+            </p>
+            {result.supplyShortages?.length ? (
+              <div className="space-y-0.5">
+                {result.supplyShortages.map((shortage, index) => (
+                  <p
+                    key={`warning-shortage-${index}`}
+                    className="text-sm font-medium text-sky-600/80 dark:text-sky-400/80 leading-relaxed"
+                  >
+                    {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
+                    {shortage.selectedDepotName
+                      ? ` • Kho chính: ${shortage.selectedDepotName}`
+                      : ""}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-sky-600/80 dark:text-sky-400/80 leading-relaxed">
+                Kho hiện tại chưa đủ vật phẩm để đáp ứng toàn bộ kế hoạch.
               </p>
-              {result.supplyShortages?.length ? (
-                <div className="space-y-0.5">
-                  {result.supplyShortages.map((shortage, index) => (
-                    <p
-                      key={`warning-shortage-${index}`}
-                      className="text-sm font-medium text-sky-600/80 dark:text-sky-400/80 leading-relaxed"
-                    >
-                      {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
-                      {shortage.selectedDepotName
-                        ? ` • Kho chính: ${shortage.selectedDepotName}`
-                        : ""}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm font-medium text-sky-600/80 dark:text-sky-400/80 leading-relaxed">
-                  Kho hiện tại chưa đủ vật phẩm để đáp ứng toàn bộ kế hoạch.
-                </p>
-              )}
-            </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
       {result.specialNotes && (
         <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/[0.06] border border-amber-500/15">
           <Warning

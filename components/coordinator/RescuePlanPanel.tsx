@@ -801,6 +801,23 @@ function getVictimDisplayName(victim: ClusterTargetVictim): string {
   return "Nạn nhân";
 }
 
+// For single-victim activities, targetVictimSummary (e.g. "Ông Khoa (người lớn)")
+// is more accurate than the generic per-victim displayName (e.g. "Người lớn 1").
+function resolveVictimName(
+  victim: ClusterTargetVictim,
+  activityVictimSummary: string | null | undefined,
+  totalVictims: number,
+): string {
+  if (totalVictims === 1) {
+    const summary = trimToNull(activityVictimSummary);
+    if (summary) {
+      // Strip trailing " (type)" suffix — type is already shown as a separate badge
+      return summary.replace(/\s*\([^)]*\)$/, "").trim() || summary;
+    }
+  }
+  return getVictimDisplayName(victim);
+}
+
 function getVictimMedicalIssues(victim: ClusterTargetVictim): string[] {
   return Array.isArray(victim.medicalIssues)
     ? victim.medicalIssues.filter(
@@ -972,59 +989,85 @@ function TargetVictimsBlock({
       ) : (
         <div className="space-y-2">
           {victims.map((victim, index) => {
-            const medicalIssues = getVictimMedicalIssues(victim);
-            const personTypeLabel = victim.personType
-              ? getPersonTypeLabel(victim.personType)
-              : "Nạn nhân";
-            const severityLabel = formatVictimSeverityLabel(victim.severity);
-            const phone = trimToNull(victim.personPhone);
+            {
+              const medicalIssues = getVictimMedicalIssues(victim);
+              const personTypeLabel = victim.personType
+                ? getPersonTypeLabel(victim.personType)
+                : "Nạn nhân";
+              const severityLabel = formatVictimSeverityLabel(victim.severity);
+              const phone = trimToNull(victim.personPhone);
+              const diet = trimToNull(victim.specialDietDescription);
+              const clothingGender = trimToNull(victim.clothingGender);
 
-            return (
-              <div
-                key={`${victim.personId ?? "victim"}-${index}`}
-                className="rounded-lg border border-rose-100/50 bg-background/80 p-2.5 shadow-sm dark:border-rose-900/30"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 text-sm font-bold text-foreground">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
-                      <User className="h-3 w-3" weight="bold" />
-                    </div>
-                    {getVictimDisplayName(victim)}
-                  </span>
-                  <Badge className="bg-muted/50 px-1.5 py-0 text-[11px] font-bold text-muted-foreground">
-                    {personTypeLabel}
-                  </Badge>
-                  {victim.isInjured ? (
-                    <Badge
-                      variant="destructive"
-                      className="bg-rose-500/10 px-1.5 py-0 text-[11px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
-                    >
-                      BỊ THƯƠNG
-                      {severityLabel ? `: ${severityLabel.toUpperCase()}` : ""}
-                    </Badge>
-                  ) : null}
-                  {phone ? (
-                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
-                      <Phone className="h-3 w-3" />
-                      {phone}
+              return (
+                <div
+                  key={`${victim.personId ?? "victim"}-${index}`}
+                  className="rounded-lg border border-rose-100/50 bg-background/80 p-2.5 shadow-sm dark:border-rose-900/30"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-bold text-foreground">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
+                        <User className="h-3 w-3" weight="bold" />
+                      </div>
+                      {resolveVictimName(
+                        victim,
+                        activity.targetVictimSummary,
+                        victims.length,
+                      )}
                     </span>
-                  ) : null}
-                </div>
-                {!compact && medicalIssues.length > 0 && (
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {medicalIssues.slice(0, 4).map((issue) => (
-                      <span
-                        key={issue}
-                        className="inline-flex items-center rounded-md bg-rose-50/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                    <Badge className="bg-muted/50 px-1.5 py-0 text-[11px] font-bold text-muted-foreground">
+                      {personTypeLabel}
+                    </Badge>
+                    {victim.isInjured ? (
+                      <Badge
+                        variant="destructive"
+                        className="bg-rose-500/10 px-1.5 py-0 text-[11px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
                       >
-                        <FirstAid className="mr-1 h-3 w-3" weight="fill" />
-                        {getMedicalIssueLabel(issue)}
+                        BỊ THƯƠNG
+                        {severityLabel
+                          ? `: ${severityLabel.toUpperCase()}`
+                          : ""}
+                      </Badge>
+                    ) : null}
+                    {phone ? (
+                      <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
+                        <Phone className="h-3 w-3" />
+                        {phone}
                       </span>
-                    ))}
+                    ) : null}
                   </div>
-                )}
-              </div>
-            );
+                  {!compact &&
+                    (medicalIssues.length > 0 ||
+                      diet ||
+                      victim.clothingNeeded) && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {medicalIssues.slice(0, 4).map((issue) => (
+                          <span
+                            key={issue}
+                            className="inline-flex items-center rounded-md bg-rose-50/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                          >
+                            <FirstAid className="mr-1 h-3 w-3" weight="fill" />
+                            {getMedicalIssueLabel(issue)}
+                          </span>
+                        ))}
+                        {diet ? (
+                          <span className="rounded-md bg-zinc-100/80 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+                            ĂN: {diet.toUpperCase()}
+                          </span>
+                        ) : null}
+                        {victim.clothingNeeded ? (
+                          <span className="rounded-md bg-zinc-100/80 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+                            QUẦN ÁO
+                            {clothingGender
+                              ? ` (${getClothingGenderLabel(clothingGender).toUpperCase()})`
+                              : ""}
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+                </div>
+              );
+            }
           })}
         </div>
       )}
@@ -9756,6 +9799,12 @@ const RescuePlanPanel = ({
           targetLatitude: resolvedTargetCoordinates.lat,
           targetLongitude: resolvedTargetCoordinates.lng,
           rescueTeamId,
+          targetVictimSummary: trimToNull(activity.targetVictimSummary) ?? null,
+          targetVictims:
+            Array.isArray(activity.targetVictims) &&
+            activity.targetVictims.length > 0
+              ? activity.targetVictims
+              : null,
         };
 
         return {
@@ -9844,6 +9893,9 @@ const RescuePlanPanel = ({
                         : {}),
                     };
                   }),
+                  targetVictimSummary:
+                    createRequest.targetVictimSummary ?? null,
+                  targetVictims: createRequest.targetVictims ?? null,
                 }),
               ),
             },
@@ -10705,8 +10757,26 @@ const RescuePlanPanel = ({
       return;
     }
 
+    // Prefer the properly-flattened saved suggestion (Validated group, refined
+    // per-activity victim lists) over the raw SSE stream data when a matching
+    // saved suggestion exists.
+    if (activeSuggestionPreview.sourceSuggestionId != null) {
+      const savedMatch = renderableSavedSuggestions.find(
+        (s) =>
+          s.sourceSuggestionId === activeSuggestionPreview.sourceSuggestionId,
+      );
+      if (savedMatch) {
+        handleSuggestionEditRequest(savedMatch);
+        return;
+      }
+    }
+
     handleSuggestionEditRequest(activeSuggestionPreview);
-  }, [activeSuggestionPreview, handleSuggestionEditRequest]);
+  }, [
+    activeSuggestionPreview,
+    handleSuggestionEditRequest,
+    renderableSavedSuggestions,
+  ]);
 
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
@@ -10759,6 +10829,10 @@ const RescuePlanPanel = ({
               assemblyPointName: a.assemblyPointName ?? null,
               assemblyPointLatitude: a.assemblyPointLatitude ?? null,
               assemblyPointLongitude: a.assemblyPointLongitude ?? null,
+              targetVictimSummary: a.targetVictimSummary ?? null,
+              targetVictims: Array.isArray(a.targetVictims)
+                ? a.targetVictims
+                : [],
               suppliesToCollect: a.suppliesToCollect,
               suggestedTeam: linkedMissionTeam
                 ? {

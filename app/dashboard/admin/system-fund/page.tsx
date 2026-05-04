@@ -47,6 +47,10 @@ function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
 }
 
+function isSystemFundOutflow(transactionType: string) {
+  return transactionType === "AllocationToDepot";
+}
+
 function formatMoneyInput(value: string | number): string {
   const raw =
     typeof value === "string"
@@ -463,7 +467,9 @@ export default function SystemFundPage() {
                   </TableHeader>
                   <TableBody>
                     {transactionData.items.map((tx, index) => {
-                      const isIn = tx.amount >= 0;
+                      const isOutflow = isSystemFundOutflow(
+                        tx.transactionType,
+                      );
                       return (
                         <TableRow key={tx.id}>
                           <TableCell className="text-center text-sm text-muted-foreground">
@@ -472,13 +478,15 @@ export default function SystemFundPage() {
                           <TableCell className="text-sm font-medium">
                             <span
                               className={`inline-flex items-center gap-1 ${
-                                isIn ? "text-emerald-600" : "text-rose-600"
+                                isOutflow
+                                  ? "text-rose-600"
+                                  : "text-emerald-600"
                               }`}
                             >
-                              {isIn ? (
-                                <ArrowUp size={12} weight="bold" />
-                              ) : (
+                              {isOutflow ? (
                                 <ArrowDown size={12} weight="bold" />
+                              ) : (
+                                <ArrowUp size={12} weight="bold" />
                               )}
                               {transactionTypeMap[tx.transactionType] ??
                                 tx.transactionType}
@@ -494,10 +502,11 @@ export default function SystemFundPage() {
                           </TableCell>
                           <TableCell
                             className={`text-right text-sm font-bold ${
-                              isIn ? "text-emerald-600" : "text-rose-600"
+                              isOutflow
+                                ? "text-rose-600"
+                                : "text-emerald-600"
                             }`}
                           >
-                            {isIn ? "+" : ""}
                             {formatMoney(tx.amount)}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground">

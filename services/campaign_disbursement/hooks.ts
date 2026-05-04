@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   allocateDisbursement,
+  getDisbursementSourceTypes,
   getCampaignSpending,
   getCampaigns,
   getCampaignMetadata,
@@ -16,6 +17,7 @@ import type {
   AllocateDisbursementRequest,
   CampaignMetadata,
   CampaignStatusMetadata,
+  DisbursementSourceTypeMetadata,
   GetCampaignSpendingParams,
   GetCampaignSpendingResponse,
   GetCampaignsParams,
@@ -33,6 +35,9 @@ export const CAMPAIGN_SPENDING_QUERY_KEY = ["campaign-spending"] as const;
 export const CAMPAIGNS_QUERY_KEY = ["campaigns"] as const;
 export const CAMPAIGN_METADATA_QUERY_KEY = ["campaign-metadata"] as const;
 export const CAMPAIGN_STATUSES_QUERY_KEY = ["campaign-statuses"] as const;
+export const DISBURSEMENT_SOURCE_TYPES_QUERY_KEY = [
+  "disbursement-source-types",
+] as const;
 
 /* ── GET campaign spending ── */
 
@@ -65,6 +70,18 @@ export function useAllocateDisbursement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CAMPAIGN_SPENDING_QUERY_KEY });
     },
+  });
+}
+
+/* ── GET disbursement source types ── */
+
+/**
+ * Hook to fetch disbursement source types for source selector
+ */
+export function useDisbursementSourceTypes() {
+  return useQuery<DisbursementSourceTypeMetadata[]>({
+    queryKey: DISBURSEMENT_SOURCE_TYPES_QUERY_KEY,
+    queryFn: getDisbursementSourceTypes,
   });
 }
 
