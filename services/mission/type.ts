@@ -107,6 +107,10 @@ export interface MissionActivity {
   completedAt: string | null;
   completedBy?: string | null;
   lastDecisionBy?: string | null;
+  targetVictimSummary?: string | null;
+  targetVictims?:
+    | import("@/services/sos_cluster/type").ClusterTargetVictim[]
+    | null;
 }
 
 export interface MissionEntity {
@@ -205,6 +209,10 @@ export interface UpdateMissionActivityRequest {
   targetLatitude?: number;
   targetLongitude?: number;
   items: UpdateMissionActivityItemRequest[];
+  targetVictimSummary?: string | null;
+  targetVictims?:
+    | import("@/services/sos_cluster/type").ClusterTargetVictim[]
+    | null;
 }
 
 export interface UpdateMissionRequest {
@@ -253,6 +261,10 @@ export interface CreateMissionActivityRequest {
   targetLatitude: number;
   targetLongitude: number;
   rescueTeamId?: number | null;
+  targetVictimSummary?: string | null;
+  targetVictims?:
+    | import("@/services/sos_cluster/type").ClusterTargetVictim[]
+    | null;
 }
 
 export interface CreateMissionSupplyRequest {

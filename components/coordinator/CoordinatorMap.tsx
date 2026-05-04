@@ -119,8 +119,6 @@ const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
-
-
 const CoordinatorMap = ({
   sosRequests,
   rescuers,
@@ -1040,7 +1038,6 @@ const CoordinatorMap = ({
             />
           ))}
 
-
         {/* Depot Markers */}
         {!isServiceZoneOverview &&
           layerFilter.depots &&
@@ -1198,7 +1195,7 @@ function ServiceZoneOverlay({
       className: "custom-service-zone-marker",
       html: `
         <div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;justify-content:center;padding:5px 14px;border-radius:20px;background:rgba(14,116,144,0.92);border:2px solid rgba(255,255,255,0.95);box-shadow:0 4px 14px rgba(8,47,73,0.3);color:#fff;white-space:nowrap;font-family:system-ui,-apple-system,sans-serif;">
-          <span style="font-size:12px;font-weight:700;letter-spacing:0.02em;">${zone.name}</span>
+          <span style="font-size:14px;font-weight:700;letter-spacing:0.02em;">${zone.name}</span>
         </div>
       `,
       iconSize: [0, 0],
@@ -1222,10 +1219,10 @@ function ServiceZoneOverlay({
       L.divIcon({
         className: "",
         html: `
-          <div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;background:${bg};border:1.5px solid rgba(255,255,255,0.92);box-shadow:0 2px 8px rgba(0,0,0,0.18);color:#fff;white-space:nowrap;font-family:system-ui,-apple-system,sans-serif;">
-            <span style="font-size:10px;line-height:1;">${emoji}</span>
-            <span style="font-size:10px;font-weight:700;line-height:1;">${count}</span>
-            <span style="font-size:9px;font-weight:500;opacity:0.85;line-height:1;">${label}</span>
+          <div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${bg};border:2px solid rgba(255,255,255,0.95);box-shadow:0 3px 12px rgba(0,0,0,0.25);color:#fff;white-space:nowrap;font-family:system-ui,-apple-system,sans-serif;">
+            <span style="font-size:14px;line-height:1;">${emoji}</span>
+            <span style="font-size:14px;font-weight:800;line-height:1;">${count}</span>
+            <span style="font-size:14px;font-weight:800;opacity:0.92;line-height:1;">${label}</span>
           </div>
         `,
         iconSize: [0, 0],
