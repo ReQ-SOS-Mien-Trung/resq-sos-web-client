@@ -102,6 +102,7 @@ import {
   useAssemblyPoints,
 } from "@/services/assembly_points/hooks";
 import { useDepotInventoryRealtime } from "@/hooks/useDepotInventoryRealtime";
+import { useMissionRealtime } from "@/hooks/useMissionRealtime";
 import { getActivityRoute } from "@/services/mission/api";
 import type {
   MissionActivity,
@@ -11039,6 +11040,55 @@ const RescuePlanPanel = ({
     });
   }, [missionsData?.missions]);
 
+  const missionRealtimeMissionIds = useMemo(
+    () => sortedMissions.map((mission) => mission.id),
+    [sortedMissions],
+  );
+
+  const handleRealtimeActivityStatusUpdated = useCallback(
+    ({
+      missionId,
+      activityId,
+      status,
+    }: {
+      missionId: number;
+      activityId: number;
+      status: string;
+    }) => {
+      if (editingMissionId !== missionId) {
+        return;
+      }
+
+      setEditActivities((previous) => {
+        let changed = false;
+        const next = previous.map((activity) => {
+          if (
+            activity._missionActivityId !== activityId ||
+            activity._missionStatus === status
+          ) {
+            return activity;
+          }
+
+          changed = true;
+          return {
+            ...activity,
+            _missionStatus: status,
+          };
+        });
+
+        return changed ? next : previous;
+      });
+    },
+    [editingMissionId],
+  );
+
+  useMissionRealtime({
+    clusterId,
+    missionIds: missionRealtimeMissionIds,
+    enabled: open && !!clusterId,
+    onActivityStatusUpdated: handleRealtimeActivityStatusUpdated,
+  });
+
   const assignedMissionCount = useMemo(
     () =>
       sortedMissions.filter(
@@ -12791,7 +12841,7 @@ const RescuePlanPanel = ({
                                       (groupHasError
                                         ? "border-red-400 bg-red-50/20 dark:border-red-800 dark:bg-red-950/10"
                                         : group.matchedSOS?.priority === "P1"
-                                          ? "border-red-400 bg-red-50/30 dark:border-red-800 dark:bg-red-950/10"
+                                          ? "border-violet-400 bg-violet-50/20 dark:border-violet-700 dark:bg-violet-950/10"
                                           : group.matchedSOS?.priority === "P2"
                                             ? "border-orange-400 bg-orange-50/30 dark:border-orange-800 dark:bg-orange-950/10"
                                             : group.matchedSOS?.priority ===
