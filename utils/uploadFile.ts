@@ -18,13 +18,28 @@ function isHeicFile(file: File): boolean {
  */
 async function toJpegBlob(file: File): Promise<Blob> {
   if (isHeicFile(file)) {
-    const heic2any = (await import("heic2any")).default;
-    const result = await heic2any({
-      blob: file,
-      toType: "image/jpeg",
-      quality: 0.92,
-    });
-    return Array.isArray(result) ? result[0] : result;
+    if (typeof window === "undefined") {
+      throw new Error("HEIC conversion is only supported in the browser");
+    }
+    try {
+      const heic2any = (await import("heic2any")).default;
+      const result = await heic2any({
+        blob: file,
+        toType: "image/jpeg",
+        quality: 0.92,
+      });
+      return Array.isArray(result) ? result[0] : result;
+    } catch (err) {
+      console.error("[heic2any] Conversion failed:", err);
+      throw new Error(
+        "Không thể chuyển đổi ảnh HEIC. Vui lòng thử định dạng khác.",
+      );
+    }
+  }
+
+  if (typeof window === "undefined") {
+    // SSR: skip canvas conversion, return file as-is
+    return file;
   }
 
   return new Promise((resolve, reject) => {
