@@ -26,6 +26,19 @@ function isIgnorableSignalRErrorMessage(message: string): boolean {
   return isServerCloseNoise || isWebSocket1006Noise || isServerTimeoutNoise;
 }
 
+function isRecoverableSignalRConnectionMessage(message: string): boolean {
+  const normalized = normalizeSignalRMessage(message);
+
+  return (
+    normalized.includes("failed to complete negotiation") ||
+    normalized.includes("failed to start the connection") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("stopped during negotiation") ||
+    normalized.includes("connection disconnected with error") ||
+    normalized.includes("connection closed with an error")
+  );
+}
+
 class SignalRConsoleLogger implements ILogger {
   log(logLevel: LogLevel, message: string): void {
     if (logLevel < LogLevel.Error) {
@@ -36,7 +49,12 @@ class SignalRConsoleLogger implements ILogger {
       return;
     }
 
-    console.error(message);
+    if (isRecoverableSignalRConnectionMessage(message)) {
+      console.warn(message);
+      return;
+    }
+
+    console.warn(message);
   }
 }
 

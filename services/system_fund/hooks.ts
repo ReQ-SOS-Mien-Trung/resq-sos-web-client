@@ -51,7 +51,7 @@ export function useSystemFund(options?: { enabled?: boolean }) {
     );
 
     void adminFinanceRealtimeClient.subscribeSystemFund().catch((error) => {
-      console.error("Failed to subscribe system fund realtime:", error);
+      console.warn("Failed to subscribe system fund realtime:", error);
     });
 
     return () => {
