@@ -8688,12 +8688,6 @@ const SuggestionCard = ({
                                               </span>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
-                                              <span className="text-[14px] font-black text-primary">
-                                                ×{supply.quantity}
-                                              </span>
-                                              <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                                                {supply.unit}
-                                              </span>
                                               {showSupplyBuffer ? (
                                                 <span className="rounded bg-amber-50 px-1 text-[11px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                   Dự trù{" "}
@@ -8702,6 +8696,12 @@ const SuggestionCard = ({
                                                   )}
                                                 </span>
                                               ) : null}
+                                              <span className="text-[14px] font-black text-primary">
+                                                ×{supply.quantity}
+                                              </span>
+                                              <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                                                {supply.unit}
+                                              </span>
                                             </div>
                                           </div>
                                         );
@@ -12670,10 +12670,6 @@ const RescuePlanPanel = ({
                                                                               </span>
                                                                             </div>
                                                                             <div className="flex shrink-0 items-center gap-1">
-                                                                              <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                                                                                {supply.quantityLabel ||
-                                                                                  "-"}
-                                                                              </span>
                                                                               {supply.bufferRatioLabel ? (
                                                                                 <span className="rounded bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                                                   Dự
@@ -12683,6 +12679,10 @@ const RescuePlanPanel = ({
                                                                                   }
                                                                                 </span>
                                                                               ) : null}
+                                                                              <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                                                                {supply.quantityLabel ||
+                                                                                  "-"}
+                                                                              </span>
                                                                             </div>
                                                                           </div>
 
@@ -14128,7 +14128,7 @@ const RescuePlanPanel = ({
                                                                     <div
                                                                       className={cn(
                                                                         showBufferInput
-                                                                          ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
+                                                                          ? "grid min-w-0 grid-cols-[minmax(0,1fr)_76px_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
                                                                           : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
                                                                         hasActivityError
                                                                           ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
@@ -14160,40 +14160,6 @@ const RescuePlanPanel = ({
                                                                             "Vật phẩm chưa rõ tên"}
                                                                         </span>
                                                                       </div>
-                                                                      <Input
-                                                                        type="number"
-                                                                        min={0}
-                                                                        value={
-                                                                          Number.isNaN(
-                                                                            supply.quantity,
-                                                                          )
-                                                                            ? ""
-                                                                            : supply.quantity
-                                                                        }
-                                                                        onChange={(
-                                                                          event,
-                                                                        ) =>
-                                                                          handleUpdateSupplyQuantity(
-                                                                            activity._id,
-                                                                            sIdx,
-                                                                            parseInt(
-                                                                              event
-                                                                                .target
-                                                                                .value,
-                                                                            ),
-                                                                          )
-                                                                        }
-                                                                        disabled={
-                                                                          isAutoManagedSupplyStep ||
-                                                                          lockGeneralActivityEdits
-                                                                        }
-                                                                        className="h-6 w-full px-1 text-center text-sm"
-                                                                      />
-                                                                      <span className="text-right text-sm text-muted-foreground">
-                                                                        {normalizeSupplyUnit(
-                                                                          supply.unit,
-                                                                        )}
-                                                                      </span>
                                                                       {showBufferInput ? (
                                                                         <div className="relative min-w-0">
                                                                           <Input
@@ -14234,6 +14200,40 @@ const RescuePlanPanel = ({
                                                                           </span>
                                                                         </div>
                                                                       ) : null}
+                                                                      <Input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        value={
+                                                                          Number.isNaN(
+                                                                            supply.quantity,
+                                                                          )
+                                                                            ? ""
+                                                                            : supply.quantity
+                                                                        }
+                                                                        onChange={(
+                                                                          event,
+                                                                        ) =>
+                                                                          handleUpdateSupplyQuantity(
+                                                                            activity._id,
+                                                                            sIdx,
+                                                                            parseInt(
+                                                                              event
+                                                                                .target
+                                                                                .value,
+                                                                            ),
+                                                                          )
+                                                                        }
+                                                                        disabled={
+                                                                          isAutoManagedSupplyStep ||
+                                                                          lockGeneralActivityEdits
+                                                                        }
+                                                                        className="h-6 w-full px-1 text-center text-sm"
+                                                                      />
+                                                                      <span className="text-right text-sm text-muted-foreground">
+                                                                        {normalizeSupplyUnit(
+                                                                          supply.unit,
+                                                                        )}
+                                                                      </span>
                                                                       <Button
                                                                         variant="ghost"
                                                                         size="icon"
@@ -14905,10 +14905,6 @@ const RescuePlanPanel = ({
                                                             </span>
                                                           </div>
                                                           <div className="flex shrink-0 items-center gap-1">
-                                                            <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                                                              {supply.quantityLabel ||
-                                                                "-"}
-                                                            </span>
                                                             {supply.bufferRatioLabel ? (
                                                               <span className="rounded bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                                 Dự trù{" "}
@@ -14917,6 +14913,10 @@ const RescuePlanPanel = ({
                                                                 }
                                                               </span>
                                                             ) : null}
+                                                            <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                                              {supply.quantityLabel ||
+                                                                "-"}
+                                                            </span>
                                                           </div>
                                                         </div>
                                                       </div>
