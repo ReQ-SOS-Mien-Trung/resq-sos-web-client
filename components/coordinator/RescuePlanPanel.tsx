@@ -1160,6 +1160,44 @@ const getMedicalIssueColorClass = (code: string): string => {
   return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
 };
 
+/**
+ * Parse a raw SOS message string (pipe-separated structured format) and return:
+ * - missionType: the [TYPE] prefix if present
+ * - freeTextNote: the "Ghi chú:" free-text portion (the human-written note)
+ * - isStructured: whether the message had a pipe-separated structure
+ */
+function parseSOSMessageNote(message: string): {
+  missionType: string | null;
+  freeTextNote: string | null;
+  isStructured: boolean;
+} {
+  if (!message?.trim()) {
+    return { missionType: null, freeTextNote: null, isStructured: false };
+  }
+
+  if (!message.includes("|")) {
+    return {
+      missionType: null,
+      freeTextNote: message.trim() || null,
+      isStructured: false,
+    };
+  }
+
+  const typeMatch = message.match(/^\s*\[([^\]]+)\]/);
+  const missionType = typeMatch ? typeMatch[1].trim() : null;
+
+  // "Ghi chú:" is always the last meaningful segment
+  const ghiChuMatch = message.match(/\|\s*Ghi\s*ch[uú]\s*:\s*(.+)$/i);
+  const freeTextNote = ghiChuMatch ? ghiChuMatch[1].trim() : null;
+
+  return { missionType, freeTextNote, isStructured: true };
+}
+
+/** Normalize a string for dedup comparison (trim, collapse whitespace, lowercase) */
+function normalizeForDedup(value?: string | null): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
   const { data: analysisData } = useSOSRequestAnalysis(Number(sos.id), {
     enabled: !!sos.id && !isNaN(Number(sos.id)),
@@ -1195,6 +1233,19 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
     v3GroupNeeds?.other_supply_description ||
     (sos as any).otherSupplyDescription ||
     structured?.other_supply_description;
+
+  // Parse the raw message: extract only the free-text "Ghi chú" portion so we
+  // don't repeat structured data already shown in the other columns.
+  const {
+    missionType: parsedMissionType,
+    freeTextNote,
+    isStructured: messageIsStructured,
+  } = parseSOSMessageNote(sos.message);
+
+  // Suppress additionalDesc if it is the same text as what we extracted from the message
+  const showAdditionalDesc =
+    !!additionalDesc &&
+    normalizeForDedup(additionalDesc) !== normalizeForDedup(freeTextNote);
 
   return (
     <div
@@ -1306,15 +1357,31 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
           </div>
 
           {/* Col 2: Nội dung yêu cầu */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase">
-              Nội dung yêu cầu
+              Lời nhắn
             </p>
-            <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-sm tracking-tighter leading-relaxed text-foreground/90 italic">
-              {sos.message}
-            </div>
-            {additionalDesc && (
-              <div className="mt-2 text-sm tracking-tighter bg-amber-50/50 dark:bg-amber-900/10 p-2.5 rounded border border-amber-200/50">
+
+            {messageIsStructured ? (
+              /* Structured pipe-message: show only the human free-text note */
+              freeTextNote ? (
+                <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-[14px] tracking-tighter leading-relaxed text-foreground/90 italic">
+                  {freeTextNote}
+                </div>
+              ) : (
+                <p className="text-[13px] tracking-tighter text-muted-foreground italic">
+                  Không có lời nhắn thêm.
+                </p>
+              )
+            ) : (
+              /* Free-text message: show as-is */
+              <div className="rounded-lg bg-muted/40 p-3 border border-dashed text-[14px] tracking-tighter leading-relaxed text-foreground/90 italic">
+                {sos.message}
+              </div>
+            )}
+
+            {showAdditionalDesc && (
+              <div className="text-[14px] tracking-tighter bg-amber-50/50 dark:bg-amber-900/10 p-2.5 rounded border border-amber-200/50">
                 <span className="font-semibold tracking-tighter text-amber-700 dark:text-amber-400 mr-1">
                   Ghi chú thêm:
                 </span>
@@ -10000,7 +10067,12 @@ const RescuePlanPanel = ({
   });
   const renderableSavedSuggestions = useMemo(
     () =>
-      (suggestionsData?.missionSuggestions ?? [])
+      [...(suggestionsData?.missionSuggestions ?? [])]
+        .sort((a, b) => {
+          const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tB - tA;
+        })
         .filter(hasRenderableMissionSuggestion)
         .map(buildSuggestionPreviewFromMissionSuggestion),
     [suggestionsData?.missionSuggestions],
