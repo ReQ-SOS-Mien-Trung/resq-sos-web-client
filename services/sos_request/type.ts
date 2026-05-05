@@ -228,6 +228,14 @@ export interface SOSStructuredData {
   prepared_profiles?: unknown[] | null;
 }
 
+// Companion (person accompanying the victim / at the scene)
+export interface SOSCompanion {
+  userId: string | null;
+  fullName: string | null;
+  phone: string | null;
+  addedAt: string | null;
+}
+
 // Network metadata from mesh relay
 export interface SOSNetworkMetadata {
   path: string[];
@@ -286,7 +294,7 @@ export interface SOSRequestEntity {
   latestIncidentNote?: string | null;
   latestIncidentAt?: string | null;
   incidentHistory?: SOSIncidentHistoryEntry[] | null;
-  companions?: unknown[] | null;
+  companions?: SOSCompanion[] | null;
   evaluation?: SOSRequestEvaluationSummary | null;
 }
 
@@ -412,7 +420,7 @@ export interface SuggestedResource {
 }
 
 // Severity level
-export type SeverityLevel = "Low" | "Medium" | "High" | "Critical";
+export type SeverityLevel = "Low" | "Medium" | "Moderate" | "High" | "Critical";
 
 // Mission type
 export type MissionType = "RESCUE" | "EVACUATE" | "MEDICAL" | "SUPPLY";
@@ -488,22 +496,22 @@ export interface AiAnalysisMetadata {
 
 export interface AiAnalysis {
   id: number;
-  modelName: string;
-  modelVersion: string;
-  analysisType: string;
-  suggestedSeverityLevel: SeverityLevel;
+  modelName?: string | null;
+  modelVersion?: string | null;
+  analysisType?: string | null;
+  suggestedSeverityLevel: SeverityLevel | string;
   suggestedPriority: SOSPriorityLevel;
   suggestedPriorityScore: number;
   agreesWithRuleBase: boolean;
   needsImmediateSafeTransfer: boolean;
   canWaitForCombinedMission: boolean;
   explanation: string;
-  handlingReason?: string;
-  confidenceScore: number;
-  suggestionScope: string;
-  metadata: AiAnalysisMetadata;
+  handlingReason?: string | null;
+  confidenceScore?: number | null;
+  suggestionScope?: string | null;
+  metadata?: AiAnalysisMetadata | null;
   createdAt: string;
-  adoptedAt: string | null;
+  adoptedAt?: string | null;
 }
 
 export interface SOSRequestEvaluationSummary {

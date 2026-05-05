@@ -10,6 +10,7 @@ import type {
   SOSSupplyDetails,
   SOSVictimProfile,
   SOSIncidentHistoryEntry,
+  SOSCompanion,
 } from "@/services/sos_request/type";
 
 interface Ticker {
@@ -120,10 +121,13 @@ export interface SOSRequest {
   isSentOnBehalf?: boolean;
   latestIncidentNote?: string | null;
   reporterIsOnline?: boolean;
+  reporterBatteryLevel?: number | null;
   hopCount?: number;
   locationAccuracy?: number | null;
+  reviewedAt?: Date | null;
   evaluation?: SOSRequestEvaluationSummary | null;
   victims?: SOSVictimProfile[] | null;
+  companions?: SOSCompanion[] | null;
   incidentHistory?: SOSIncidentHistoryEntry[] | null;
 }
 
