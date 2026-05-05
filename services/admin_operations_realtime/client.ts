@@ -14,9 +14,19 @@ import { useAuthStore } from "@/stores/auth.store";
 import {
   ADMIN_OPERATIONS_REALTIME_EVENTS,
   ADMIN_OPERATIONS_REALTIME_METHODS,
+  AdminMissionActivityRealtimeUpdate,
+  AdminMissionExecutionProgressRealtimeUpdate,
+  AdminMissionRealtimeUpdate,
 } from "./type";
 import { ChartInvalidation } from "@/services/chart_invalidation/type";
 
+type MissionUpdateHandler = (payload: AdminMissionRealtimeUpdate) => void;
+type MissionActivityUpdateHandler = (
+  payload: AdminMissionActivityRealtimeUpdate,
+) => void;
+type MissionExecutionProgressHandler = (
+  payload: AdminMissionExecutionProgressRealtimeUpdate,
+) => void;
 type RescueTeamUpdateHandler = () => void;
 type RescuerScoresUpdateHandler = () => void;
 type ChartInvalidationHandler = (payload: ChartInvalidation) => void;
@@ -31,10 +41,19 @@ class AdminOperationsRealtimeClient {
   private startPromise: Promise<void> | null = null;
 
   private rescueTeamListSubscribers = 0;
+  private sosClusterSubscriptions = new Map<number, number>();
+  private missionActivitiesSubscriptions = new Map<number, number>();
+  private missionExecutionSubscriptions = new Map<number, number>();
   private rescueTeamDetailSubscriptions = new Map<number, number>();
   private rescuerScoresSubscriptions = new Map<string, number>();
   private depotChartSubscriptions = new Map<number, number>();
 
+  private missionUpdateListeners = new Set<MissionUpdateHandler>();
+  private missionActivityUpdateListeners =
+    new Set<MissionActivityUpdateHandler>();
+  private missionExecutionProgressListeners =
+    new Set<MissionExecutionProgressHandler>();
+  private reconnectListeners = new Set<() => void>();
   private rescueTeamUpdateListeners = new Set<RescueTeamUpdateHandler>();
   private rescuerScoresUpdateListeners = new Set<RescuerScoresUpdateHandler>();
   private chartInvalidationListeners = new Set<ChartInvalidationHandler>();
@@ -54,6 +73,9 @@ class AdminOperationsRealtimeClient {
       if (
         this.connectionRetainers > 0 ||
         this.rescueTeamListSubscribers > 0 ||
+        this.sosClusterSubscriptions.size > 0 ||
+        this.missionActivitiesSubscriptions.size > 0 ||
+        this.missionExecutionSubscriptions.size > 0 ||
         this.rescueTeamDetailSubscriptions.size > 0 ||
         this.rescuerScoresSubscriptions.size > 0 ||
         this.depotChartSubscriptions.size > 0
@@ -140,7 +162,9 @@ class AdminOperationsRealtimeClient {
     );
 
     connection.onreconnected(() => {
-      void this.rejoinSubscriptions();
+      void this.rejoinSubscriptions().finally(() => {
+        this.reconnectListeners.forEach((listener) => listener());
+      });
     });
 
     return connection;
@@ -152,6 +176,33 @@ class AdminOperationsRealtimeClient {
     }
 
     if (!this.isReceiveEventBound) {
+      this.connection.on(
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveMissionUpdate,
+        (payload: AdminMissionRealtimeUpdate) => {
+          this.missionUpdateListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
+
+      this.connection.on(
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveMissionActivityUpdate,
+        (payload: AdminMissionActivityRealtimeUpdate) => {
+          this.missionActivityUpdateListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
+
+      this.connection.on(
+        ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveMissionExecutionProgress,
+        (payload: AdminMissionExecutionProgressRealtimeUpdate) => {
+          this.missionExecutionProgressListeners.forEach((listener) =>
+            listener(payload),
+          );
+        },
+      );
+
       this.connection.on(
         ADMIN_OPERATIONS_REALTIME_EVENTS.ReceiveRescueTeamUpdate,
         () => {
@@ -212,6 +263,39 @@ class AdminOperationsRealtimeClient {
         ),
       );
     }
+
+    this.sosClusterSubscriptions.forEach((count, clusterId) => {
+      if (count > 0) {
+        tasks.push(
+          connection.invoke(
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeSOSCluster,
+            clusterId,
+          ),
+        );
+      }
+    });
+
+    this.missionActivitiesSubscriptions.forEach((count, missionId) => {
+      if (count > 0) {
+        tasks.push(
+          connection.invoke(
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeMissionActivities,
+            missionId,
+          ),
+        );
+      }
+    });
+
+    this.missionExecutionSubscriptions.forEach((count, missionId) => {
+      if (count > 0) {
+        tasks.push(
+          connection.invoke(
+            ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeMissionExecution,
+            missionId,
+          ),
+        );
+      }
+    });
 
     this.rescueTeamDetailSubscriptions.forEach((count, teamId) => {
       if (count > 0) {
@@ -315,6 +399,128 @@ class AdminOperationsRealtimeClient {
 
     if (this.connectionRetainers > 0) return;
 
+    this.scheduleStop();
+  }
+
+  onReconnected(handler: () => void): () => void {
+    this.reconnectListeners.add(handler);
+    return () => {
+      this.reconnectListeners.delete(handler);
+    };
+  }
+
+  // ─── Missions ────────────────────────────────────────────────────
+
+  onMissionUpdate(handler: MissionUpdateHandler): () => void {
+    this.missionUpdateListeners.add(handler);
+    return () => {
+      this.missionUpdateListeners.delete(handler);
+      this.scheduleStop();
+    };
+  }
+
+  onMissionActivityUpdate(handler: MissionActivityUpdateHandler): () => void {
+    this.missionActivityUpdateListeners.add(handler);
+    return () => {
+      this.missionActivityUpdateListeners.delete(handler);
+      this.scheduleStop();
+    };
+  }
+
+  onMissionExecutionProgress(
+    handler: MissionExecutionProgressHandler,
+  ): () => void {
+    this.missionExecutionProgressListeners.add(handler);
+    return () => {
+      this.missionExecutionProgressListeners.delete(handler);
+      this.scheduleStop();
+    };
+  }
+
+  async subscribeSOSCluster(clusterId: number): Promise<void> {
+    const current = this.sosClusterSubscriptions.get(clusterId) ?? 0;
+    this.sosClusterSubscriptions.set(clusterId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeSOSCluster,
+      clusterId,
+    );
+  }
+
+  async unsubscribeSOSCluster(clusterId: number): Promise<void> {
+    const current = this.sosClusterSubscriptions.get(clusterId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.sosClusterSubscriptions.set(clusterId, next);
+      return;
+    }
+
+    this.sosClusterSubscriptions.delete(clusterId);
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeSOSCluster,
+      clusterId,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  async subscribeMissionActivities(missionId: number): Promise<void> {
+    const current = this.missionActivitiesSubscriptions.get(missionId) ?? 0;
+    this.missionActivitiesSubscriptions.set(missionId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeMissionActivities,
+      missionId,
+    );
+  }
+
+  async unsubscribeMissionActivities(missionId: number): Promise<void> {
+    const current = this.missionActivitiesSubscriptions.get(missionId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.missionActivitiesSubscriptions.set(missionId, next);
+      return;
+    }
+
+    this.missionActivitiesSubscriptions.delete(missionId);
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeMissionActivities,
+      missionId,
+    ).catch(() => null);
+    this.scheduleStop();
+  }
+
+  async subscribeMissionExecution(missionId: number): Promise<void> {
+    const current = this.missionExecutionSubscriptions.get(missionId) ?? 0;
+    this.missionExecutionSubscriptions.set(missionId, current + 1);
+
+    if (current > 0) return;
+
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.SubscribeMissionExecution,
+      missionId,
+    );
+  }
+
+  async unsubscribeMissionExecution(missionId: number): Promise<void> {
+    const current = this.missionExecutionSubscriptions.get(missionId) ?? 0;
+    const next = Math.max(0, current - 1);
+
+    if (next > 0) {
+      this.missionExecutionSubscriptions.set(missionId, next);
+      return;
+    }
+
+    this.missionExecutionSubscriptions.delete(missionId);
+    await this.invokeWhenConnected(
+      ADMIN_OPERATIONS_REALTIME_METHODS.UnsubscribeMissionExecution,
+      missionId,
+    ).catch(() => null);
     this.scheduleStop();
   }
 

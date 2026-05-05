@@ -600,20 +600,44 @@ function FormattedAINotes({
   textClassName?: string;
 }) {
   if (!text) return null;
-  const lines = text
+  const rawLines = text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
+  // Pre-process: merge |-prefixed continuation lines into the preceding review block
+  type ProcessedEntry =
+    | { type: "review"; items: string[] }
+    | { type: "text"; content: string };
+
+  const processed: ProcessedEntry[] = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
+      const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
+      const items = content
+        .split("|")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      // Absorb any following |-prefixed continuation lines
+      while (i + 1 < rawLines.length && rawLines[i + 1].startsWith("|")) {
+        i++;
+        const cont = rawLines[i].replace(/^\|/, "").trim();
+        if (cont) items.push(cont);
+      }
+      processed.push({ type: "review", items });
+    } else if (line.startsWith("|")) {
+      // Standalone |-prefixed line (not following a review block) — strip | and show as plain text
+      processed.push({ type: "text", content: line.replace(/^\|/, "").trim() });
+    } else {
+      processed.push({ type: "text", content: line });
+    }
+  }
+
   return (
     <div className="space-y-3">
-      {lines.map((line, idx) => {
-        if (line.includes("[CẦN REVIEW THỦ CÔNG]")) {
-          const content = line.replace("[CẦN REVIEW THỦ CÔNG]", "").trim();
-          const items = content
-            .split("|")
-            .map((i) => i.trim())
-            .filter(Boolean);
+      {processed.map((entry, idx) => {
+        if (entry.type === "review") {
           return (
             <div
               key={idx}
@@ -624,7 +648,7 @@ function FormattedAINotes({
                 CẦN XEM LẠI THỦ CÔNG
               </h5>
               <ul className="list-disc list-inside space-y-1 text-sm font-medium text-red-600/90 dark:text-red-400/90 leading-relaxed">
-                {items.map((item, i) => (
+                {entry.items.map((item, i) => (
                   <li key={i}>{translateAIText(item)}</li>
                 ))}
               </ul>
@@ -638,7 +662,7 @@ function FormattedAINotes({
               textClassName || "text-sm text-foreground/80 leading-relaxed"
             }
           >
-            {translateAIText(line)}
+            {translateAIText(entry.content)}
           </p>
         );
       })}
