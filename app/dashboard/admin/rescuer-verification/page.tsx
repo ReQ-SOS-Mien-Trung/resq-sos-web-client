@@ -67,6 +67,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Icon } from "@iconify/react";
+import heic2any from "heic2any";
 
 type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
 type SortColumn = "name" | "email" | "region" | "status" | "submittedAt";
@@ -240,10 +241,11 @@ const RescuerVerificationPage = () => {
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
             <div
-              className={`p-2.5 rounded-xl ${reviewDialog.isApproved
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-rose-500/10 text-rose-600"
-                }`}
+              className={`p-2.5 rounded-xl ${
+                reviewDialog.isApproved
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : "bg-rose-500/10 text-rose-600"
+              }`}
             >
               {reviewDialog.isApproved ? (
                 <CheckCircle size={22} weight="bold" />
@@ -345,16 +347,16 @@ const RescuerVerificationPage = () => {
             {/* Floating Close Button */}
             <button
               onClick={() => setPreviewDoc(null)}
-              className="absolute -top-4 -right-4 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all z-100 text-black hover:bg-gray-100"
+              className="fixed top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all z-9999 text-black hover:bg-gray-100"
               aria-label="Đóng"
             >
-              <X size={18} weight="bold" />
+              <X size={20} weight="bold" />
             </button>
 
             {/* Media Content */}
             <div className="w-full flex items-center justify-center">
               {previewDoc.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ||
-                previewDoc.url.startsWith("blob:") ? (
+              previewDoc.url.startsWith("blob:") ? (
                 <img
                   src={previewDoc.url}
                   alt={previewDoc.name}
@@ -466,10 +468,7 @@ const RescuerVerificationPage = () => {
     return result;
   }, [items, searchQuery, sort]);
 
-  const getStatusConfig = (
-    status: string,
-    labels?: Record<string, string>,
-  ) => {
+  const getStatusConfig = (status: string, labels?: Record<string, string>) => {
     const configs: Record<
       string,
       {
@@ -714,35 +713,35 @@ const RescuerVerificationPage = () => {
                     },
                     ...(selectedItem.reviewedAt
                       ? [
-                        {
-                          icon: (
-                            <Icon icon="mdi:approve" width="20" height="20" />
-                          ),
-                          iconCls:
-                            "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
-                          label: "Ngày xét duyệt",
-                          value: new Date(
-                            selectedItem.reviewedAt,
-                          ).toLocaleString("vi-VN"),
-                        },
-                      ]
+                          {
+                            icon: (
+                              <Icon icon="mdi:approve" width="20" height="20" />
+                            ),
+                            iconCls:
+                              "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
+                            label: "Ngày xét duyệt",
+                            value: new Date(
+                              selectedItem.reviewedAt,
+                            ).toLocaleString("vi-VN"),
+                          },
+                        ]
                       : []),
                     ...(selectedItem.adminNote
                       ? [
-                        {
-                          icon: (
-                            <Icon
-                              icon="fluent:person-note-24-regular"
-                              width="20"
-                              height="20"
-                            />
-                          ),
-                          iconCls:
-                            "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
-                          label: "Ghi chú của quản trị viên",
-                          value: selectedItem.adminNote,
-                        },
-                      ]
+                          {
+                            icon: (
+                              <Icon
+                                icon="fluent:person-note-24-regular"
+                                width="20"
+                                height="20"
+                              />
+                            ),
+                            iconCls:
+                              "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
+                            label: "Ghi chú của quản trị viên",
+                            value: selectedItem.adminNote,
+                          },
+                        ]
                       : []),
                   ].map((field, idx) => (
                     <div key={idx} className="flex items-start gap-3">
@@ -800,13 +799,34 @@ const RescuerVerificationPage = () => {
                           <input
                             type="file"
                             className="hidden"
-                            accept="image/*"
-                            onChange={(e) => {
+                            accept="image/*,.heic,.heif"
+                            onChange={async (e) => {
                               const file = e.target.files?.[0];
-                              if (file) {
-                                setAvatarFile(file);
-                                const objectUrl = URL.createObjectURL(file);
-                                setAvatarPreview(objectUrl);
+                              if (!file) return;
+                              setAvatarFile(file);
+                              const isHeic =
+                                file.type === "image/heic" ||
+                                file.type === "image/heif" ||
+                                file.name.toLowerCase().endsWith(".heic") ||
+                                file.name.toLowerCase().endsWith(".heif");
+                              if (isHeic) {
+                                try {
+                                  const converted = await heic2any({
+                                    blob: file,
+                                    toType: "image/jpeg",
+                                    quality: 0.9,
+                                  });
+                                  const blob = Array.isArray(converted)
+                                    ? converted[0]
+                                    : converted;
+                                  setAvatarPreview(URL.createObjectURL(blob));
+                                } catch {
+                                  toast.error(
+                                    "Không thể đọc ảnh HEIC. Thử ảnh khác.",
+                                  );
+                                }
+                              } else {
+                                setAvatarPreview(URL.createObjectURL(file));
                               }
                             }}
                           />
