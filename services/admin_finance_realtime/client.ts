@@ -124,7 +124,7 @@ class AdminFinanceRealtimeClient {
 
     const connection = applySignalRConnectionDefaults(
       new HubConnectionBuilder()
-        .withUrl(`${baseUrl}/hubs/admin-finance`, {
+        .withUrl(`${baseUrl}/hubs/funds`, {
           accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
           withCredentials: false,
           transport:
@@ -202,7 +202,10 @@ class AdminFinanceRealtimeClient {
 
     const tasks: Promise<unknown>[] = [];
 
-    if (this.fundingRequestListSubscribers > 0) {
+    if (
+      this.fundingRequestListSubscribers > 0 ||
+      this.detailSubscriptions.size > 0
+    ) {
       tasks.push(
         connection.invoke(
           ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequests,
@@ -216,17 +219,6 @@ class AdminFinanceRealtimeClient {
       );
     }
 
-    this.detailSubscriptions.forEach((subscriberCount, requestId) => {
-      if (subscriberCount > 0) {
-        tasks.push(
-          connection.invoke(
-            ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequest,
-            requestId,
-          ),
-        );
-      }
-    });
-
     this.depotFundChartSubscriptions.forEach((subscriberCount, depotId) => {
       if (subscriberCount > 0) {
         tasks.push(
@@ -238,18 +230,11 @@ class AdminFinanceRealtimeClient {
       }
     });
 
-    this.campaignFundFlowSubscriptions.forEach(
-      (subscriberCount, campaignId) => {
-        if (subscriberCount > 0) {
-          tasks.push(
-            connection.invoke(
-              ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaignFundFlow,
-              campaignId,
-            ),
-          );
-        }
-      },
-    );
+    if (this.campaignFundFlowSubscriptions.size > 0) {
+      tasks.push(
+        connection.invoke(ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaigns),
+      );
+    }
 
     await Promise.all(tasks.map((task) => task.catch(() => null)));
   }
@@ -368,9 +353,12 @@ class AdminFinanceRealtimeClient {
   }
 
   async subscribeFundingRequests(): Promise<void> {
+    const hadSubscribers =
+      this.fundingRequestListSubscribers > 0 ||
+      this.detailSubscriptions.size > 0;
     this.fundingRequestListSubscribers += 1;
 
-    if (this.fundingRequestListSubscribers > 1) return;
+    if (hadSubscribers) return;
 
     await this.invokeWhenConnected(
       ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequests,
@@ -384,22 +372,20 @@ class AdminFinanceRealtimeClient {
     );
 
     if (this.fundingRequestListSubscribers > 0) return;
-
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeFundingRequests,
-    ).catch(() => null);
     this.scheduleStop();
   }
 
   async subscribeFundingRequest(requestId: number): Promise<void> {
+    const hadSubscribers =
+      this.fundingRequestListSubscribers > 0 ||
+      this.detailSubscriptions.size > 0;
     const current = this.detailSubscriptions.get(requestId) ?? 0;
     this.detailSubscriptions.set(requestId, current + 1);
 
-    if (current > 0) return;
+    if (current > 0 || hadSubscribers) return;
 
     await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequest,
-      requestId,
+      ADMIN_FINANCE_REALTIME_METHODS.SubscribeFundingRequests,
     );
   }
 
@@ -413,10 +399,6 @@ class AdminFinanceRealtimeClient {
     }
 
     this.detailSubscriptions.delete(requestId);
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeFundingRequest,
-      requestId,
-    ).catch(() => null);
     this.scheduleStop();
   }
 
@@ -450,14 +432,14 @@ class AdminFinanceRealtimeClient {
   }
 
   async subscribeCampaignFundFlow(campaignId: number): Promise<void> {
+    const hadSubscribers = this.campaignFundFlowSubscriptions.size > 0;
     const current = this.campaignFundFlowSubscriptions.get(campaignId) ?? 0;
     this.campaignFundFlowSubscriptions.set(campaignId, current + 1);
 
-    if (current > 0) return;
+    if (current > 0 || hadSubscribers) return;
 
     await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaignFundFlow,
-      campaignId,
+      ADMIN_FINANCE_REALTIME_METHODS.SubscribeCampaigns,
     );
   }
 
@@ -471,10 +453,6 @@ class AdminFinanceRealtimeClient {
     }
 
     this.campaignFundFlowSubscriptions.delete(campaignId);
-    await this.invokeWhenConnected(
-      ADMIN_FINANCE_REALTIME_METHODS.UnsubscribeCampaignFundFlow,
-      campaignId,
-    ).catch(() => null);
     this.scheduleStop();
   }
 }

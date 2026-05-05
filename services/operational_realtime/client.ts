@@ -215,7 +215,7 @@ export class OperationalRealtimeClient {
 
     return applySignalRConnectionDefaults(
       new HubConnectionBuilder()
-        .withUrl(`${baseUrl}/hubs/operational`, {
+        .withUrl(`${baseUrl}/hubs/logistics`, {
           accessTokenFactory: () => useAuthStore.getState().accessToken ?? "",
           withCredentials: false,
           transport:

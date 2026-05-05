@@ -258,15 +258,17 @@ export function NotificationBell({
         className={cn("w-90 p-0 overflow-hidden shadow-xl", contentClassName)}
       >
         {/* ── Header ── */}
-        <div className="border-b border-primary/15 bg-linear-to-r from-primary/12 via-primary/6 to-transparent px-4 py-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold tracking-tighter text-primary">
+        <div className="border-b border-border px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <p className="text-base font-semibold tracking-tighter text-foreground">
               {title}
             </p>
-            <p className="text-xs text-primary/80 tracking-tighter mt-0.5">
+            <p className="text-xs text-muted-foreground tracking-tighter">
+              (
               {unreadCount > 0
                 ? `${unreadCount} chưa đọc`
                 : "Tất cả đã được đọc"}
+              )
             </p>
           </div>
           {showMarkAll && unreadCount > 0 && (
@@ -275,7 +277,7 @@ export function NotificationBell({
               size="sm"
               onClick={handleMarkAllAsRead}
               disabled={isMarkingAll}
-              className="text-xs h-8 px-2.5 text-primary/85 hover:text-primary hover:bg-primary/10 gap-1.5"
+              className="text-sm h-8 px-2.5 text-foreground/70 hover:text-foreground hover:bg-muted gap-1.5"
             >
               <CheckCircle className="h-3.5 w-3.5" />
               Đọc hết
@@ -315,8 +317,8 @@ export function NotificationBell({
                       "w-full rounded-xl border text-left transition-all duration-150 overflow-hidden",
                       "hover:shadow-sm",
                       isUnread
-                        ? "border-primary/25 bg-primary/6 hover:border-primary/40 hover:bg-primary/10"
-                        : "border-transparent bg-transparent hover:bg-primary/4",
+                        ? "border-border bg-muted/60 hover:bg-muted/80"
+                        : "border-border/50 bg-transparent hover:bg-muted/30",
                     )}
                   >
                     <div className="flex">
@@ -334,7 +336,7 @@ export function NotificationBell({
                             className={cn(
                               "text-sm tracking-tighter line-clamp-1 leading-snug",
                               isUnread
-                                ? "font-semibold text-primary"
+                                ? "font-semibold text-foreground"
                                 : "font-medium text-foreground/80",
                             )}
                           >
@@ -363,7 +365,7 @@ export function NotificationBell({
                             className={cn(
                               "text-[11px] tracking-tighter whitespace-nowrap",
                               isUnread
-                                ? "text-primary/70"
+                                ? "text-muted-foreground"
                                 : "text-muted-foreground/70",
                             )}
                           >
@@ -379,17 +381,17 @@ export function NotificationBell({
 
             {/* ── Pagination ── */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-primary/15 px-3 py-2 bg-primary/5">
+              <div className="flex items-center justify-between border-t border-border px-3 py-2 bg-transparent">
                 <button
                   type="button"
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-primary/10 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs text-foreground/70 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-muted transition-colors"
                 >
                   <CaretLeft size={12} />
                   Trước
                 </button>
-                <span className="text-xs text-primary/80 tracking-tighter tabular-nums">
+                <span className="text-xs text-foreground/70 tracking-tighter tabular-nums">
                   {page + 1} / {totalPages}
                 </span>
                 <button
@@ -398,7 +400,7 @@ export function NotificationBell({
                     setPage((p) => Math.min(totalPages - 1, p + 1))
                   }
                   disabled={page === totalPages - 1}
-                  className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-primary/10 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs text-foreground/70 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-muted transition-colors"
                 >
                   Sau
                   <CaretRight size={12} />
