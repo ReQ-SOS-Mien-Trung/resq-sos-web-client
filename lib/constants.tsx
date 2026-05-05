@@ -598,7 +598,13 @@ export const navigationItems = [
   },
 ];
 
-const RescuerHelmetIcon = ({ size, className }: { size?: number; className?: string }) => (
+const RescuerHelmetIcon = ({
+  size,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) => (
   <IconifyIcon
     icon="fluent-emoji-high-contrast:rescue-workers-helmet"
     width={size ?? 16}
@@ -856,6 +862,16 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     label: "Hỗn hợp",
     color: "text-indigo-700 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+  },
+  MOVE_TO_LOCATION: {
+    label: "Di chuyển",
+    color: "text-sky-700 dark:text-sky-400",
+    bgColor: "bg-sky-100 dark:bg-sky-900/30",
+  },
+  SOS_SUPPORT: {
+    label: "Hỗ trợ SOS",
+    color: "text-violet-700 dark:text-violet-400",
+    bgColor: "bg-violet-100 dark:bg-violet-900/30",
   },
 };
 

@@ -14,12 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  UsersThree,
-  Eye,
-  ListChecks,
-  CaretRight,
-} from "@phosphor-icons/react";
+import { UsersThree, Eye, ListChecks, CaretRight } from "@phosphor-icons/react";
 import { Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -38,6 +33,7 @@ import {
 import RescuerScoreSheet from "./RescuerScoreSheet";
 import MissionTeamReportInline from "./MissionTeamReportInline";
 import { Icon } from "@iconify/react";
+import { activityTypeConfig } from "@/lib/constants";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
@@ -202,55 +198,48 @@ function getActivityStatusBadge(status?: string | null, label?: string) {
   if (normalized === "succeed") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   }
 
   if (normalized === "ongoing") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      className: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
     };
   }
 
   if (normalized === "pendingconfirmation") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+      className: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     };
   }
 
   if (normalized === "failed" || normalized === "incompleted") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+      className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
     };
   }
 
   if (normalized === "cancelled" || normalized === "canceled") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+      className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
     };
   }
 
   if (normalized === "planned") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
+      className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
     };
   }
 
   return {
     label: label ?? fallbackLabel,
-    className:
-      "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+    className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   };
 }
 
@@ -298,7 +287,9 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
     enabled: isMissionSheetOpen,
   });
 
-  const [missionTab, setMissionTab] = useState<Record<number, "activities" | "report">>({});
+  const [missionTab, setMissionTab] = useState<
+    Record<number, "activities" | "report">
+  >({});
 
   if (isLoading) {
     return (
@@ -338,7 +329,12 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                   />
                   Tỉ lệ hoàn thành nhiệm vụ
                 </CardTitle>
-                <Button variant="outline" size="sm" className="h-8 text-xs shrink-0 px-3" onClick={() => setIsMissionSheetOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs shrink-0 px-3"
+                  onClick={() => setIsMissionSheetOpen(true)}
+                >
                   Xem chi tiết
                   <CaretRight size={14} className="ml-1" />
                 </Button>
@@ -369,7 +365,14 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                         }}
                         options={{
                           cutout: "62%",
-                          layout: { padding: { left: 24, right: 24, top: 16, bottom: 16 } },
+                          layout: {
+                            padding: {
+                              left: 24,
+                              right: 24,
+                              top: 16,
+                              bottom: 16,
+                            },
+                          },
                           plugins: {
                             legend: { display: false },
                             tooltip: {
@@ -407,7 +410,8 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
                         <span className="whitespace-nowrap">
-                          Chưa hoàn thành: {data.completionRate.incompletedCount} (
+                          Chưa hoàn thành:{" "}
+                          {data.completionRate.incompletedCount} (
                           {data.completionRate.incompletedPercent.toFixed(0)}%)
                         </span>
                       </div>
@@ -461,7 +465,12 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                             {m.lastName} {m.firstName}
                           </span>
                           {m.isLeader && (
-                            <Icon icon="iconoir:bright-crown" width="20" height="20" className="text-amber-500 shrink-0" />
+                            <Icon
+                              icon="iconoir:bright-crown"
+                              width="20"
+                              height="20"
+                              className="text-amber-500 shrink-0"
+                            />
                           )}
                         </div>
                       </div>
@@ -475,8 +484,6 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
             </Card>
           </motion.div>
         </div>
-
-
       </motion.div>
 
       <RescuerScoreSheet
@@ -528,33 +535,59 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                   const isExpanded = expandedMission === mission.missionTeamId;
                   const missionTypeBadge = getTeamTypeBadge(
                     mission.missionType,
-                    getMetadataValue(rescueTeamTypeOptions, mission.missionType),
+                    getMetadataValue(
+                      rescueTeamTypeOptions,
+                      mission.missionType,
+                    ),
                   );
                   const statusConfig =
                     mission.missionStatus === "Completed"
-                      ? { label: "Hoàn thành", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" }
+                      ? {
+                          label: "Hoàn thành",
+                          className:
+                            "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                          dot: "bg-emerald-500",
+                        }
                       : mission.missionStatus === "InProgress"
-                        ? { label: "Đang thực hiện", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400", dot: "bg-blue-500" }
-                        : { label: mission.missionStatus, className: "bg-rose-500/10 text-rose-700 dark:text-rose-400", dot: "bg-rose-500" };
+                        ? {
+                            label: "Đang thực hiện",
+                            className:
+                              "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+                            dot: "bg-blue-500",
+                          }
+                        : {
+                            label: mission.missionStatus,
+                            className:
+                              "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+                            dot: "bg-rose-500",
+                          };
                   return (
                     <motion.div
                       key={mission.missionTeamId}
                       layout={!shouldReduceMotion}
-                      variants={shouldReduceMotion ? undefined : missionRowVariants}
+                      variants={
+                        shouldReduceMotion ? undefined : missionRowVariants
+                      }
                       custom={idx}
                       className={`overflow-hidden rounded-xl border bg-white shadow-sm transition-shadow dark:bg-card ${isExpanded ? "border-primary/30 shadow-md" : "border-border/50 hover:shadow-md"}`}
                     >
                       <button
                         onClick={() =>
                           setExpandedMission((prev) =>
-                            prev === mission.missionTeamId ? null : mission.missionTeamId,
+                            prev === mission.missionTeamId
+                              ? null
+                              : mission.missionTeamId,
                           )
                         }
                         className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
                       >
                         <motion.div
                           className="text-muted-foreground"
-                          animate={shouldReduceMotion ? undefined : { rotate: isExpanded ? 90 : 0 }}
+                          animate={
+                            shouldReduceMotion
+                              ? undefined
+                              : { rotate: isExpanded ? 90 : 0 }
+                          }
                           transition={{ duration: 0.18, ease: "easeOut" }}
                         >
                           <CaretRight size={15} />
@@ -564,25 +597,41 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                           <span className="text-sm font-semibold tracking-tighter text-foreground">
                             #{mission.missionId}
                           </span>
-                          <Badge className={`whitespace-nowrap px-2 py-0.5 text-[13px] font-medium tracking-tighter ${missionTypeBadge.className}`}>
+                          <Badge
+                            className={`whitespace-nowrap px-2 py-0.5 text-[13px] font-medium tracking-tighter ${missionTypeBadge.className}`}
+                          >
                             {missionTypeBadge.label}
                           </Badge>
-                          <Badge className={`whitespace-nowrap text-xs tracking-tighter ${statusConfig.className}`}>
-                            <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${statusConfig.dot}`} />
+                          <Badge
+                            className={`whitespace-nowrap text-xs tracking-tighter ${statusConfig.className}`}
+                          >
+                            <span
+                              className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${statusConfig.dot}`}
+                            />
                             {statusConfig.label}
                           </Badge>
                           {mission.reportStatus && (
-                            <Badge variant="outline" className="whitespace-nowrap text-xs font-normal tracking-tighter text-muted-foreground">
+                            <Badge
+                              variant="outline"
+                              className="whitespace-nowrap text-xs font-normal tracking-tighter text-muted-foreground"
+                            >
                               Báo cáo: {mission.reportStatus}
                             </Badge>
                           )}
                         </div>
 
                         <div className="hidden shrink-0 text-right text-xs tracking-tighter text-muted-foreground sm:block">
-                          <div>{new Date(mission.assignedAt).toLocaleString("vi-VN")}</div>
+                          <div>
+                            {new Date(mission.assignedAt).toLocaleString(
+                              "vi-VN",
+                            )}
+                          </div>
                           {mission.missionCompletedAt && (
                             <div className="mt-0.5 tracking-tighter text-emerald-600">
-                              ✓ {new Date(mission.missionCompletedAt).toLocaleString("vi-VN")}
+                              ✓{" "}
+                              {new Date(
+                                mission.missionCompletedAt,
+                              ).toLocaleString("vi-VN")}
                             </div>
                           )}
                         </div>
@@ -602,20 +651,29 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setMissionTab((prev) => ({ ...prev, [mission.missionTeamId]: "activities" }));
+                                    setMissionTab((prev) => ({
+                                      ...prev,
+                                      [mission.missionTeamId]: "activities",
+                                    }));
                                   }}
                                   className={`relative flex-1 px-4 py-2.5 text-sm font-medium tracking-tighter transition-colors ${
-                                    (missionTab[mission.missionTeamId] ?? "activities") === "activities"
+                                    (missionTab[mission.missionTeamId] ??
+                                      "activities") === "activities"
                                       ? "text-primary"
                                       : "text-muted-foreground hover:text-foreground"
                                   }`}
                                 >
                                   Chi tiết hoạt động
-                                  {(missionTab[mission.missionTeamId] ?? "activities") === "activities" && (
+                                  {(missionTab[mission.missionTeamId] ??
+                                    "activities") === "activities" && (
                                     <motion.span
                                       layoutId={`mission-tab-underline-${mission.missionTeamId}`}
                                       className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary"
-                                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                                      transition={{
+                                        type: "spring",
+                                        stiffness: 420,
+                                        damping: 34,
+                                      }}
                                     />
                                   )}
                                 </button>
@@ -623,20 +681,29 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setMissionTab((prev) => ({ ...prev, [mission.missionTeamId]: "report" }));
+                                      setMissionTab((prev) => ({
+                                        ...prev,
+                                        [mission.missionTeamId]: "report",
+                                      }));
                                     }}
                                     className={`relative flex-1 px-4 py-2.5 text-sm font-medium tracking-tighter transition-colors ${
-                                      missionTab[mission.missionTeamId] === "report"
+                                      missionTab[mission.missionTeamId] ===
+                                      "report"
                                         ? "text-primary"
                                         : "text-muted-foreground hover:text-foreground"
                                     }`}
                                   >
                                     Xem báo cáo
-                                    {missionTab[mission.missionTeamId] === "report" && (
+                                    {missionTab[mission.missionTeamId] ===
+                                      "report" && (
                                       <motion.span
                                         layoutId={`mission-tab-underline-${mission.missionTeamId}`}
                                         className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary"
-                                        transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                                        transition={{
+                                          type: "spring",
+                                          stiffness: 420,
+                                          damping: 34,
+                                        }}
                                       />
                                     )}
                                   </button>
@@ -645,76 +712,137 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
 
                               <div className="px-5 py-4">
                                 <AnimatePresence mode="wait" initial={false}>
-                                  {(missionTab[mission.missionTeamId] ?? "activities") === "activities" ? (
+                                  {(missionTab[mission.missionTeamId] ??
+                                    "activities") === "activities" ? (
                                     <motion.div
                                       key="activities"
-                                      variants={shouldReduceMotion ? undefined : tabPanelVariants}
+                                      variants={
+                                        shouldReduceMotion
+                                          ? undefined
+                                          : tabPanelVariants
+                                      }
                                       initial="hidden"
                                       animate="visible"
                                       exit="exit"
                                     >
-                                    {mission.activities.length > 0 ? (
-                                      <motion.div
-                                        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-                                        variants={shouldReduceMotion ? undefined : activityGridVariants}
-                                        initial="hidden"
-                                        animate="visible"
-                                      >
-                                        {mission.activities.map((act: MissionActivity, actIdx: number) => {
-                                          const stepColors = [
-                                            { border: "border-l-blue-500", bg: "bg-blue-500/10", text: "text-blue-600" },
-                                            { border: "border-l-violet-500", bg: "bg-violet-500/10", text: "text-violet-600" },
-                                            { border: "border-l-amber-500", bg: "bg-amber-500/10", text: "text-amber-600" },
-                                            { border: "border-l-rose-500", bg: "bg-rose-500/10", text: "text-rose-600" },
-                                            { border: "border-l-emerald-500", bg: "bg-emerald-500/10", text: "text-emerald-600" },
-                                            { border: "border-l-cyan-500", bg: "bg-cyan-500/10", text: "text-cyan-600" },
-                                            { border: "border-l-pink-500", bg: "bg-pink-500/10", text: "text-pink-600" },
-                                          ];
-                                          const color = stepColors[actIdx % stepColors.length];
-                                          const activityStatusBadge =
-                                            getActivityStatusBadge(
-                                              act.status,
-                                              getActivityStatusLabel(
-                                                activityStatusOptions,
-                                                act.status,
-                                              ),
-                                            );
-                                          return (
-                                            <motion.div
-                                              key={act.id}
-                                              variants={shouldReduceMotion ? undefined : activityCardVariants}
-                                              className={`rounded-xl border border-border/40 border-l-[3px] ${color.border} bg-white px-3.5 py-3 dark:bg-card`}
-                                            >
-                                              <div className="flex items-center gap-2.5 mb-2">
-                                                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${color.bg} text-xs font-bold ${color.text}`}>
-                                                  {act.step}
-                                                </span>
-                                                <span className="text-sm font-medium tracking-tighter text-foreground">
-                                                  {act.activityType}
-                                                </span>
-                                                <Badge
-                                                  className={`ml-auto text-[13px] font-semibold tracking-tighter ${activityStatusBadge.className}`}
+                                      {mission.activities.length > 0 ? (
+                                        <motion.div
+                                          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                                          variants={
+                                            shouldReduceMotion
+                                              ? undefined
+                                              : activityGridVariants
+                                          }
+                                          initial="hidden"
+                                          animate="visible"
+                                        >
+                                          {mission.activities.map(
+                                            (
+                                              act: MissionActivity,
+                                              actIdx: number,
+                                            ) => {
+                                              const stepColors = [
+                                                {
+                                                  border: "border-l-blue-500",
+                                                  bg: "bg-blue-500/10",
+                                                  text: "text-blue-600",
+                                                },
+                                                {
+                                                  border: "border-l-violet-500",
+                                                  bg: "bg-violet-500/10",
+                                                  text: "text-violet-600",
+                                                },
+                                                {
+                                                  border: "border-l-amber-500",
+                                                  bg: "bg-amber-500/10",
+                                                  text: "text-amber-600",
+                                                },
+                                                {
+                                                  border: "border-l-rose-500",
+                                                  bg: "bg-rose-500/10",
+                                                  text: "text-rose-600",
+                                                },
+                                                {
+                                                  border:
+                                                    "border-l-emerald-500",
+                                                  bg: "bg-emerald-500/10",
+                                                  text: "text-emerald-600",
+                                                },
+                                                {
+                                                  border: "border-l-cyan-500",
+                                                  bg: "bg-cyan-500/10",
+                                                  text: "text-cyan-600",
+                                                },
+                                                {
+                                                  border: "border-l-pink-500",
+                                                  bg: "bg-pink-500/10",
+                                                  text: "text-pink-600",
+                                                },
+                                              ];
+                                              const color =
+                                                stepColors[
+                                                  actIdx % stepColors.length
+                                                ];
+                                              const activityStatusBadge =
+                                                getActivityStatusBadge(
+                                                  act.status,
+                                                  getActivityStatusLabel(
+                                                    activityStatusOptions,
+                                                    act.status,
+                                                  ),
+                                                );
+                                              return (
+                                                <motion.div
+                                                  key={act.id}
+                                                  variants={
+                                                    shouldReduceMotion
+                                                      ? undefined
+                                                      : activityCardVariants
+                                                  }
+                                                  className={`rounded-xl border border-border/40 border-l-[3px] ${color.border} bg-white px-3.5 py-3 dark:bg-card`}
                                                 >
-                                                  {activityStatusBadge.label}
-                                                </Badge>
-                                              </div>
-                                              <p className="text-sm leading-relaxed tracking-tighter text-muted-foreground">
-                                                {act.description}
-                                              </p>
-                                            </motion.div>
-                                          );
-                                        })}
-                                      </motion.div>
-                                    ) : (
-                                      <p className="py-2 text-center text-sm tracking-tighter text-muted-foreground">
-                                        Chưa có hoạt động nào cho nhiệm vụ này
-                                      </p>
-                                    )}
+                                                  <div className="flex items-center gap-2.5 mb-2">
+                                                    <span
+                                                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${color.bg} text-xs font-bold ${color.text}`}
+                                                    >
+                                                      {act.step}
+                                                    </span>
+                                                    <span className="text-sm font-medium tracking-tighter text-foreground">
+                                                      {activityTypeConfig[
+                                                        act.activityType
+                                                      ]?.label ??
+                                                        act.activityType}
+                                                    </span>
+                                                    <Badge
+                                                      className={`ml-auto text-[13px] font-semibold tracking-tighter ${activityStatusBadge.className}`}
+                                                    >
+                                                      {
+                                                        activityStatusBadge.label
+                                                      }
+                                                    </Badge>
+                                                  </div>
+                                                  <p className="text-sm leading-relaxed tracking-tighter text-muted-foreground">
+                                                    {act.description}
+                                                  </p>
+                                                </motion.div>
+                                              );
+                                            },
+                                          )}
+                                        </motion.div>
+                                      ) : (
+                                        <p className="py-2 text-center text-sm tracking-tighter text-muted-foreground">
+                                          Chưa có hoạt động nào cho nhiệm vụ này
+                                        </p>
+                                      )}
                                     </motion.div>
-                                ) : (
+                                  ) : (
                                     <motion.div
                                       key="report"
-                                      variants={shouldReduceMotion ? undefined : tabPanelVariants}
+                                      variants={
+                                        shouldReduceMotion
+                                          ? undefined
+                                          : tabPanelVariants
+                                      }
                                       initial="hidden"
                                       animate="visible"
                                       exit="exit"
