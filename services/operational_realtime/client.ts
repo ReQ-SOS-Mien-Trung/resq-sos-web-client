@@ -19,6 +19,7 @@ import {
   ReceiveDepotActivityUpdatePayload,
   ReceiveDepotClosureUpdatePayload,
   ReceiveDepotInventoryUpdatePayload,
+  ReceiveDepotFundsUpdatePayload,
   ReceiveLogisticsUpdatePayload,
   ReceiveInventoryLotsUpdatePayload,
   ReceiveSupplyRequestUpdatePayload,
@@ -37,6 +38,10 @@ type AssemblyPointListUpdateListener = (
 
 type DepotInventoryUpdateListener = (
   payload: ReceiveDepotInventoryUpdatePayload,
+) => void;
+
+type DepotFundsUpdateListener = (
+  payload: ReceiveDepotFundsUpdatePayload,
 ) => void;
 
 type LogisticsUpdateListener = (
@@ -83,6 +88,7 @@ export class OperationalRealtimeClient {
   private reconnectListeners = new Set<() => void>();
   private assemblyPointListListeners = new Set<AssemblyPointListUpdateListener>();
   private depotInventoryListeners = new Set<DepotInventoryUpdateListener>();
+  private depotFundsListeners = new Set<DepotFundsUpdateListener>();
   private logisticsListeners = new Set<LogisticsUpdateListener>();
   private supplyRequestListeners = new Set<SupplyRequestUpdateListener>();
   private depotActivityListeners = new Set<DepotActivityUpdateListener>();
@@ -93,6 +99,8 @@ export class OperationalRealtimeClient {
   private chartInvalidationListeners = new Set<ChartInvalidationListener>();
   private inventoryLotsListeners = new Set<InventoryLotsUpdateListener>();
   private joinedDepots = new Map<number, number>();
+  private joinedDepotFundsList = 0;
+  private joinedDepotFunds = new Map<number, number>();
   private joinedClusters = new Map<number, number>();
   private joinedSupplyRequestDepots = new Map<number, number>();
   private joinedSupplyRequests = new Map<number, number>();
@@ -277,6 +285,13 @@ export class OperationalRealtimeClient {
       );
 
       this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveDepotFundsUpdate,
+        (payload: ReceiveDepotFundsUpdatePayload) => {
+          this.depotFundsListeners.forEach((listener) => listener(payload));
+        },
+      );
+
+      this.connection.on(
         OPERATIONAL_REALTIME_EVENTS.ReceiveLogisticsUpdate,
         (payload: ReceiveLogisticsUpdatePayload) => {
           this.logisticsListeners.forEach((listener) => listener(payload));
@@ -353,6 +368,18 @@ export class OperationalRealtimeClient {
       ...Array.from(this.joinedDepots.keys()).map((depotId) =>
         connection
           .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepot, depotId)
+          .catch(() => null),
+      ),
+      ...(this.joinedDepotFundsList > 0
+        ? [
+            connection
+              .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotFunds)
+              .catch(() => null),
+          ]
+        : []),
+      ...Array.from(this.joinedDepotFunds.keys()).map((depotId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotFund, depotId)
           .catch(() => null),
       ),
       ...Array.from(this.joinedClusters.keys()).map((clusterId) =>
@@ -652,6 +679,50 @@ export class OperationalRealtimeClient {
       .catch(() => null);
   }
 
+  async subscribeDepotFunds(): Promise<void> {
+    this.joinedDepotFundsList += 1;
+
+    if (this.joinedDepotFundsList > 1) {
+      return;
+    }
+
+    await this.invokeWithReconnectRetryArgs(
+      OPERATIONAL_REALTIME_METHODS.SubscribeDepotFunds,
+    );
+  }
+
+  async unsubscribeDepotFunds(): Promise<void> {
+    this.joinedDepotFundsList = Math.max(0, this.joinedDepotFundsList - 1);
+  }
+
+  async subscribeDepotFund(depotId: number): Promise<void> {
+    const existingCount = this.joinedDepotFunds.get(depotId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedDepotFunds.set(depotId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeDepotFund,
+      depotId,
+    );
+    this.joinedDepotFunds.set(depotId, 1);
+  }
+
+  async unsubscribeDepotFund(depotId: number): Promise<void> {
+    const existingCount = this.joinedDepotFunds.get(depotId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedDepotFunds.set(depotId, existingCount - 1);
+      return;
+    }
+
+    this.joinedDepotFunds.delete(depotId);
+  }
+
   async subscribeCluster(clusterId: number): Promise<void> {
     const existingCount = this.joinedClusters.get(clusterId) ?? 0;
     if (existingCount > 0) {
@@ -696,6 +767,14 @@ export class OperationalRealtimeClient {
 
     return () => {
       this.assemblyPointListListeners.delete(listener);
+    };
+  }
+
+  onDepotFundsUpdate(listener: DepotFundsUpdateListener): () => void {
+    this.depotFundsListeners.add(listener);
+
+    return () => {
+      this.depotFundsListeners.delete(listener);
     };
   }
 

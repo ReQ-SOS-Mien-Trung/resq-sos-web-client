@@ -91,9 +91,21 @@ export type ReceiveInventoryLotsUpdatePayload = {
   changedAt: string;
 };
 
+export type ReceiveDepotFundsUpdatePayload = {
+  depotId?: number | null;
+  endpoint: string;
+  scope?: {
+    depotId?: number | null;
+  } | null;
+  reason: string;
+  changedAt: string;
+};
+
 export const OPERATIONAL_REALTIME_METHODS = {
   SubscribeDepot: "SubscribeDepot",
   UnsubscribeDepot: "UnsubscribeDepot",
+  SubscribeDepotFunds: "SubscribeDepotFunds",
+  SubscribeDepotFund: "SubscribeDepotFund",
   SubscribeCluster: "SubscribeCluster",
   UnsubscribeCluster: "UnsubscribeCluster",
   SubscribeSupplyRequests: "SubscribeSupplyRequests",
@@ -130,5 +142,6 @@ export const OPERATIONAL_REALTIME_EVENTS = {
   ReceiveUpcomingReturnsUpdate: "ReceiveUpcomingReturnsUpdate",
   ReceiveChartInvalidation: "ReceiveChartInvalidation",
   ReceiveInventoryLotsUpdate: "ReceiveInventoryLotsUpdate",
+  ReceiveDepotFundsUpdate: "ReceiveDepotFundsUpdate",
   ReceiveAssemblyEventCheckedInRescuersUpdate: "ReceiveAssemblyEventCheckedInRescuersUpdate",
 } as const;
