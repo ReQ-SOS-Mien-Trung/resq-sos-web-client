@@ -1247,6 +1247,41 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
     !!additionalDesc &&
     normalizeForDedup(additionalDesc) !== normalizeForDedup(freeTextNote);
 
+  // Reporter / sender info
+  const reporterName = sos.reporterName ?? null;
+  const reporterPhone = sos.reporterPhone ?? null;
+  const reporterBatteryLevel = (sos as any).reporterBatteryLevel as
+    | number
+    | null
+    | undefined;
+  const reporterIsOnline = sos.reporterIsOnline;
+  const isSentOnBehalf = sos.isSentOnBehalf ?? false;
+  const companions =
+    ((sos as any).companions as Array<{
+      userId?: string | null;
+      fullName?: string | null;
+      phone?: string | null;
+      addedAt?: string | null;
+    }> | null) ?? [];
+
+  // AI analysis (prefer full analysis endpoint result, fall back to inline entity)
+  const inlineAi = (sos.evaluation as any)?.aiAnalysis ?? null;
+  const aiAnalysis =
+    analysisData?.aiAnalysis ?? analysisData?.aiAnalyses?.[0] ?? inlineAi;
+  const aiExplanation = aiAnalysis?.explanation
+    ? String(aiAnalysis.explanation).trim()
+    : null;
+  const aiHandlingReason = aiAnalysis?.handlingReason
+    ? String(aiAnalysis.handlingReason).trim()
+    : null;
+  // Suppress handlingReason if it's the same text as explanation
+  const showHandlingReason =
+    !!aiHandlingReason &&
+    normalizeForDedup(aiHandlingReason) !== normalizeForDedup(aiExplanation);
+  const needsImmediateTransfer =
+    aiAnalysis?.needsImmediateSafeTransfer === true;
+  const canWait = aiAnalysis?.canWaitForCombinedMission === true;
+
   return (
     <div
       className={cn(
@@ -1476,6 +1511,100 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
           </div>
         </div>
 
+        {/* Reporter & Companions */}
+        {(reporterName || reporterPhone || companions.length > 0) && (
+          <div className="space-y-3 border-t pt-4">
+            <div className="grid gap-3 grid-cols-1 @2xl:grid-cols-2">
+              {/* Reporter */}
+              {(reporterName || reporterPhone || isSentOnBehalf) && (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    {isSentOnBehalf ? "Người báo thay" : "Người báo cáo"}
+                  </p>
+                  <div className="rounded-lg border bg-background px-3 py-2.5 space-y-1.5">
+                    {reporterName && (
+                      <p className="text-[14px] font-semibold tracking-tighter text-foreground">
+                        {reporterName}
+                      </p>
+                    )}
+                    {reporterPhone && (
+                      <p className="text-[14px] tracking-tighter text-muted-foreground flex items-center gap-1.5">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        {reporterPhone}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      {isSentOnBehalf && (
+                        <Badge
+                          variant="outline"
+                          className="h-5 px-1.5 text-xs bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-300"
+                        >
+                          Báo thay
+                        </Badge>
+                      )}
+                      {reporterIsOnline !== undefined && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-5 px-1.5 text-xs",
+                            reporterIsOnline
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-300"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {reporterIsOnline ? "Đang online" : "Offline"}
+                        </Badge>
+                      )}
+                      {typeof reporterBatteryLevel === "number" && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-5 px-1.5 text-xs",
+                            reporterBatteryLevel <= 20
+                              ? "bg-red-50 text-red-700 border-red-300 dark:bg-red-900/20 dark:text-red-300"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          Pin {reporterBatteryLevel}%
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Companions */}
+              {companions.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Đi cùng ({companions.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {companions.map((c, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg border bg-background px-3 py-2 flex items-center justify-between gap-2"
+                      >
+                        <p className="text-[14px] font-medium tracking-tighter text-foreground">
+                          {c.fullName ?? "Không rõ tên"}
+                        </p>
+                        {c.phone && (
+                          <p className="text-[13px] tracking-tighter text-muted-foreground shrink-0 flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {c.phone}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Needs & Supplies */}
         <div className="space-y-3 border-t pt-4">
           <p className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">
@@ -1553,6 +1682,38 @@ const SOSRequestDetailedCard = ({ sos }: { sos: SOSRequest }) => {
             )}
           </div>
         </div>
+
+        {/* AI Assessment */}
+        {(aiExplanation || needsImmediateTransfer || canWait) && (
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-sm font-semibold tracking-tighter text-muted-foreground uppercase flex items-center gap-1.5">
+              <Sparkle className="h-3.5 w-3.5 text-primary" weight="fill" />
+              Đánh giá AI
+            </p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {needsImmediateTransfer && (
+                <Badge className="h-6 px-2 text-sm bg-red-50 text-red-700 border border-red-300 dark:bg-red-900/20 dark:text-red-300 font-semibold">
+                  Cần chuyển viện khẩn
+                </Badge>
+              )}
+              {canWait && (
+                <Badge className="h-6 px-2 text-sm bg-sky-50 text-sky-700 border border-sky-300 dark:bg-sky-900/20 dark:text-sky-300 font-semibold">
+                  Có thể ghép mission
+                </Badge>
+              )}
+            </div>
+            {aiExplanation && (
+              <p className="text-[14px] tracking-tighter leading-relaxed text-foreground/80 bg-muted/40 rounded-lg p-3 border border-dashed">
+                {aiExplanation}
+              </p>
+            )}
+            {showHandlingReason && (
+              <p className="text-[14px] tracking-tighter leading-relaxed text-amber-700/90 dark:text-amber-300/90 bg-amber-50/60 dark:bg-amber-900/10 rounded-lg p-3 border border-amber-200/60">
+                {aiHandlingReason}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

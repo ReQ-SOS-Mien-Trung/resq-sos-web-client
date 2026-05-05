@@ -4,6 +4,7 @@ import type {
   SOSPriorityLevel,
   SOSRequestEntity,
   SOSRequestStatus,
+  SOSCompanion,
 } from "@/services/sos_request/type";
 
 export function mapSOSPriorityLevelToPriority(
@@ -125,10 +126,15 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     latestIncidentNote,
     reporterIsOnline:
       reporterInfo?.is_online ?? entity.senderInfo?.is_online ?? undefined,
+    reporterBatteryLevel:
+      reporterInfo?.battery_level ?? entity.senderInfo?.battery_level ?? null,
     hopCount: networkMetadata?.hop_count,
     locationAccuracy: entity.locationAccuracy,
+    reviewedAt: entity.reviewedAt ? new Date(entity.reviewedAt) : null,
     evaluation: entity.evaluation ?? null,
     victims: structuredData?.victims ?? null,
+    companions:
+      (entity.companions as SOSCompanion[] | null | undefined) ?? null,
     incidentHistory: entity.incidentHistory ?? null,
   };
 }
