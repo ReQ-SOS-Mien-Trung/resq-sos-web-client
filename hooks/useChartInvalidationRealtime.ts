@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ADMIN_DASHBOARD_KEYS } from "@/services/admin_dashboard/hooks";
+import { adminDepotRealtimeClient } from "@/services/admin_depot_realtime/client";
 import { adminFinanceRealtimeClient } from "@/services/admin_finance_realtime/client";
-import { adminOperationsRealtimeClient } from "@/services/admin_operations_realtime/client";
 import { ChartInvalidation } from "@/services/chart_invalidation/type";
 import { dashboardRealtimeClient } from "@/services/dashboard_realtime/client";
 import { operationalRealtimeClient } from "@/services/operational_realtime/client";
@@ -147,17 +147,14 @@ export function useAdminOperationsDepotChartInvalidation(
       return;
     }
 
-    adminOperationsRealtimeClient.retainConnection();
-    void adminOperationsRealtimeClient.subscribeDepotCharts(activeDepotId).catch(
+    adminDepotRealtimeClient.retainConnection();
+    void adminDepotRealtimeClient.subscribeDepotCharts(activeDepotId).catch(
       (error) => {
-        console.error(
-          "Failed to subscribe admin operations depot charts:",
-          error,
-        );
+        console.error("Failed to subscribe admin depot charts:", error);
       },
     );
 
-    const unsubscribe = adminOperationsRealtimeClient.onChartInvalidation(
+    const unsubscribe = adminDepotRealtimeClient.onChartInvalidation(
       (event) => {
         if (!scopeMatches(event.scope, "depotId", activeDepotId)) return;
 
@@ -172,10 +169,10 @@ export function useAdminOperationsDepotChartInvalidation(
 
     return () => {
       unsubscribe();
-      void adminOperationsRealtimeClient
+      void adminDepotRealtimeClient
         .unsubscribeDepotCharts(activeDepotId)
         .catch(() => null);
-      void adminOperationsRealtimeClient.releaseConnection().catch(() => null);
+      void adminDepotRealtimeClient.releaseConnection().catch(() => null);
     };
   }, [accessToken, activeDepotId, options?.enabled, queryClient]);
 }

@@ -13,8 +13,11 @@ export const ADMIN_FINANCE_REALTIME_METHODS = {
   UnsubscribeFundingRequest: "UnsubscribeFundingRequest",
   SubscribeDepotFundCharts: "SubscribeDepotFundCharts",
   UnsubscribeDepotFundCharts: "UnsubscribeDepotFundCharts",
+  SubscribeDepotFunds: "SubscribeDepotFunds",
   SubscribeCampaignFundFlow: "SubscribeCampaignFundFlow",
   UnsubscribeCampaignFundFlow: "UnsubscribeCampaignFundFlow",
+  SubscribeCampaigns: "SubscribeCampaigns",
+  SubscribeDisbursements: "SubscribeDisbursements",
   SubscribeSystemFund: "SubscribeSystemFund",
 } as const;
 

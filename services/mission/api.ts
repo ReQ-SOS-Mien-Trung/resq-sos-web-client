@@ -288,6 +288,12 @@ function normalizeCreateMissionRequest(
           activity.rescueTeamId == null
             ? null
             : toNumberOrZero(activity.rescueTeamId),
+        targetVictimSummary: activity.targetVictimSummary ?? null,
+        targetVictims:
+          Array.isArray(activity.targetVictims) &&
+          activity.targetVictims.length > 0
+            ? activity.targetVictims
+            : null,
       };
     }),
   };
@@ -440,7 +446,10 @@ function normalizeUpdateMissionRequest(
             : {}),
           items: Array.isArray(activity?.items)
             ? activity.items.map((item) =>
-                normalizeUpdateMissionActivityItem(item, shouldSendSupplyBuffer),
+                normalizeUpdateMissionActivityItem(
+                  item,
+                  shouldSendSupplyBuffer,
+                ),
               )
             : [],
         };
