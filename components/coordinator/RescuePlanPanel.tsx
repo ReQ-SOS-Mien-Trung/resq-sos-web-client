@@ -344,11 +344,32 @@ const AI_STEP_TRANSLATIONS: Record<string, string> = {
   RETURN_SUPPLIES: "Hoàn trả vật phẩm",
   MOVE_TO_LOCATION: "Di chuyển",
   SOS_SUPPORT: "Hỗ trợ SOS",
+  MEDICAL_AID: "Hỗ trợ y tế",
 };
+
+// Standalone English terms the AI may inject verbatim into note/warning strings.
+// Order matters: longer/more-specific keys must come before shorter ones.
+const AI_INLINE_TERM_TRANSLATIONS: [RegExp, string][] = [
+  [
+    /\bREUSABLE_FIELD_USE_BEFORE_RETURN\b/g,
+    "dùng vật dụng tái sử dụng trước khi hoàn trả",
+  ],
+  [/\bCOLLECT_SUPPLIES\b/g, "Tiếp nhận vật phẩm"],
+  [/\bDELIVER_SUPPLIES\b/g, "Phân phát vật phẩm"],
+  [/\bRETURN_SUPPLIES\b/g, "Hoàn trả vật phẩm"],
+  [/\bMOVE_TO_LOCATION\b/g, "Di chuyển"],
+  [/\bSOS_SUPPORT\b/g, "Hỗ trợ SOS"],
+  [/\bMEDICAL_AID\b/g, "Hỗ trợ y tế"],
+  [/\bCOLLECT\b/g, "Tiếp nhận"],
+  [/\bDELIVER\b/g, "Phân phát"],
+  [/\bRESCUE\b/g, "Cứu hộ"],
+  [/\bEVACUATE\b/g, "Sơ tán"],
+  [/\b[Cc]oordinator\b/g, "người điều phối"],
+];
 
 function translateAIText(text: string): string {
   if (!text) return text;
-  return text
+  let result = text
     .replace(
       /Activity step (\d+) \(([^)]+)\)/g,
       (match, step, type) =>
@@ -359,6 +380,10 @@ function translateAIText(text: string): string {
       /pool nearby teams/g,
       "danh sách đội cứu hộ được quét xung quanh khu vực",
     );
+  for (const [pattern, replacement] of AI_INLINE_TERM_TRANSLATIONS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
 }
 
 function FormattedAINotes({
@@ -8388,7 +8413,7 @@ const SuggestionCard = ({
                   Cảnh báo gộp cứu hộ và cứu trợ
                 </p>
                 <p className="mt-0.5 text-sm text-rose-700/80 dark:text-rose-300/80 leading-relaxed">
-                  {suggestion.mixedRescueReliefWarning}
+                  {translateAIText(suggestion.mixedRescueReliefWarning ?? "")}
                 </p>
               </div>
             ) : null}
@@ -8396,7 +8421,7 @@ const SuggestionCard = ({
             {suggestion.lowConfidenceWarning ? (
               <div className="rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-2 dark:border-amber-800/40 dark:bg-amber-900/10">
                 <p className="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
-                  {suggestion.lowConfidenceWarning}
+                  {translateAIText(suggestion.lowConfidenceWarning ?? "")}
                 </p>
               </div>
             ) : null}
