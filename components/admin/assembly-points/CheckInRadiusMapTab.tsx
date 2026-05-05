@@ -1,7 +1,14 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import L from "leaflet";
 import {
   MapPin,
@@ -634,37 +641,45 @@ function CheckInRadiusMapInner(props: {
   onSelect: (id: number) => void;
   flyTo: { lat: number; lng: number } | null;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Gate rendering: only mount MapContainer after the wrapper div is confirmed
+  // clean. This prevents "Map container is being reused" in React Strict Mode /
+  // hot-reload scenarios where the DOM node retains Leaflet's _leaflet_id.
+  const [isReady, setIsReady] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Clean up any lingering Leaflet instance on the DOM node before mounting
-  useEffect(() => {
-    const el = containerRef.current;
+  useLayoutEffect(() => {
+    const el = wrapperRef.current;
     if (!el) return;
-    return () => {
-      // Remove Leaflet's internal marker so MapContainer can remount cleanly
-      const mapEl = el.querySelector(".leaflet-container") as HTMLElement & {
-        _leaflet_id?: number;
-      };
-      if (mapEl) {
-        delete mapEl._leaflet_id;
-      }
+
+    // Scrub any lingering Leaflet state on the wrapper or its descendants
+    const scrub = (node: HTMLElement & { _leaflet_id?: number }) => {
+      if (node._leaflet_id !== undefined) delete node._leaflet_id;
     };
+    scrub(el as HTMLElement & { _leaflet_id?: number });
+    el.querySelectorAll("[class*='leaflet']").forEach((n) =>
+      scrub(n as HTMLElement & { _leaflet_id?: number }),
+    );
+
+    setIsReady(true);
+    return () => setIsReady(false);
   }, []);
 
   return (
-    <div ref={containerRef} className="h-full w-full relative">
-      <MapContainer
-        center={[16.4637, 107.5909]}
-        zoom={13}
-        className="h-full w-full"
-        zoomControl={false}
-        attributionControl={false}
-      >
-        <GoongLeafletLayer
-          apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
-        />
-        <CheckInRadiusMapLogic {...props} />
-      </MapContainer>
+    <div ref={wrapperRef} className="h-full w-full relative">
+      {isReady && (
+        <MapContainer
+          center={[16.4637, 107.5909]}
+          zoom={13}
+          className="h-full w-full"
+          zoomControl={false}
+          attributionControl={false}
+        >
+          <GoongLeafletLayer
+            apiKey={process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || ""}
+          />
+          <CheckInRadiusMapLogic {...props} />
+        </MapContainer>
+      )}
     </div>
   );
 }
