@@ -1459,23 +1459,25 @@ const UserDetailSheet = ({
                       <p className="text-sm font-semibold tracking-tighter text-foreground">
                         Chứng chỉ {index + 1}
                       </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-muted-foreground hover:text-destructive"
-                        onClick={() =>
-                          setDocumentRows((prev) =>
-                            prev.length === 1
-                              ? [createEmptyDocumentRow()]
-                              : prev.filter(
-                                  (item) => item.localId !== row.localId,
-                                ),
-                          )
-                        }
-                      >
-                        <Trash size={14} />
-                      </Button>
+                      {!row.fileUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setDocumentRows((prev) =>
+                              prev.length === 1
+                                ? [createEmptyDocumentRow()]
+                                : prev.filter(
+                                    (item) => item.localId !== row.localId,
+                                  ),
+                            )
+                          }
+                        >
+                          <Trash size={14} />
+                        </Button>
+                      )}
                     </div>
 
                     <div className="min-w-0 space-y-1.5">
@@ -1644,7 +1646,7 @@ const UserDetailSheet = ({
 
           {/* ── kỹ năng (view only, rescuer only) ── */}
           {!isEditing && user?.roleId === 3 && (
-            <div className="px-6 pb-3 border-b border-border/30">
+            <div className="mt-2 px-6 pb-3 border-b border-border/30">
               <SectionLabel>KỸ NĂNG</SectionLabel>
               {isLoading ? (
                 <div className="space-y-3">
@@ -1691,7 +1693,7 @@ const UserDetailSheet = ({
 
           {/* ── chứng chỉ (view only, rescuer only) ── */}
           {!isEditing && user?.roleId === 3 && (
-            <div className="px-6 pb-3 border-b border-border/30">
+            <div className="px-6 pb-3 mt-2 border-b border-border/30">
               <SectionLabel>CHỨNG CHỈ</SectionLabel>
               {isLoading ? (
                 <div className="space-y-2">
@@ -1732,7 +1734,7 @@ const UserDetailSheet = ({
 
           {/* ── thời gian (view only) ── */}
           {!isEditing && (
-            <div className="px-6 pb-3">
+            <div className="mt-2 px-6 pb-3">
               <SectionLabel>THỜI GIAN</SectionLabel>
               {isLoading ? (
                 <div className="space-y-3">
