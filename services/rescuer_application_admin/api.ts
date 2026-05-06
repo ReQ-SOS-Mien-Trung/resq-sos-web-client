@@ -5,6 +5,7 @@ import {
   RescuerApplicationDetail,
   ReviewRescuerApplicationRequest,
   ReviewRescuerApplicationResponse,
+  UpdateRescuerCertificatesRequest,
 } from "./type";
 
 /**
@@ -31,9 +32,7 @@ export async function getRescuerApplications(
 export async function getRescuerApplicationDetail(
   id: number,
 ): Promise<RescuerApplicationDetail> {
-  const { data } = await api.get(
-    `/identity/admin/rescuer-applications/${id}`,
-  );
+  const { data } = await api.get(`/identity/admin/rescuer-applications/${id}`);
   return data;
 }
 
@@ -49,4 +48,18 @@ export async function reviewRescuerApplication(
     request,
   );
   return data;
+}
+
+/**
+ * Update certificates for a rescuer application
+ * PUT /identity/admin/rescuer-applications/{userId}/certificates
+ */
+export async function updateRescuerCertificates(
+  userId: string,
+  request: UpdateRescuerCertificatesRequest,
+): Promise<void> {
+  await api.put(
+    `/identity/admin/rescuer-applications/${userId}/certificates`,
+    request,
+  );
 }

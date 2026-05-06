@@ -191,6 +191,70 @@ export interface AbilityCategoryMetadataOption {
   value: string;
 }
 
+export interface DocumentFileTypeCategory {
+  id: number;
+  code: string;
+  description: string;
+}
+
+export interface DocumentFileType {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  documentFileTypeCategoryId: number;
+  documentFileTypeCategory: DocumentFileTypeCategory;
+}
+
+export interface GetDocumentFileTypesResponse {
+  items: DocumentFileType[];
+}
+
+export interface AbilityCategory {
+  id: number;
+  code: string;
+  description: string;
+}
+
+export interface AbilitySubgroup {
+  id: number;
+  code: string;
+  description: string;
+  abilityCategoryId: number;
+  abilityCategory: AbilityCategory;
+}
+
+export interface AbilityEntity {
+  id: number;
+  code: string;
+  description: string;
+  abilitySubgroupId: number;
+  abilitySubgroup: AbilitySubgroup;
+}
+
+export interface GetAbilitiesResponse {
+  items: AbilityEntity[];
+}
+
+export interface UpdateUserAbilityPayload {
+  abilityId: number;
+  level: number;
+}
+
+export interface UpdateUserAbilitiesRequest {
+  abilities: UpdateUserAbilityPayload[];
+}
+
+export interface RescuerDocumentPayload {
+  fileUrl: string;
+  fileTypeId: number;
+}
+
+export interface UpsertRescuerDocumentsRequest {
+  documents: RescuerDocumentPayload[];
+}
+
 export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;
