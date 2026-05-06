@@ -1061,6 +1061,7 @@ const CoordinatorMap = ({
           assemblyPoints.map((point) => (
             <AssemblyPointMarker
               key={point.id}
+              status={point.status}
               position={
                 markerDisplayPositions.assemblyPointPositions.get(point.id) ?? [
                   point.latitude,
@@ -1559,12 +1560,25 @@ function DepotMarker({
 
 // Assembly Point Marker Component
 function AssemblyPointMarker({
+  status,
   position,
   onClick,
 }: {
+  status?: string | null;
   position: [number, number];
   onClick?: () => void;
 }) {
+  const color =
+    status === "Available"
+      ? "#22c55e"
+      : status === "PendingUnavailable"
+        ? "#f97316"
+        : status === "Unavailable"
+          ? "#f59e0b"
+          : status === "Closed"
+            ? "#ef4444"
+            : "#6366f1";
+
   const iconEl = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1574,16 +1588,18 @@ function AssemblyPointMarker({
       className: "custom-assembly-point-marker",
       html: `
         <div class="relative flex items-center justify-center" style="width: 36px; height: 36px;">
-          <div class="rounded-lg flex items-center justify-center text-lg bg-purple-100 border-2 border-purple-500" 
-               style="width: 36px; height: 36px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+          <div class="rounded-lg flex items-center justify-center text-lg bg-purple-50 border-2"
+               style="width: 36px; height: 36px; border-color: ${color}; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
             📍
           </div>
+          <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"
+               style="background-color: ${color};"></div>
         </div>
       `,
       iconSize: [36, 36],
       iconAnchor: [18, 18],
     });
-  }, []);
+  }, [color]);
 
   if (!iconEl) return null;
 

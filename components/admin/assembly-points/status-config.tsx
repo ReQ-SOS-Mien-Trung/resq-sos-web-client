@@ -13,6 +13,7 @@ import type {
 export const ASSEMBLY_POINT_STATUS_ORDER: AssemblyPointStatus[] = [
   "Created",
   "Available",
+  "PendingUnavailable",
   "Unavailable",
   "Closed",
 ];
@@ -49,6 +50,12 @@ const STATUS_STYLE: Record<AssemblyPointStatus, AssemblyPointStatusStyle> = {
     color: "text-emerald-700",
     bg: "bg-emerald-500/10 border-emerald-200",
     icon: <CheckCircle size={20} weight="fill" className="text-emerald-500" />,
+  },
+  PendingUnavailable: {
+    fallbackLabel: "Chờ điều phối lại",
+    color: "text-orange-700",
+    bg: "bg-orange-500/10 border-orange-200",
+    icon: <WarningCircle size={20} weight="fill" className="text-orange-500" />,
   },
   Unavailable: {
     fallbackLabel: "Không khả dụng",

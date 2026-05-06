@@ -2,12 +2,16 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { DepotEntity } from "@/services/depot/type";
 import {
+  ASSEMBLY_POINTS_QUERY_KEY,
+  ASSEMBLY_POINT_EVENTS_QUERY_KEY,
   useAssemblyPointById,
   useAssemblyPointEvents,
   useScheduleAssemblyPointGathering,
   useCancelAssemblyPointEvent,
+  useSetAssemblyPointUnavailable,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
@@ -21,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -79,10 +84,10 @@ import {
 } from "@/lib/backend-circuit";
 import { useBackendConnectionStore } from "@/stores/backend-connection.store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { saveAssemblyPointUnavailableDraft } from "@/lib/assembly-point-unavailable-flow";
 
 // Panel width
 const PANEL_WIDTH = 420;
-
 
 const assemblyTeamTypeLabel: Record<string, string> = {
   Rescue: "Cứu hộ",
@@ -697,7 +702,9 @@ function DepotDetails({
               </div>
               <div>
                 <p className="text-sm font-semibold">Trạng thái kho</p>
-                <p className="text-xs text-muted-foreground">Sẵn sàng điều phối</p>
+                <p className="text-xs text-muted-foreground">
+                  Sẵn sàng điều phối
+                </p>
               </div>
             </div>
             {isCategoryLoading ? (
@@ -708,7 +715,10 @@ function DepotDetails({
                 Có hàng
               </Badge>
             ) : (
-              <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-0 px-3 py-1">
+              <Badge
+                variant="secondary"
+                className="bg-slate-100 text-slate-500 border-0 px-3 py-1"
+              >
                 Trống
               </Badge>
             )}
@@ -742,9 +752,13 @@ function DepotDetails({
           ) : categoryData && categoryData.length > 0 ? (
             <div className="grid gap-3">
               {categoryData.map((category) => {
-                const totalQty = category.totalConsumableQuantity + category.totalReusableUnits;
-                const availQty = category.availableConsumableQuantity + category.availableReusableUnits;
-                
+                const totalQty =
+                  category.totalConsumableQuantity +
+                  category.totalReusableUnits;
+                const availQty =
+                  category.availableConsumableQuantity +
+                  category.availableReusableUnits;
+
                 if (totalQty === 0) return null;
 
                 return (
@@ -756,7 +770,7 @@ function DepotDetails({
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400 group-hover:bg-slate-100 group-hover:text-[#FF5722] transition-colors">
                         {getCategoryIcon(category.categoryCode)}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold truncate group-hover:text-[#FF5722] transition-colors">
@@ -766,25 +780,27 @@ function DepotDetails({
                             {availQty.toLocaleString("vi-VN")} sản phẩm
                           </span>
                         </div>
-
-
                       </div>
                     </div>
                   </div>
                 );
               })}
-              
+
               {!hasStock && (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center">
                   <Package className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-                  <p className="text-sm text-slate-500">Kho hiện tại không có hàng</p>
+                  <p className="text-sm text-slate-500">
+                    Kho hiện tại không có hàng
+                  </p>
                 </div>
               )}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center">
               <Package className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-sm text-slate-500">Chưa có dữ liệu phân loại</p>
+              <p className="text-sm text-slate-500">
+                Chưa có dữ liệu phân loại
+              </p>
             </div>
           )}
         </div>
@@ -814,6 +830,9 @@ function AssemblyPointDetails({
     Record<number, boolean>
   >({});
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [setUnavailableOpen, setSetUnavailableOpen] = useState(false);
+  const [unavailableReason, setUnavailableReason] = useState("");
+  const queryClient = useQueryClient();
 
   const {
     data: assemblyPointDetail,
@@ -838,10 +857,12 @@ function AssemblyPointDetails({
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
+  const { mutateAsync: cancelAssemblyPointEvent, isPending: isCancelingEvent } =
+    useCancelAssemblyPointEvent();
   const {
-    mutateAsync: cancelAssemblyPointEvent,
-    isPending: isCancelingEvent,
-  } = useCancelAssemblyPointEvent();
+    mutateAsync: setAssemblyPointUnavailable,
+    isPending: isSettingUnavailable,
+  } = useSetAssemblyPointUnavailable();
 
   const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
     assemblyPointDetail ?? assemblyPoint;
@@ -884,6 +905,13 @@ function AssemblyPointDetails({
   const StatusIcon = statusConfig.icon;
 
   const handleScheduleGathering = async () => {
+    if (displayAssemblyPoint.status !== "Available") {
+      toast.error(
+        "Chỉ có thể triệu tập tại điểm tập kết đang ở trạng thái Sẵn sàng.",
+      );
+      return;
+    }
+
     if (!assemblyDateInput) {
       toast.error("Vui lòng chọn thời gian tập trung.");
       return;
@@ -969,12 +997,14 @@ function AssemblyPointDetails({
 
   const shouldShowCreateTeam =
     !hasActiveEvent ||
-    (selectedEvent?.status === "Scheduled" ||
-      selectedEvent?.status === "Gathering");
+    selectedEvent?.status === "Scheduled" ||
+    selectedEvent?.status === "Gathering";
   const isAssemblyPointAvailable = displayAssemblyPoint.status === "Available";
+  const isAssemblyPointPendingUnavailable =
+    displayAssemblyPoint.status === "PendingUnavailable";
   const canToggleSchedule = isAssemblyPointAvailable && !hasActiveEvent;
   const effectiveShowScheduleForm = canToggleSchedule && showScheduleForm;
-  const canCreateTeam = shouldShowCreateTeam;
+  const canCreateTeam = isAssemblyPointAvailable && shouldShowCreateTeam;
   const isRefreshingAssemblyData =
     isAssemblyPointDetailFetching || isAssemblyPointEventsFetching;
   const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
@@ -989,9 +1019,74 @@ function AssemblyPointDetails({
   }, [refetchAssemblyPointDetail, refetchAssemblyPointEvents]);
 
   const handleCreateTeam = () => {
+    if (displayAssemblyPoint.status !== "Available") {
+      toast.error(
+        "Chỉ có thể tạo đội tại điểm tập kết đang ở trạng thái Sẵn sàng.",
+      );
+      return;
+    }
+
     const eventId = selectedEvent?.eventId ?? effectiveSelectedEventId;
     const query = `?assemblyPointId=${assemblyPoint.id}${eventId ? `&eventId=${eventId}` : ""}`;
     router.push(`/dashboard/coordinator/rescue-teams/create${query}`);
+  };
+
+  const handleContinueUnavailableReassignment = () => {
+    router.push(
+      `/dashboard/coordinator/assembly-points/${assemblyPoint.id}/set-unavailable`,
+    );
+  };
+
+  const handleSetUnavailable = async () => {
+    const reason = unavailableReason.trim();
+    if (!reason) {
+      toast.error("Vui lòng nhập lý do không khả dụng.");
+      return;
+    }
+
+    try {
+      const result = await setAssemblyPointUnavailable({
+        id: assemblyPoint.id,
+        reason,
+      });
+
+      if (result.status === "PendingUnavailable" || result.impact != null) {
+        saveAssemblyPointUnavailableDraft({
+          assemblyPointId: assemblyPoint.id,
+          reason,
+          impact: result.impact ?? null,
+          savedAt: new Date().toISOString(),
+        });
+
+        toast.warning(
+          result.message || "Cần điều phối lại trước khi hoàn tất.",
+        );
+        setSetUnavailableOpen(false);
+        router.push(
+          `/dashboard/coordinator/assembly-points/${assemblyPoint.id}/set-unavailable`,
+        );
+        return;
+      }
+
+      toast.success(
+        result.message || "Đã chuyển điểm tập kết sang Không khả dụng.",
+      );
+      setSetUnavailableOpen(false);
+      setUnavailableReason("");
+      void refetchAssemblyPointDetail();
+      void refetchAssemblyPointEvents();
+      void queryClient.invalidateQueries({
+        queryKey: ASSEMBLY_POINTS_QUERY_KEY,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ASSEMBLY_POINT_EVENTS_QUERY_KEY,
+      });
+    } catch (error) {
+      const backendMessage = extractBackendErrorMessage(error);
+      toast.error(
+        backendMessage || "Không thể chuyển điểm tập kết sang Không khả dụng.",
+      );
+    }
   };
 
   const toggleTeamExpand = (teamId: number) => {
@@ -1068,44 +1163,11 @@ function AssemblyPointDetails({
           <span className="text-xs text-muted-foreground">•</span>
           <span className="text-xs text-muted-foreground">Điểm tập kết</span>
         </div>
-
-        {(displayAssemblyPoint.statusReason ||
-          displayAssemblyPoint.statusChangedAt ||
-          displayAssemblyPoint.statusChangedBy) && (
-          <div className="mt-3 grid gap-2 rounded-xl border border-border/60 bg-muted/30 p-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Lý do trạng thái</p>
-              <p className="mt-1 text-sm text-foreground">
-                {displayAssemblyPoint.statusReason?.trim() || "Không có"}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-lg border border-border/60 bg-background px-2.5 py-2">
-                <p className="text-xs text-muted-foreground">
-                  Đổi trạng thái lúc
-                </p>
-                <p className="mt-1">
-                  {formatOptionalDateTimeVi(
-                    displayAssemblyPoint.statusChangedAt,
-                  )}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-background px-2.5 py-2">
-                <p className="text-xs text-muted-foreground">
-                  Đổi trạng thái bởi
-                </p>
-                <p className="mt-1 break-all">
-                  {displayAssemblyPoint.statusChangedBy?.trim() || "Chưa có"}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Quick Actions */}
       <div className="px-5 py-3 border-b shrink-0">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <div className="flex justify-center">
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
@@ -1141,6 +1203,33 @@ function AssemblyPointDetails({
 
           <div className="flex justify-center">
             <ActionButton
+              icon={<WarningCircle className="h-5 w-5" weight="fill" />}
+              label={
+                isAssemblyPointPendingUnavailable ? "Điều phối" : "Tạm đóng"
+              }
+              color={
+                isAssemblyPointAvailable || isAssemblyPointPendingUnavailable
+                  ? "text-orange-600"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              active={isAssemblyPointPendingUnavailable}
+              disabled={
+                (!isAssemblyPointAvailable &&
+                  !isAssemblyPointPendingUnavailable) ||
+                isSettingUnavailable
+              }
+              onClick={
+                isAssemblyPointPendingUnavailable
+                  ? handleContinueUnavailableReassignment
+                  : isAssemblyPointAvailable
+                    ? () => setSetUnavailableOpen(true)
+                    : undefined
+              }
+            />
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
               icon={
                 <ArrowsClockwise
                   className={cn(
@@ -1157,6 +1246,13 @@ function AssemblyPointDetails({
             />
           </div>
         </div>
+
+        {isAssemblyPointPendingUnavailable ? (
+          <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs leading-relaxed text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-300">
+            Điểm tập kết đang chờ điều phối lại. Các thao tác check-in, triệu
+            tập, tạo đội và gán activity mới tới điểm này sẽ bị chặn.
+          </div>
+        ) : null}
 
         {effectiveShowScheduleForm && (
           <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-3">
@@ -1332,7 +1428,9 @@ function AssemblyPointDetails({
                         onClick={() => setCancelConfirmOpen(true)}
                         disabled={isCancelingEvent}
                       >
-                        {isCancelingEvent ? "Đang xử lý..." : "Hủy sự kiện tập trung"}
+                        {isCancelingEvent
+                          ? "Đang xử lý..."
+                          : "Hủy sự kiện tập trung"}
                       </Button>
                     </div>
                   )}
@@ -1539,6 +1637,56 @@ function AssemblyPointDetails({
               disabled={isCancelingEvent}
             >
               {isCancelingEvent ? "Đang xử lý..." : "Xác nhận hủy"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={setUnavailableOpen}
+        onOpenChange={(open) => {
+          setSetUnavailableOpen(open);
+          if (!open) setUnavailableReason("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-700">
+              <WarningCircle className="h-5 w-5" weight="fill" />
+              Đánh dấu không khả dụng
+            </DialogTitle>
+            <DialogDescription>
+              Nhập lý do để tạm ngưng sử dụng điểm tập kết này. Nếu có người,
+              đội hoặc hoạt động bị ảnh hưởng, hệ thống sẽ chuyển sang màn hình
+              điều phối lại.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Lý do *</p>
+            <Textarea
+              value={unavailableReason}
+              onChange={(event) => setUnavailableReason(event.target.value)}
+              placeholder="Ví dụ: Khu vực ngập sâu, cần tạm dừng sử dụng"
+              rows={4}
+              disabled={isSettingUnavailable}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSetUnavailableOpen(false)}
+              disabled={isSettingUnavailable}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSetUnavailable}
+              disabled={isSettingUnavailable || !unavailableReason.trim()}
+            >
+              {isSettingUnavailable ? "Đang xử lý..." : "Tiếp tục"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1831,7 +1979,9 @@ function ActionButton({
       >
         {icon}
       </div>
-      <span className={cn("text-xs font-medium", color)}>{label}</span>
+      <span className={cn("text-xs font-medium whitespace-nowrap", color)}>
+        {label}
+      </span>
     </button>
   );
 }

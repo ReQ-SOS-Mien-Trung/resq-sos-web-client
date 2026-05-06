@@ -261,6 +261,23 @@ type AssemblyPointOptionEntry = {
   longitude: number | null;
 };
 
+function getAssemblyPointTargetStatusLabel(status: string | null): string {
+  switch (status) {
+    case "Created":
+      return "Mới tạo";
+    case "Available":
+      return "Sẵn sàng";
+    case "PendingUnavailable":
+      return "Chờ điều phối lại";
+    case "Unavailable":
+      return "Không khả dụng";
+    case "Closed":
+      return "Đã đóng";
+    default:
+      return status ?? "Không xác định";
+  }
+}
+
 type BackendActivityErrorClues = {
   step: number | null;
   itemId: number | null;
@@ -10378,6 +10395,10 @@ const RescuePlanPanel = ({
     () => new Map(assemblyPointOptions.map((point) => [point.id, point])),
     [assemblyPointOptions],
   );
+  const availableAssemblyPointOptions = useMemo(
+    () => assemblyPointOptions.filter((point) => point.status === "Available"),
+    [assemblyPointOptions],
+  );
 
   const nearbyRescueTeams = useMemo(() => {
     const sourceTeams = nearbyTeamsByClusterData ?? [];
@@ -10546,6 +10567,13 @@ const RescuePlanPanel = ({
         parsedAssemblyPointId,
       );
       if (!selectedAssemblyPoint) {
+        return;
+      }
+
+      if (selectedAssemblyPoint.status !== "Available") {
+        toast.error(
+          "Chỉ có thể chọn điểm tập kết đang ở trạng thái Sẵn sàng.",
+        );
         return;
       }
 
@@ -13344,24 +13372,14 @@ const RescuePlanPanel = ({
                                           selectedAssemblyPointOption?.status ??
                                           null;
                                         const selectedAssemblyPointStatusLabel =
-                                          selectedAssemblyPointStatus ===
-                                          "Created"
-                                            ? "Mới tạo"
-                                            : selectedAssemblyPointStatus ===
-                                                "Available"
-                                              ? "Sẵn sàng"
-                                              : selectedAssemblyPointStatus ===
-                                                  "Unavailable"
-                                                ? "Không khả dụng"
-                                                : selectedAssemblyPointStatus ===
-                                                    "Closed"
-                                                  ? "Đã đóng"
-                                                  : selectedAssemblyPointStatus;
+                                          getAssemblyPointTargetStatusLabel(
+                                            selectedAssemblyPointStatus,
+                                          );
                                         const isSelectedAssemblyPointRestricted =
-                                          selectedAssemblyPointStatus ===
-                                            "Unavailable" ||
-                                          selectedAssemblyPointStatus ===
-                                            "Closed";
+                                          selectedAssemblyPointStatus !==
+                                            null &&
+                                          selectedAssemblyPointStatus !==
+                                            "Available";
                                         const selectedAssemblyPointLabel =
                                           hasValidAssemblyPointId
                                             ? (assemblyPointOptionById.get(
@@ -13767,6 +13785,7 @@ const RescuePlanPanel = ({
                                                             selectedAssemblyPointValue
                                                           }
                                                           className="text-sm"
+                                                          disabled
                                                         >
                                                           {
                                                             selectedAssemblyPointLabel
@@ -13775,7 +13794,37 @@ const RescuePlanPanel = ({
                                                         </SelectItem>
                                                       ) : null}
 
-                                                      {assemblyPointOptions.map(
+                                                      {hasValidAssemblyPointId &&
+                                                      selectedAssemblyPointOption &&
+                                                      selectedAssemblyPointStatus !==
+                                                        "Available" ? (
+                                                        <SelectItem
+                                                          value={
+                                                            selectedAssemblyPointValue
+                                                          }
+                                                          className="text-sm"
+                                                          disabled
+                                                        >
+                                                          {
+                                                            selectedAssemblyPointLabel
+                                                          }{" "}
+                                                          (
+                                                          {
+                                                            selectedAssemblyPointStatusLabel
+                                                          }
+                                                          )
+                                                        </SelectItem>
+                                                      ) : null}
+
+                                                      {availableAssemblyPointOptions.length ===
+                                                      0 ? (
+                                                        <div className="px-2 py-2 text-sm text-muted-foreground">
+                                                          Không có điểm tập kết
+                                                          sẵn sàng
+                                                        </div>
+                                                      ) : null}
+
+                                                      {availableAssemblyPointOptions.map(
                                                         (point) => (
                                                           <SelectItem
                                                             key={point.id}
