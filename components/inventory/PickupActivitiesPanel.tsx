@@ -1753,7 +1753,6 @@ function DetailPanel({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <PriorityBadge priority={item.priority} />
                   <StatusBadge status={item.status} map={ACTIVITY_STATUS_MAP} />
                   <Button
                     variant="ghost"
@@ -2479,7 +2478,6 @@ function UpcomingTable({
                 ["activityCode", "Mã hoạt động"],
                 ["rescueTeamName", "Đội cứu hộ"],
                 ["missionType", "Loại nhiệm vụ"],
-                ["priority", "Mức độ ưu tiên"],
                 ["status", "Trạng thái"],
                 [
                   "itemCount",
@@ -2543,9 +2541,6 @@ function UpcomingTable({
               </td>
               <td className="px-4 py-3 text-sm tracking-tighter">
                 {item.missionType}
-              </td>
-              <td className="px-4 py-3">
-                <PriorityBadge priority={item.priority} />
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={item.status} map={ACTIVITY_STATUS_MAP} />
@@ -2679,7 +2674,6 @@ function HistoryTable({
                 ["activityCode", "Mã hoạt động"],
                 ["rescueTeamName", "Đội cứu hộ"],
                 ["status", "Trạng thái"],
-                ["priority", "Mức độ ưu tiên"],
                 [
                   "itemCount",
                   activityKind === "return"
@@ -2745,9 +2739,6 @@ function HistoryTable({
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={item.status} map={ACTIVITY_STATUS_MAP} />
-              </td>
-              <td className="px-4 py-3">
-                <PriorityBadge priority={item.priority} />
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1.5">

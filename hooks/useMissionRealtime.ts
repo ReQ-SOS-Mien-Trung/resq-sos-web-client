@@ -29,6 +29,7 @@ export type MissionRealtimeActivityStatusUpdate = {
   activityId: number;
   status: string;
   changedAt?: string | null;
+  imageUrl?: string | null;
 };
 
 interface UseMissionRealtimeOptions {
@@ -76,10 +77,21 @@ function patchActivityStatus(
   activities: MissionActivity[],
   activityId: number,
   status: string,
+  imageUrl?: string | null,
 ): MissionActivity[] {
   let changed = false;
   const nextActivities = activities.map((activity) => {
-    if (activity.id !== activityId || activity.status === status) {
+    if (activity.id !== activityId) {
+      return activity;
+    }
+
+    const statusChanged = activity.status !== status;
+    const imageChanged =
+      imageUrl != null &&
+      imageUrl.trim() !== "" &&
+      activity.imageUrl !== imageUrl;
+
+    if (!statusChanged && !imageChanged) {
       return activity;
     }
 
@@ -87,6 +99,7 @@ function patchActivityStatus(
     return {
       ...activity,
       status: status as ActivityStatus,
+      ...(imageChanged ? { imageUrl } : {}),
     };
   });
 
@@ -97,6 +110,7 @@ function patchMissionActivityStatus(
   mission: MissionEntity,
   activityId: number,
   status: string,
+  imageUrl?: string | null,
 ): MissionEntity {
   if (!mission.activities || mission.activities.length === 0) {
     return mission;
@@ -106,6 +120,7 @@ function patchMissionActivityStatus(
     mission.activities,
     activityId,
     status,
+    imageUrl,
   );
 
   if (patchedActivities === mission.activities) {
@@ -129,7 +144,10 @@ function patchMissionStatusInCache(
   if (isMissionListResponse(data)) {
     let changed = false;
     const missions = data.missions.map((mission) => {
-      if (mission.id !== payload.missionId || mission.status === payload.status) {
+      if (
+        mission.id !== payload.missionId ||
+        mission.status === payload.status
+      ) {
         return mission;
       }
 
@@ -161,6 +179,7 @@ function patchMissionActivityStatusInCache(
       data as MissionActivity[],
       update.activityId,
       update.status,
+      update.imageUrl,
     );
   }
 
@@ -175,6 +194,7 @@ function patchMissionActivityStatusInCache(
         mission,
         update.activityId,
         update.status,
+        update.imageUrl,
       );
       changed = changed || patchedMission !== mission;
       return patchedMission;
@@ -184,7 +204,12 @@ function patchMissionActivityStatusInCache(
   }
 
   if (isMissionEntity(data) && data.id === update.missionId) {
-    return patchMissionActivityStatus(data, update.activityId, update.status);
+    return patchMissionActivityStatus(
+      data,
+      update.activityId,
+      update.status,
+      update.imageUrl,
+    );
   }
 
   return data;
@@ -290,7 +315,9 @@ export function useMissionRealtime({
         await adminOperationsRealtimeClient.subscribeMissionActivities(
           missionId,
         );
-        await adminOperationsRealtimeClient.subscribeMissionExecution(missionId);
+        await adminOperationsRealtimeClient.subscribeMissionExecution(
+          missionId,
+        );
       }
     };
 
@@ -359,17 +386,15 @@ export function useMissionRealtime({
         { queryKey: MISSION_ACTIVITIES_QUERY_KEY },
         (oldData) => patchMissionActivityStatusInCache(oldData, update),
       );
-      queryClient.setQueriesData(
-        { queryKey: MISSIONS_QUERY_KEY },
-        (oldData) => patchMissionActivityStatusInCache(oldData, update),
+      queryClient.setQueriesData({ queryKey: MISSIONS_QUERY_KEY }, (oldData) =>
+        patchMissionActivityStatusInCache(oldData, update),
       );
       onActivityStatusUpdatedRef.current?.(update);
     };
 
     const handleMissionUpdate = (payload: AdminMissionRealtimeUpdate) => {
-      queryClient.setQueriesData(
-        { queryKey: MISSIONS_QUERY_KEY },
-        (oldData) => patchMissionStatusInCache(oldData, payload),
+      queryClient.setQueriesData({ queryKey: MISSIONS_QUERY_KEY }, (oldData) =>
+        patchMissionStatusInCache(oldData, payload),
       );
 
       if (
@@ -399,7 +424,11 @@ export function useMissionRealtime({
         status: payload.status,
         changedAt: payload.changedAt,
       });
-      invalidateActivity(payload.missionId, payload.activityId, payload.depotId);
+      invalidateActivity(
+        payload.missionId,
+        payload.activityId,
+        payload.depotId,
+      );
     };
 
     const handleMissionExecutionProgress = (
@@ -413,6 +442,7 @@ export function useMissionRealtime({
           activityId: payload.activityId,
           status: primaryStatus,
           changedAt: payload.changedAt,
+          imageUrl: payload.imageUrl,
         });
       }
 
@@ -464,8 +494,9 @@ export function useMissionRealtime({
       adminOperationsRealtimeClient.onMissionExecutionProgress(
         handleMissionExecutionProgress,
       );
-    const unsubscribeReconnected =
-      adminOperationsRealtimeClient.onReconnected(invalidateActiveQueries);
+    const unsubscribeReconnected = adminOperationsRealtimeClient.onReconnected(
+      invalidateActiveQueries,
+    );
 
     return () => {
       unsubscribeMission();
@@ -473,11 +504,5 @@ export function useMissionRealtime({
       unsubscribeMissionExecution();
       unsubscribeReconnected();
     };
-  }, [
-    accessToken,
-    activeClusterId,
-    enabled,
-    hasActiveScope,
-    queryClient,
-  ]);
+  }, [accessToken, activeClusterId, enabled, hasActiveScope, queryClient]);
 }

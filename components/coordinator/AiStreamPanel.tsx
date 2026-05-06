@@ -364,7 +364,7 @@ function ActivityExecutionMeta({
       {requiredTeamCount > 0 ? (
         <Badge className="h-7 border-emerald-200/50 bg-emerald-50/80 px-2.5 text-[13px] font-semibold text-emerald-700 backdrop-blur-sm dark:border-emerald-800/30 dark:bg-emerald-900/30 dark:text-emerald-300">
           <Users className="mr-1.5 h-3.5 w-3.5" weight="bold" />
-          {requiredTeamCount} đội cần hỗ trợ
+          {requiredTeamCount} đội hỗ trợ
         </Badge>
       ) : null}
       {activity.sosRequestId && (
@@ -2166,9 +2166,6 @@ function ActivityFlowNode({
           >
             <Icon className="h-4 w-4 mr-1" weight="fill" />
             {config.label}
-          </Badge>
-          <Badge className="text-sm px-2 h-7 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
-            {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
             <span className="text-sm font-medium flex items-center gap-0.5 ml-auto">
