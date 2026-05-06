@@ -19,6 +19,7 @@ import type {
   MissionTeamReportResponse,
 } from "@/services/mission/type";
 import { cn } from "@/lib/utils";
+import { activityTypeConfig } from "@/lib/constants";
 
 interface Props {
   missionId: number;
@@ -110,55 +111,48 @@ function getActivityStatusBadge(status?: string | null, label?: string) {
   if (normalized === "succeed") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   }
 
   if (normalized === "ongoing") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      className: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
     };
   }
 
   if (normalized === "pendingconfirmation") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+      className: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     };
   }
 
   if (normalized === "failed" || normalized === "incompleted") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+      className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
     };
   }
 
   if (normalized === "cancelled" || normalized === "canceled") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+      className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
     };
   }
 
   if (normalized === "planned") {
     return {
       label: label ?? fallbackLabel,
-      className:
-        "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
+      className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
     };
   }
 
   return {
     label: label ?? fallbackLabel,
-    className:
-      "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+    className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   };
 }
 function fmtDt(v?: string | null) {
@@ -248,7 +242,8 @@ function getRescuerTypeBadge(type?: string | null, label?: string) {
   if (normalizedType === "core") {
     return {
       label: label ?? "Nhân sự nòng cốt",
-      className: "bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-950/5",
+      className:
+        "bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-950/5",
     };
   }
 
@@ -520,7 +515,9 @@ function ActivityList({
                     {idx + 1}
                   </span>
                   <p className="text-sm font-bold text-foreground tracking-tighter truncate">
-                    {a.activityType || "Hoạt động"}
+                    {activityTypeConfig[a.activityType ?? ""]?.label ??
+                      a.activityType ??
+                      "Hoạt động"}
                   </p>
                 </div>
                 <Badge

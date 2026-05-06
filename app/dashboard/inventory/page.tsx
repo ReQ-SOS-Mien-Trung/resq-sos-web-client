@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, Suspense } from "react";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
@@ -1186,4 +1186,10 @@ const InventoryDashboardPage = () => {
   );
 };
 
-export default InventoryDashboardPage;
+const InventoryDashboardPageWithSuspense = () => (
+  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+    <InventoryDashboardPage />
+  </Suspense>
+);
+
+export default InventoryDashboardPageWithSuspense;
