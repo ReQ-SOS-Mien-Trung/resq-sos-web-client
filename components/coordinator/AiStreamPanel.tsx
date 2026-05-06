@@ -2167,9 +2167,11 @@ function ActivityFlowNode({
             <Icon className="h-4 w-4 mr-1" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-sm px-2 h-7 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
-            {severityConfig[activity.priority]?.label || activity.priority}
-          </Badge>
+          {activity.priority ? (
+            <Badge className="text-sm px-2 h-7 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+              {severityConfig[activity.priority]?.label || activity.priority}
+            </Badge>
+          ) : null}
           {activity.estimatedTime && (
             <span className="text-sm font-medium flex items-center gap-0.5 ml-auto">
               <Clock className="h-4 w-4" />

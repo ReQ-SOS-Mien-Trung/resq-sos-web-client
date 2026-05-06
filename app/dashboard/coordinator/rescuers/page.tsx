@@ -534,8 +534,6 @@ export default function CoordinatorRescuerManagementPage() {
     ? splitUniqueRescuerCount
     : (rescuersData?.totalCount ?? rescuers.length);
 
-
-
   const assemblyPointNameById = useMemo(() => {
     const entries = (assemblyPointOptions ?? [])
       .map((option) => {
@@ -945,219 +943,136 @@ export default function CoordinatorRescuerManagementPage() {
 
     const draggedCount = draggedRescuers.length;
     const primaryName = `${primaryRescuer.lastName} ${primaryRescuer.firstName}`;
-    const secondaryLabel =
-      draggedCount > 1
-        ? `+${draggedCount - 1} người cứu hộ nữa`
-        : "Người cứu hộ được chọn";
+    const FONT =
+      '"SF Pro Text", "Segoe UI", "Helvetica Neue", system-ui, sans-serif';
 
+    // ── wrapper (fixed off-screen so browser uses it as drag image) ──
     const preview = document.createElement("div");
     preview.style.position = "fixed";
     preview.style.top = "-9999px";
     preview.style.left = "-9999px";
     preview.style.pointerEvents = "none";
-    preview.style.width = "248px";
-    preview.style.height = "92px";
-    preview.style.padding = "10px 0 0 12px";
-    preview.style.font =
-      '500 12px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+    // give it a bit of breathing room so shadows aren't clipped
+    preview.style.padding = "6px";
 
-    for (let layerIndex = 2; layerIndex >= 1; layerIndex -= 1) {
-      const layer = document.createElement("div");
-      layer.style.position = "absolute";
-      layer.style.inset = "0";
-      layer.style.width = "228px";
-      layer.style.height = "74px";
-      layer.style.borderRadius = "18px";
-      layer.style.border = "1px solid rgba(255, 87, 34, 0.18)";
-      layer.style.background =
-        layerIndex === 2 ? "rgba(255,255,255,0.72)" : "rgba(255,247,242,0.92)";
-      layer.style.boxShadow =
-        layerIndex === 2
-          ? "0 18px 34px rgba(15, 23, 42, 0.10)"
-          : "0 16px 28px rgba(255, 87, 34, 0.12)";
-      layer.style.transform = `translate(${layerIndex * 7}px, ${layerIndex * 4}px)`;
-      preview.appendChild(layer);
-    }
-
+    // ── single card ──
     const card = document.createElement("div");
-    card.style.position = "relative";
     card.style.display = "flex";
     card.style.alignItems = "center";
     card.style.gap = "12px";
-    card.style.width = "228px";
-    card.style.height = "74px";
-    card.style.padding = "12px 14px";
-    card.style.borderRadius = "18px";
-    card.style.border = "1px solid rgba(255, 87, 34, 0.24)";
-    card.style.background =
-      "linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,248,244,0.98) 100%)";
+    card.style.width = "232px";
+    card.style.padding = "10px 14px 10px 12px";
+    card.style.borderRadius = "14px";
+    card.style.background = "#FFFFFF";
+    card.style.border = "1.5px solid rgba(255, 87, 34, 0.22)";
     card.style.boxShadow =
-      "0 18px 40px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(255, 87, 34, 0.12)";
-    card.style.backdropFilter = "blur(8px)";
+      "0 4px 6px -1px rgba(0,0,0,0.07), 0 10px 24px -4px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.04)";
 
-    const countBadge = document.createElement("span");
-    countBadge.textContent = `${draggedCount} người`;
-    countBadge.style.position = "absolute";
-    countBadge.style.top = "-9px";
-    countBadge.style.right = "10px";
-    countBadge.style.display = "inline-flex";
-    countBadge.style.alignItems = "center";
-    countBadge.style.justifyContent = "center";
-    countBadge.style.minWidth = "62px";
-    countBadge.style.height = "24px";
-    countBadge.style.padding = "0 10px";
-    countBadge.style.borderRadius = "999px";
-    countBadge.style.background = "#FF5722";
-    countBadge.style.color = "#FFF7ED";
-    countBadge.style.font =
-      '700 11px/1 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
-    countBadge.style.boxShadow = "0 8px 18px rgba(255, 87, 34, 0.28)";
+    // ── left accent strip ──
+    const strip = document.createElement("div");
+    strip.style.position = "absolute";
+    strip.style.left = "0";
+    strip.style.top = "12px";
+    strip.style.bottom = "12px";
+    strip.style.width = "3px";
+    strip.style.borderRadius = "0 3px 3px 0";
+    strip.style.background = "#FF5722";
+    card.style.position = "relative";
+    card.appendChild(strip);
 
-    const avatarCluster = document.createElement("div");
-    avatarCluster.style.position = "relative";
-    avatarCluster.style.width = "52px";
-    avatarCluster.style.height = "40px";
-    avatarCluster.style.flexShrink = "0";
+    // ── avatar stack (overlapping inline) ──
+    const avatarRow = document.createElement("div");
+    avatarRow.style.display = "flex";
+    avatarRow.style.flexShrink = "0";
 
-    const buildAvatar = (
-      label: string,
-      background: string,
-      size: number,
-      left: number,
-      top: number,
-      borderColor: string,
-      textColor: string,
-      zIndex: number,
-    ) => {
-      const avatar = document.createElement("span");
-      avatar.textContent = label;
-      avatar.style.position = "absolute";
-      avatar.style.left = `${left}px`;
-      avatar.style.top = `${top}px`;
-      avatar.style.display = "flex";
-      avatar.style.alignItems = "center";
-      avatar.style.justifyContent = "center";
-      avatar.style.width = `${size}px`;
-      avatar.style.height = `${size}px`;
-      avatar.style.borderRadius = "999px";
-      avatar.style.border = `1px solid ${borderColor}`;
-      avatar.style.background = background;
-      avatar.style.color = textColor;
-      avatar.style.font =
-        '700 11px/1 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
-      avatar.style.boxShadow = "0 8px 18px rgba(15, 23, 42, 0.10)";
-      avatar.style.zIndex = `${zIndex}`;
-      return avatar;
-    };
-
-    avatarCluster.appendChild(
-      buildAvatar(
-        getInitials(primaryRescuer.firstName, primaryRescuer.lastName),
-        "linear-gradient(180deg, #FFF1EB 0%, #FFE1D5 100%)",
-        36,
-        0,
-        2,
-        "rgba(255, 87, 34, 0.28)",
-        "#C2410C",
-        3,
-      ),
-    );
-
-    for (
-      let index = 1;
-      index < Math.min(draggedRescuers.length, 3);
-      index += 1
-    ) {
+    const maxAvatars = Math.min(draggedRescuers.length, 3);
+    for (let index = 0; index < maxAvatars; index += 1) {
       const rescuer = draggedRescuers[index];
-      avatarCluster.appendChild(
-        buildAvatar(
-          getInitials(rescuer.firstName, rescuer.lastName),
-          "rgba(255,255,255,0.96)",
-          24,
-          18 + (index - 1) * 12,
-          10,
-          "rgba(148, 163, 184, 0.25)",
-          "#64748B",
-          2 - index,
-        ),
-      );
+      const av = document.createElement("span");
+      av.textContent = getInitials(rescuer.firstName, rescuer.lastName);
+      av.style.display = "flex";
+      av.style.alignItems = "center";
+      av.style.justifyContent = "center";
+      av.style.width = "34px";
+      av.style.height = "34px";
+      av.style.borderRadius = "999px";
+      av.style.border = "2px solid #FFFFFF";
+      av.style.background =
+        index === 0
+          ? "linear-gradient(135deg, #FFD0BC 0%, #FFA07A 100%)"
+          : index === 1
+            ? "#EFF6FF"
+            : "#F0FDF4";
+      av.style.color =
+        index === 0 ? "#B45309" : index === 1 ? "#1D4ED8" : "#15803D";
+      av.style.font = `700 11px/1 ${FONT}`;
+      av.style.boxShadow = "0 1px 3px rgba(0,0,0,0.12)";
+      av.style.marginLeft = index === 0 ? "0" : "-8px";
+      av.style.zIndex = `${maxAvatars - index}`;
+      av.style.position = "relative";
+      avatarRow.appendChild(av);
     }
 
-    const accentDot = document.createElement("span");
-    accentDot.style.position = "absolute";
-    accentDot.style.left = "26px";
-    accentDot.style.top = "-1px";
-    accentDot.style.width = "10px";
-    accentDot.style.height = "10px";
-    accentDot.style.borderRadius = "999px";
-    accentDot.style.background = "#FF8A65";
-    accentDot.style.boxShadow = "0 0 0 3px rgba(255, 138, 101, 0.16)";
-    accentDot.style.zIndex = "4";
-    avatarCluster.appendChild(accentDot);
+    // if more than 3, show +N pill
+    if (draggedRescuers.length > 3) {
+      const extra = document.createElement("span");
+      extra.textContent = `+${draggedRescuers.length - 3}`;
+      extra.style.display = "flex";
+      extra.style.alignItems = "center";
+      extra.style.justifyContent = "center";
+      extra.style.width = "34px";
+      extra.style.height = "34px";
+      extra.style.borderRadius = "999px";
+      extra.style.border = "2px solid #FFFFFF";
+      extra.style.background = "#F3F4F6";
+      extra.style.color = "#6B7280";
+      extra.style.font = `700 10px/1 ${FONT}`;
+      extra.style.marginLeft = "-8px";
+      extra.style.position = "relative";
+      extra.style.zIndex = "0";
+      avatarRow.appendChild(extra);
+    }
 
+    // ── text block ──
     const body = document.createElement("div");
-    body.style.display = "flex";
-    body.style.minWidth = "0";
-    body.style.flexDirection = "column";
-    body.style.gap = "5px";
     body.style.flex = "1";
+    body.style.minWidth = "0";
+    body.style.display = "flex";
+    body.style.flexDirection = "column";
+    body.style.gap = "3px";
 
     const title = document.createElement("div");
     title.textContent = primaryName;
     title.style.overflow = "hidden";
-    title.style.color = "#111827";
     title.style.textOverflow = "ellipsis";
     title.style.whiteSpace = "nowrap";
-    title.style.font =
-      '700 14px/1.2 "SF Pro Display", "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+    title.style.color = "#111827";
+    title.style.font = `700 13px/1.3 ${FONT}`;
 
-    const subtitle = document.createElement("div");
-    subtitle.textContent = secondaryLabel;
-    subtitle.style.overflow = "hidden";
-    subtitle.style.color = "#6B7280";
-    subtitle.style.textOverflow = "ellipsis";
-    subtitle.style.whiteSpace = "nowrap";
-    subtitle.style.font =
-      '500 11px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+    const sub = document.createElement("div");
+    sub.style.display = "flex";
+    sub.style.alignItems = "center";
+    sub.style.gap = "5px";
 
-    const chips = document.createElement("div");
-    chips.style.display = "flex";
-    chips.style.alignItems = "center";
-    chips.style.gap = "6px";
-    chips.style.flexWrap = "wrap";
+    const countPill = document.createElement("span");
+    countPill.textContent = `${draggedCount} người`;
+    countPill.style.display = "inline-flex";
+    countPill.style.alignItems = "center";
+    countPill.style.height = "18px";
+    countPill.style.padding = "0 7px";
+    countPill.style.borderRadius = "999px";
+    countPill.style.background = "#FF5722";
+    countPill.style.color = "#FFFFFF";
+    countPill.style.font = `700 10px/1 ${FONT}`;
 
-    const createChip = (
-      text: string,
-      background: string,
-      borderColor: string,
-      color: string,
-    ) => {
-      const chip = document.createElement("span");
-      chip.textContent = text;
-      chip.style.display = "inline-flex";
-      chip.style.alignItems = "center";
-      chip.style.height = "20px";
-      chip.style.padding = "0 8px";
-      chip.style.borderRadius = "999px";
-      chip.style.border = `1px solid ${borderColor}`;
-      chip.style.background = background;
-      chip.style.color = color;
-      chip.style.font =
-        '600 10px/1 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
-      return chip;
-    };
+    const subText = document.createElement("span");
+    subText.textContent = "đang được kéo";
+    subText.style.color = "#9CA3AF";
+    subText.style.font = `500 11px/1 ${FONT}`;
 
-    chips.append(
-      createChip(
-        "Kéo cùng nhóm",
-        "rgba(255, 237, 213, 0.92)",
-        "rgba(255, 87, 34, 0.24)",
-        "#C2410C",
-      ),
-    );
-
-    body.append(title, subtitle, chips);
-    card.append(avatarCluster, body, countBadge);
+    sub.append(countPill, subText);
+    body.append(title, sub);
+    card.append(avatarRow, body);
     preview.append(card);
 
     return preview;
@@ -1871,7 +1786,7 @@ export default function CoordinatorRescuerManagementPage() {
                   )}
                 >
                   {rescuer.hasTeam
-                    ? (rescuer.activeTeamName || "Đã vào team")
+                    ? rescuer.activeTeamName || "Đã vào team"
                     : "Chưa vào team"}
                 </Badge>
 
@@ -1972,7 +1887,7 @@ export default function CoordinatorRescuerManagementPage() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <Button asChild variant="outline" className="gap-2">
             <Link href="/dashboard/coordinator">
@@ -2260,9 +2175,7 @@ export default function CoordinatorRescuerManagementPage() {
                       <Select
                         value={bulkSelectedAssemblyPointId}
                         onValueChange={setBulkSelectedAssemblyPointId}
-                        disabled={
-                          isAssignmentBusy || totalSelectedCount === 0
-                        }
+                        disabled={isAssignmentBusy || totalSelectedCount === 0}
                       >
                         <SelectTrigger className="h-9 w-full border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20 sm:flex-1">
                           <SelectValue
@@ -2349,6 +2262,7 @@ export default function CoordinatorRescuerManagementPage() {
               </div>
             ) : isSplitByAssemblyPointView ? (
               <div className="grid gap-3 xl:grid-cols-2">
+                {/* ── Left panel: assigned ── */}
                 <div
                   ref={leftPanelRef}
                   onDragOver={(event) => handlePanelDragOver(event, "left")}
@@ -2356,23 +2270,35 @@ export default function CoordinatorRescuerManagementPage() {
                   onDrop={(event) => {
                     void handlePanelDrop(event, "left");
                   }}
-                  className="rounded-lg border border-sky-200 bg-sky-50/55"
+                  className="flex flex-col overflow-hidden rounded-xl border border-sky-300/60 bg-white shadow-sm"
                 >
-                  <div className="border-b border-sky-200/90 bg-sky-50/70 px-3 py-2">
-                    <p className="text-sm font-semibold tracking-tight text-sky-900">
-                      Người cứu hộ trong điểm tập kết{" "}
-                      {selectedAssemblyPointLabel}
-                    </p>
-                    <p className="text-sm text-sky-800/80">
-                      {assignedCount} người cứu hộ đang thuộc điểm tập kết này.
-                      Kéo từ bên phải qua để thêm tạm. đổi.
-                    </p>
+                  {/* panel header */}
+                  <div className="flex items-start gap-3 border-b border-sky-200/70 bg-sky-50 px-4 py-3">
+                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+                      <CheckCircle className="h-4 w-4" weight="bold" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold uppercase tracking-widest text-sky-700">
+                        Điểm tập kết: {selectedAssemblyPointLabel}
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-sky-700/70">
+                        <span className="font-semibold">{assignedCount}</span>{" "}
+                        người cứu hộ đang thuộc điểm tập kết này — kéo từ cột
+                        phải sang để thêm tạm thời.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 p-3">
+                  <div className="flex-1 space-y-2 p-3">
                     {splitLeftPanelRescuers.length === 0 ? (
-                      <div className="rounded-md border border-dashed border-sky-200 bg-white/90 p-3 text-sm text-sky-900/70">
-                        Chưa có người cứu hộ nào trong điểm tập kết này.
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-sky-200 bg-sky-50/50 px-4 py-8 text-center">
+                        <MapPin
+                          className="h-6 w-6 text-sky-300"
+                          weight="duotone"
+                        />
+                        <p className="text-[13px] font-medium text-sky-600/80">
+                          Chưa có người cứu hộ nào trong điểm tập kết này.
+                        </p>
                       </div>
                     ) : (
                       splitLeftPanelRescuers.map((rescuer) =>
@@ -2385,6 +2311,7 @@ export default function CoordinatorRescuerManagementPage() {
                   </div>
                 </div>
 
+                {/* ── Right panel: unassigned / unconfirmed ── */}
                 <div
                   ref={rightPanelRef}
                   onDragOver={(event) => handlePanelDragOver(event, "right")}
@@ -2392,24 +2319,37 @@ export default function CoordinatorRescuerManagementPage() {
                   onDrop={(event) => {
                     void handlePanelDrop(event, "right");
                   }}
-                  className="rounded-lg border border-[#FF5722]/40 bg-[#FF5722]/10"
+                  className="flex flex-col overflow-hidden rounded-xl border border-[#FF5722]/30 bg-white shadow-sm"
                 >
-                  <div className="border-b border-[#FF5722]/25 bg-[#FF5722]/8 px-3 py-2">
-                    <p className="text-sm font-semibold tracking-tight text-[#7C2D12]">
-                      Chưa xác nhận có mặt hoặc chưa có điểm tập kết
-                    </p>
-                    <p className="text-sm text-[#9A3412]/80">
-                      {splitRightPanelRescuers.length} người cứu hộ có thể thêm
-                      vào điểm tập kết. Kéo ngược từ trái qua để bỏ gán tạm.
-                    </p>
+                  {/* panel header */}
+                  <div className="flex items-start gap-3 border-b border-[#FF5722]/20 bg-[#FFF7F2] px-4 py-3">
+                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#FF5722]/10 text-[#FF5722]">
+                      <WarningCircle className="h-4 w-4" weight="bold" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold uppercase tracking-widest text-[#9A3412]">
+                        Chưa xác nhận có mặt hoặc chưa có điểm tập kết
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-[#9A3412]/70">
+                        <span className="font-semibold">
+                          {splitRightPanelRescuers.length}
+                        </span>{" "}
+                        người cứu hộ có thể thêm vào điểm tập kết — kéo ngược từ
+                        cột trái sang để bỏ gán tạm thời.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 p-3">
+                  <div className="flex-1 space-y-2 p-3">
                     {splitRightPanelRescuers.length === 0 ? (
-                      <div className="rounded-md border border-dashed border-[#FF5722]/35 bg-white/90 p-3 text-sm text-[#9A3412]/80">
-                        Không còn người cứu hộ phù hợp với điều kiện chưa xác
-                        nhận có mặt hoặc chưa có điểm tập kết theo bộ lọc hiện
-                        tại.
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#FF5722]/25 bg-[#FFF7F2]/60 px-4 py-8 text-center">
+                        <UsersThree
+                          className="h-6 w-6 text-[#FF5722]/40"
+                          weight="duotone"
+                        />
+                        <p className="text-[13px] font-medium text-[#9A3412]/60">
+                          Không còn người cứu hộ phù hợp với bộ lọc hiện tại.
+                        </p>
                       </div>
                     ) : (
                       splitRightPanelRescuers.map((rescuer) =>

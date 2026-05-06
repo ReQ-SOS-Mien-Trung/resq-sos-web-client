@@ -12089,11 +12089,32 @@ const RescuePlanPanel = ({
                                   <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-sm font-bold tracking-tighter text-indigo-700 dark:border-indigo-700/50 dark:bg-indigo-900/20 dark:text-indigo-300">
                                     Ưu tiên: {mission.priorityScore.toFixed(1)}
                                   </span>
-                                  {mission.suggestedSeverityLevel && (
-                                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
-                                      Mức độ: {mission.suggestedSeverityLevel}
-                                    </span>
-                                  )}
+                                  {mission.suggestedSeverityLevel &&
+                                    (() => {
+                                      const svCfg =
+                                        severityConfig[
+                                          mission.suggestedSeverityLevel as keyof typeof severityConfig
+                                        ];
+                                      const svVariant = svCfg?.variant;
+                                      const svLabel =
+                                        svCfg?.label ??
+                                        mission.suggestedSeverityLevel;
+                                      const svClass =
+                                        svVariant === "p1"
+                                          ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700/50 dark:bg-rose-900/20 dark:text-rose-300"
+                                          : svVariant === "p2"
+                                            ? "border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700/50 dark:bg-orange-900/20 dark:text-orange-300"
+                                            : svVariant === "p3"
+                                              ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-300"
+                                              : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700/50 dark:bg-slate-900/20 dark:text-slate-300";
+                                      return (
+                                        <span
+                                          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tighter ${svClass}`}
+                                        >
+                                          Mức độ: {svLabel}
+                                        </span>
+                                      );
+                                    })()}
                                   <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-bold tracking-tighter text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/20 dark:text-emerald-300">
                                     {mission.activityCount} bước
                                   </span>

@@ -174,7 +174,7 @@ export interface ClusterSuggestedActivity {
   description: string;
   targetVictimSummary?: string | null;
   targetVictims?: ClusterTargetVictim[];
-  priority: string | null;
+  priority?: string | null;
   estimatedTime: string | null;
   executionMode?: string | null;
   requiredTeamCount?: number | null;
@@ -201,7 +201,7 @@ export interface MissionSuggestionActivity {
   activityType: ClusterActivityType;
   suggestionPhase: string;
   suggestedActivities: ClusterSuggestedActivity[];
-  confidenceScore: number | null;
+  confidenceScore?: number | null;
   createdAt: string | null;
 }
 
