@@ -1,5 +1,11 @@
+import { Metadata } from "next";
 import { Suspense } from "react";
 import { RoleGuard } from "@/components/auth";
+
+export const metadata: Metadata = {
+  title: "Điều Phối | ResQ-SOS Miền Trung",
+  description: "Bảng điều phối cứu hộ thiên tai - ResQ-SOS Miền Trung",
+};
 
 export default function CoordinatorLayout({
   children,

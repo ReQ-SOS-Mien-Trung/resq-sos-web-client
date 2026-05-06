@@ -1,9 +1,9 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Coordinator Dashboard | ReQ-SOS Miền Trung",
+  title: "ResQ-SOS Miền Trung",
   description:
-    "Bảng điều khiển điều phối cứu hộ thiên tai - ReQ-SOS Miền Trung",
+    "Bảng điều khiển điều phối cứu hộ thiên tai - ResQ-SOS Miền Trung",
 };
 
 export default function DashboardLayout({

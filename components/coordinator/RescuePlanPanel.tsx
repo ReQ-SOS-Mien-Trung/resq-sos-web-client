@@ -344,11 +344,32 @@ const AI_STEP_TRANSLATIONS: Record<string, string> = {
   RETURN_SUPPLIES: "Hoàn trả vật phẩm",
   MOVE_TO_LOCATION: "Di chuyển",
   SOS_SUPPORT: "Hỗ trợ SOS",
+  MEDICAL_AID: "Hỗ trợ y tế",
 };
+
+// Standalone English terms the AI may inject verbatim into note/warning strings.
+// Order matters: longer/more-specific keys must come before shorter ones.
+const AI_INLINE_TERM_TRANSLATIONS: [RegExp, string][] = [
+  [
+    /\bREUSABLE_FIELD_USE_BEFORE_RETURN\b/g,
+    "dùng vật dụng tái sử dụng trước khi hoàn trả",
+  ],
+  [/\bCOLLECT_SUPPLIES\b/g, "Tiếp nhận vật phẩm"],
+  [/\bDELIVER_SUPPLIES\b/g, "Phân phát vật phẩm"],
+  [/\bRETURN_SUPPLIES\b/g, "Hoàn trả vật phẩm"],
+  [/\bMOVE_TO_LOCATION\b/g, "Di chuyển"],
+  [/\bSOS_SUPPORT\b/g, "Hỗ trợ SOS"],
+  [/\bMEDICAL_AID\b/g, "Hỗ trợ y tế"],
+  [/\bCOLLECT\b/g, "Tiếp nhận"],
+  [/\bDELIVER\b/g, "Phân phát"],
+  [/\bRESCUE\b/g, "Cứu hộ"],
+  [/\bEVACUATE\b/g, "Sơ tán"],
+  [/\b[Cc]oordinator\b/g, "người điều phối"],
+];
 
 function translateAIText(text: string): string {
   if (!text) return text;
-  return text
+  let result = text
     .replace(
       /Activity step (\d+) \(([^)]+)\)/g,
       (match, step, type) =>
@@ -359,6 +380,10 @@ function translateAIText(text: string): string {
       /pool nearby teams/g,
       "danh sách đội cứu hộ được quét xung quanh khu vực",
     );
+  for (const [pattern, replacement] of AI_INLINE_TERM_TRANSLATIONS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
 }
 
 function FormattedAINotes({
@@ -872,7 +897,7 @@ function ActivityExecutionMeta({
       {requiredTeamCount > 0 ? (
         <Badge className="h-7 border-emerald-200/50 bg-emerald-50/80 px-2.5 text-[13px] font-semibold text-emerald-700 backdrop-blur-sm dark:border-emerald-800/30 dark:bg-emerald-900/30 dark:text-emerald-300">
           <Users className="mr-1.5 h-3.5 w-3.5" weight="bold" />
-          {requiredTeamCount} đội cần hỗ trợ
+          {requiredTeamCount} đội hỗ trợ
         </Badge>
       ) : null}
       {activity.sosRequestId != null ? (
@@ -8388,7 +8413,7 @@ const SuggestionCard = ({
                   Cảnh báo gộp cứu hộ và cứu trợ
                 </p>
                 <p className="mt-0.5 text-sm text-rose-700/80 dark:text-rose-300/80 leading-relaxed">
-                  {suggestion.mixedRescueReliefWarning}
+                  {translateAIText(suggestion.mixedRescueReliefWarning ?? "")}
                 </p>
               </div>
             ) : null}
@@ -8396,7 +8421,7 @@ const SuggestionCard = ({
             {suggestion.lowConfidenceWarning ? (
               <div className="rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-2 dark:border-amber-800/40 dark:bg-amber-900/10">
                 <p className="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
-                  {suggestion.lowConfidenceWarning}
+                  {translateAIText(suggestion.lowConfidenceWarning ?? "")}
                 </p>
               </div>
             ) : null}
@@ -8412,8 +8437,6 @@ const SuggestionCard = ({
                 </p>
               </div>
             ) : null}
-
-            <CoordinationSummaryPanel entries={coordinationEntries} compact />
 
             {suggestion.supplyShortages.length > 0 ? (
               <div className="rounded-md border border-sky-200 bg-sky-50/80 px-2.5 py-2 dark:border-sky-800/40 dark:bg-sky-900/10">
@@ -8688,12 +8711,6 @@ const SuggestionCard = ({
                                               </span>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
-                                              <span className="text-[14px] font-black text-primary">
-                                                ×{supply.quantity}
-                                              </span>
-                                              <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                                                {supply.unit}
-                                              </span>
                                               {showSupplyBuffer ? (
                                                 <span className="rounded bg-amber-50 px-1 text-[11px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                   Dự trù{" "}
@@ -8702,6 +8719,12 @@ const SuggestionCard = ({
                                                   )}
                                                 </span>
                                               ) : null}
+                                              <span className="text-[14px] font-black text-primary">
+                                                ×{supply.quantity}
+                                              </span>
+                                              <span className="text-[11px] font-bold uppercase text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                                                {supply.unit}
+                                              </span>
                                             </div>
                                           </div>
                                         );
@@ -12064,11 +12087,32 @@ const RescuePlanPanel = ({
                                   <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-sm font-bold tracking-tighter text-indigo-700 dark:border-indigo-700/50 dark:bg-indigo-900/20 dark:text-indigo-300">
                                     Ưu tiên: {mission.priorityScore.toFixed(1)}
                                   </span>
-                                  {mission.suggestedSeverityLevel && (
-                                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/60 px-2 py-0.5 text-sm font-semibold tracking-tighter text-foreground/80">
-                                      Mức độ: {mission.suggestedSeverityLevel}
-                                    </span>
-                                  )}
+                                  {mission.suggestedSeverityLevel &&
+                                    (() => {
+                                      const svCfg =
+                                        severityConfig[
+                                          mission.suggestedSeverityLevel as keyof typeof severityConfig
+                                        ];
+                                      const svVariant = svCfg?.variant;
+                                      const svLabel =
+                                        svCfg?.label ??
+                                        mission.suggestedSeverityLevel;
+                                      const svClass =
+                                        svVariant === "p1"
+                                          ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700/50 dark:bg-rose-900/20 dark:text-rose-300"
+                                          : svVariant === "p2"
+                                            ? "border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700/50 dark:bg-orange-900/20 dark:text-orange-300"
+                                            : svVariant === "p3"
+                                              ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-300"
+                                              : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700/50 dark:bg-slate-900/20 dark:text-slate-300";
+                                      return (
+                                        <span
+                                          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm font-semibold tracking-tighter ${svClass}`}
+                                        >
+                                          Mức độ: {svLabel}
+                                        </span>
+                                      );
+                                    })()}
                                   <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-bold tracking-tighter text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/20 dark:text-emerald-300">
                                     {mission.activityCount} bước
                                   </span>
@@ -12670,10 +12714,6 @@ const RescuePlanPanel = ({
                                                                               </span>
                                                                             </div>
                                                                             <div className="flex shrink-0 items-center gap-1">
-                                                                              <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                                                                                {supply.quantityLabel ||
-                                                                                  "-"}
-                                                                              </span>
                                                                               {supply.bufferRatioLabel ? (
                                                                                 <span className="rounded bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                                                   Dự
@@ -12683,6 +12723,10 @@ const RescuePlanPanel = ({
                                                                                   }
                                                                                 </span>
                                                                               ) : null}
+                                                                              <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                                                                {supply.quantityLabel ||
+                                                                                  "-"}
+                                                                              </span>
                                                                             </div>
                                                                           </div>
 
@@ -14128,7 +14172,7 @@ const RescuePlanPanel = ({
                                                                     <div
                                                                       className={cn(
                                                                         showBufferInput
-                                                                          ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
+                                                                          ? "grid min-w-0 grid-cols-[minmax(0,1fr)_76px_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
                                                                           : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
                                                                         hasActivityError
                                                                           ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
@@ -14160,40 +14204,6 @@ const RescuePlanPanel = ({
                                                                             "Vật phẩm chưa rõ tên"}
                                                                         </span>
                                                                       </div>
-                                                                      <Input
-                                                                        type="number"
-                                                                        min={0}
-                                                                        value={
-                                                                          Number.isNaN(
-                                                                            supply.quantity,
-                                                                          )
-                                                                            ? ""
-                                                                            : supply.quantity
-                                                                        }
-                                                                        onChange={(
-                                                                          event,
-                                                                        ) =>
-                                                                          handleUpdateSupplyQuantity(
-                                                                            activity._id,
-                                                                            sIdx,
-                                                                            parseInt(
-                                                                              event
-                                                                                .target
-                                                                                .value,
-                                                                            ),
-                                                                          )
-                                                                        }
-                                                                        disabled={
-                                                                          isAutoManagedSupplyStep ||
-                                                                          lockGeneralActivityEdits
-                                                                        }
-                                                                        className="h-6 w-full px-1 text-center text-sm"
-                                                                      />
-                                                                      <span className="text-right text-sm text-muted-foreground">
-                                                                        {normalizeSupplyUnit(
-                                                                          supply.unit,
-                                                                        )}
-                                                                      </span>
                                                                       {showBufferInput ? (
                                                                         <div className="relative min-w-0">
                                                                           <Input
@@ -14234,6 +14244,40 @@ const RescuePlanPanel = ({
                                                                           </span>
                                                                         </div>
                                                                       ) : null}
+                                                                      <Input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        value={
+                                                                          Number.isNaN(
+                                                                            supply.quantity,
+                                                                          )
+                                                                            ? ""
+                                                                            : supply.quantity
+                                                                        }
+                                                                        onChange={(
+                                                                          event,
+                                                                        ) =>
+                                                                          handleUpdateSupplyQuantity(
+                                                                            activity._id,
+                                                                            sIdx,
+                                                                            parseInt(
+                                                                              event
+                                                                                .target
+                                                                                .value,
+                                                                            ),
+                                                                          )
+                                                                        }
+                                                                        disabled={
+                                                                          isAutoManagedSupplyStep ||
+                                                                          lockGeneralActivityEdits
+                                                                        }
+                                                                        className="h-6 w-full px-1 text-center text-sm"
+                                                                      />
+                                                                      <span className="text-right text-sm text-muted-foreground">
+                                                                        {normalizeSupplyUnit(
+                                                                          supply.unit,
+                                                                        )}
+                                                                      </span>
                                                                       <Button
                                                                         variant="ghost"
                                                                         size="icon"
@@ -14616,16 +14660,7 @@ const RescuePlanPanel = ({
             >
               <ScrollArea className="h-full">
                 <div className="p-3 space-y-3">
-                  {activeSuggestion &&
-                  !isEditMode &&
-                  activeCoordinationEntries.length > 0 ? (
-                    <>
-                      <CoordinationSummaryPanel
-                        entries={activeCoordinationEntries}
-                      />
-                      <Separator />
-                    </>
-                  ) : null}
+                  {null}
 
                   {/* Activity Steps — moved from left column */}
                   {activeSuggestion && !isEditMode && (
@@ -14905,10 +14940,6 @@ const RescuePlanPanel = ({
                                                             </span>
                                                           </div>
                                                           <div className="flex shrink-0 items-center gap-1">
-                                                            <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                                                              {supply.quantityLabel ||
-                                                                "-"}
-                                                            </span>
                                                             {supply.bufferRatioLabel ? (
                                                               <span className="rounded bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                                                 Dự trù{" "}
@@ -14917,6 +14948,10 @@ const RescuePlanPanel = ({
                                                                 }
                                                               </span>
                                                             ) : null}
+                                                            <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                                              {supply.quantityLabel ||
+                                                                "-"}
+                                                            </span>
                                                           </div>
                                                         </div>
                                                       </div>
