@@ -26,6 +26,17 @@ export interface GetRescuerApplicationsResponse {
   hasPreviousPage: boolean;
 }
 
+// ─── Update Certificates (PUT /identity/admin/rescuer-applications/{userId}/certificates) ───
+
+export interface UpdateRescuerCertificateDocument {
+  fileUrl: string;
+  fileTypeId: number;
+}
+
+export interface UpdateRescuerCertificatesRequest {
+  documents: UpdateRescuerCertificateDocument[];
+}
+
 // Query params for fetching rescuer applications
 export interface GetRescuerApplicationsParams {
   pageNumber?: number;

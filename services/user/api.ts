@@ -16,6 +16,10 @@ import {
   RescuerTypeMetadataOption,
   AbilityCategoryMetadataOption,
   AdminCreateUserResponse,
+  GetDocumentFileTypesResponse,
+  GetAbilitiesResponse,
+  UpdateUserAbilitiesRequest,
+  UpsertRescuerDocumentsRequest,
 } from "./type";
 
 type AbilityCategoryMetadataApiItem = {
@@ -187,4 +191,41 @@ export async function getAbilityCategoryMetadata(): Promise<
     key,
     value,
   }));
+}
+
+export async function getDocumentFileTypes(): Promise<GetDocumentFileTypesResponse> {
+  const { data } = await api.get("/identity/document-file-types");
+  return data;
+}
+
+export async function getAbilities(): Promise<GetAbilitiesResponse> {
+  const { data } = await api.get("/identity/abilities");
+  return data;
+}
+
+export async function updateUserAbilities(
+  userId: string,
+  payload: UpdateUserAbilitiesRequest,
+): Promise<void> {
+  await api.put(`/identity/user/${userId}/abilities`, payload);
+}
+
+export async function createRescuerDocuments(
+  userId: string,
+  payload: UpsertRescuerDocumentsRequest,
+): Promise<void> {
+  await api.post(
+    `/identity/admin/rescuer-applications/${userId}/certificates`,
+    payload,
+  );
+}
+
+export async function updateRescuerDocuments(
+  userId: string,
+  payload: UpsertRescuerDocumentsRequest,
+): Promise<void> {
+  await api.put(
+    `/identity/admin/rescuer-applications/${userId}/certificates`,
+    payload,
+  );
 }

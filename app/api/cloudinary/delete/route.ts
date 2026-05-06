@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const publicIds: string[] = body?.publicIds;
+    const resourceType: string = body?.resourceType ?? "raw"; // "image" | "raw" | "video"
 
     if (!Array.isArray(publicIds) || publicIds.length === 0) {
       return NextResponse.json(
@@ -33,12 +34,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cloudinary Admin API – Delete Resources (raw type for PDFs)
+    // Cloudinary Admin API – Delete Resources
     // https://cloudinary.com/documentation/admin_api#delete_resources
     const auth = Buffer.from(`${API_KEY}:${API_SECRET}`).toString("base64");
 
     const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/raw/upload`,
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/${resourceType}/upload`,
       {
         method: "DELETE",
         headers: {

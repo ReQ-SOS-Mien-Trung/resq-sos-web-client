@@ -26,7 +26,10 @@ import {
   Spinner,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { uploadImageToCloudinary } from "@/utils/uploadFile";
+import {
+  uploadImageToCloudinaryWithId,
+  deleteCloudinaryImages,
+} from "@/utils/uploadFile";
 import {
   useAdminCreateUser,
   useRoleMetadata,
@@ -245,6 +248,15 @@ export default function CreateUserPage() {
       return;
     }
 
+    const MAX_FILE_SIZE_MB = 20;
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(
+        `Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn ${MAX_FILE_SIZE_MB}MB.`,
+      );
+      e.currentTarget.value = "";
+      return;
+    }
+
     if (avatarPreview?.startsWith("blob:")) {
       URL.revokeObjectURL(avatarPreview);
     }
@@ -356,12 +368,11 @@ export default function CreateUserPage() {
       toast.loading("Đang tải ảnh đại diện...");
       setIsUploading(true);
 
+      let uploadedPublicId: string | null = null;
       try {
-        const avatarUrl = await uploadImageToCloudinary(
-          avatarFile,
-          "avatar",
-          "avatar",
-        );
+        const { secureUrl: avatarUrl, publicId } =
+          await uploadImageToCloudinaryWithId(avatarFile, "avatar", "avatar");
+        uploadedPublicId = publicId;
 
         await updateUserAvatarMutation.mutateAsync({
           userId: createdUserId,
@@ -370,7 +381,15 @@ export default function CreateUserPage() {
 
         toast.dismiss();
         toast.success("Tạo tài khoản thành công!");
-      } catch {
+      } catch (avatarErr: any) {
+        console.error(
+          "[Avatar Upload] Error:",
+          avatarErr?.response?.data ?? avatarErr,
+        );
+        // If avatar update failed after image was already uploaded → cleanup Cloudinary
+        if (uploadedPublicId) {
+          await deleteCloudinaryImages([uploadedPublicId]);
+        }
         toast.dismiss();
         toast.warning(
           "Tạo tài khoản thành công nhưng cập nhật ảnh đại diện thất bại.",
