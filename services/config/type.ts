@@ -10,6 +10,9 @@ export type SosExpressionNode =
 
 export interface SosPriorityScoreConfig {
   formula: string;
+  medical_weight: number;
+  relief_weight: number;
+  request_type_weight: number;
   use_request_type_score: boolean;
   expression: SosExpressionNode;
 }

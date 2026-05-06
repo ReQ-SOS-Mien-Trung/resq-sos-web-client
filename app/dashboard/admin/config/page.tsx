@@ -172,6 +172,14 @@ type FormulaDropTarget =
       insertAfter: boolean;
     };
 
+const DEFAULT_PRIORITY_SCORE_WEIGHTS = {
+  medical_weight: 1,
+  relief_weight: 1.1,
+  request_type_weight: 0.15,
+};
+
+type PriorityWeightKey = keyof typeof DEFAULT_PRIORITY_SCORE_WEIGHTS;
+
 const EMPTY_FORMULA_TOKENS: Record<FormulaField, FormulaToken[]> = {
   vulnerability: [],
   relief: [],
@@ -615,6 +623,99 @@ function cloneDocument(
   return structuredClone(value);
 }
 
+function formatFormulaWeight(value: number) {
+  return Number.isFinite(value) ? Number(value.toFixed(4)).toString() : "0";
+}
+
+function buildWeightedPriorityFormula(
+  priorityScore: Pick<
+    SosPriorityRuleConfigDocument["priority_score"],
+    "medical_weight" | "relief_weight" | "request_type_weight"
+  >,
+) {
+  return `MIN(100, ROUND(((medical_score * ${formatFormulaWeight(
+    priorityScore.medical_weight,
+  )}) + (relief_score * ${formatFormulaWeight(
+    priorityScore.relief_weight,
+  )}) + (request_type_score * ${formatFormulaWeight(
+    priorityScore.request_type_weight,
+  )})) * situation_multiplier * relief_pressure_multiplier))`;
+}
+
+function buildWeightedPriorityExpression(): SosExpressionNode {
+  return {
+    op: "MIN",
+    left: { value: 100 },
+    right: {
+      op: "ROUND",
+      value: {
+        op: "MUL",
+        left: {
+          op: "MUL",
+          left: {
+            op: "ADD",
+            left: {
+              op: "ADD",
+              left: {
+                op: "MUL",
+                left: { var: "medical_score" },
+                right: { var: "medical_weight" },
+              },
+              right: {
+                op: "MUL",
+                left: { var: "relief_score" },
+                right: { var: "relief_weight" },
+              },
+            },
+            right: {
+              op: "MUL",
+              left: { var: "request_type_score" },
+              right: { var: "request_type_weight" },
+            },
+          },
+          right: { var: "situation_multiplier" },
+        },
+        right: { var: "relief_pressure_multiplier" },
+      },
+    },
+  };
+}
+
+function isLegacyPriorityFormula(formula?: string) {
+  const normalized = formula?.replace(/\s+/g, "").toLowerCase() ?? "";
+  return (
+    normalized.includes("medical_score*2") &&
+    normalized.includes("relief_score*1.1") &&
+    normalized.includes("request_type_score*0.15")
+  );
+}
+
+function normalizePriorityScoreConfig(
+  priorityScore: SosPriorityRuleConfigDocument["priority_score"],
+): SosPriorityRuleConfigDocument["priority_score"] {
+  const normalized = {
+    ...priorityScore,
+    medical_weight:
+      priorityScore.medical_weight ??
+      DEFAULT_PRIORITY_SCORE_WEIGHTS.medical_weight,
+    relief_weight:
+      priorityScore.relief_weight ?? DEFAULT_PRIORITY_SCORE_WEIGHTS.relief_weight,
+    request_type_weight:
+      priorityScore.request_type_weight ??
+      DEFAULT_PRIORITY_SCORE_WEIGHTS.request_type_weight,
+  };
+
+  if (isLegacyPriorityFormula(normalized.formula)) {
+    return {
+      ...normalized,
+      formula: buildWeightedPriorityFormula(normalized),
+      expression: buildWeightedPriorityExpression(),
+    };
+  }
+
+  return normalized;
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "Chưa có";
 
@@ -644,7 +745,7 @@ function extractConfigDocument(
     is_active: config.is_active,
     medical_severe_issues: config.medical_severe_issues,
     request_type_scores: config.request_type_scores,
-    priority_score: config.priority_score,
+    priority_score: normalizePriorityScoreConfig(config.priority_score),
     medical_score: config.medical_score,
     relief_score: config.relief_score,
     situation_multiplier: config.situation_multiplier,
@@ -3384,6 +3485,30 @@ const AdminConfigPage = () => {
     setEditorDocument(updateDocumentAtPath(workingDocument, path, value));
   };
 
+  const handlePriorityWeightChange = (
+    weightKey: PriorityWeightKey,
+    value: number,
+  ) => {
+    if (!sourceKey || !workingDocument || Number.isNaN(value)) {
+      return;
+    }
+
+    const next = cloneDocument(workingDocument);
+    next.priority_score[weightKey] = value;
+    next.priority_score.formula = buildWeightedPriorityFormula(
+      next.priority_score,
+    );
+    next.priority_score.expression = buildWeightedPriorityExpression();
+
+    validateMutation.reset();
+    setEditorSourceKey(sourceKey);
+    setEditorDocument(next);
+    setEditorFormulaTokens((current) => ({
+      ...(editorSourceKey === sourceKey ? current : baseFormulaTokens),
+      priority: expressionToTokens(next.priority_score.expression),
+    }));
+  };
+
   const handleFormulaTokensChange = (
     field: FormulaField,
     next: FormulaToken[],
@@ -4829,6 +4954,54 @@ const AdminConfigPage = () => {
                                 )
                               }
                             />
+                            <div className="grid gap-3 md:grid-cols-3">
+                              {(
+                                [
+                                  [
+                                    "medical_weight",
+                                    "Medical weight",
+                                    "Trọng số điểm y tế",
+                                  ],
+                                  [
+                                    "relief_weight",
+                                    "Relief weight",
+                                    "Trọng số điểm cứu trợ",
+                                  ],
+                                  [
+                                    "request_type_weight",
+                                    "Request type weight",
+                                    "Trọng số loại SOS",
+                                  ],
+                                ] as const
+                              ).map(([key, label, description]) => (
+                                <div key={key}>
+                                  <Label className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                    {label}
+                                  </Label>
+                                  <Input
+                                    className="mt-2"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    disabled={!isDraft}
+                                    value={workingDocument.priority_score[key]}
+                                    onChange={(event) => {
+                                      const nextValue = Number(
+                                        event.target.value,
+                                      );
+                                      if (Number.isNaN(nextValue)) return;
+                                      handlePriorityWeightChange(
+                                        key,
+                                        nextValue,
+                                      );
+                                    }}
+                                  />
+                                  <p className="mt-1 text-xs tracking-tight text-muted-foreground">
+                                    {description}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
                             <div className="rounded-2xl border border-border/60 bg-muted/20 p-3">
                               <p className="text-xs tracking-tight text-muted-foreground">
                                 Created:{" "}
