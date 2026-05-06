@@ -1718,7 +1718,7 @@ const UserDetailSheet = ({
                         size={16}
                         className="text-muted-foreground shrink-0 group-hover:text-primary transition-colors"
                       />
-                      <span className="text-sm tracking-tighter text-foreground truncate flex-1">
+                      <span className="text-sm tracking-tighter italic text-foreground truncate flex-1">
                         {doc.fileTypeName ?? "Tài liệu không xác định"}
                       </span>
                       <ArrowSquareOut
