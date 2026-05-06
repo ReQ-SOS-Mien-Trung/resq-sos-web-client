@@ -897,7 +897,7 @@ function ActivityExecutionMeta({
       {requiredTeamCount > 0 ? (
         <Badge className="h-7 border-emerald-200/50 bg-emerald-50/80 px-2.5 text-[13px] font-semibold text-emerald-700 backdrop-blur-sm dark:border-emerald-800/30 dark:bg-emerald-900/30 dark:text-emerald-300">
           <Users className="mr-1.5 h-3.5 w-3.5" weight="bold" />
-          {requiredTeamCount} đội cần hỗ trợ
+          {requiredTeamCount} đội hỗ trợ
         </Badge>
       ) : null}
       {activity.sosRequestId != null ? (
@@ -8438,8 +8438,6 @@ const SuggestionCard = ({
               </div>
             ) : null}
 
-            <CoordinationSummaryPanel entries={coordinationEntries} compact />
-
             {suggestion.supplyShortages.length > 0 ? (
               <div className="rounded-md border border-sky-200 bg-sky-50/80 px-2.5 py-2 dark:border-sky-800/40 dark:bg-sky-900/10">
                 <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">
@@ -14662,16 +14660,7 @@ const RescuePlanPanel = ({
             >
               <ScrollArea className="h-full">
                 <div className="p-3 space-y-3">
-                  {activeSuggestion &&
-                  !isEditMode &&
-                  activeCoordinationEntries.length > 0 ? (
-                    <>
-                      <CoordinationSummaryPanel
-                        entries={activeCoordinationEntries}
-                      />
-                      <Separator />
-                    </>
-                  ) : null}
+                  {null}
 
                   {/* Activity Steps — moved from left column */}
                   {activeSuggestion && !isEditMode && (
