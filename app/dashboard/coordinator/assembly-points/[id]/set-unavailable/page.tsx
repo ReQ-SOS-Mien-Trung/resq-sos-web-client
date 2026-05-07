@@ -188,8 +188,8 @@ function SummaryTile({
   tone: string;
 }) {
   return (
-    <div className={cn("rounded-xl border px-4 py-3", tone)}>
-      <p className="text-xs font-semibold uppercase tracking-wider opacity-70">
+    <div className={cn("rounded-xl border px-3 py-3", tone)}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70 whitespace-nowrap">
         {label}
       </p>
       <p className="mt-1.5 text-2xl font-black tracking-tight">{value}</p>
@@ -589,9 +589,6 @@ export default function AssemblyPointUnavailableReassignmentPage() {
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] text-slate-500">
-                    Đã chọn đích
-                  </span>
                   <span className="text-[14px] font-black tracking-tight">
                     {completedCount}/{totalRequired}
                   </span>

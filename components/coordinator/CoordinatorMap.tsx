@@ -23,6 +23,7 @@ import {
   UsersThree,
   WarningCircle,
   MapTrifold,
+  Factory,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -806,7 +807,7 @@ const CoordinatorMap = ({
 
       <div
         className={cn(
-          "absolute top-3 right-3 z-1000 transition-all duration-200",
+          "absolute top-16 right-3 z-1000 transition-all duration-200",
           panelOpen && "pointer-events-none opacity-0 -translate-y-1",
         )}
       >
@@ -832,8 +833,9 @@ const CoordinatorMap = ({
             </TooltipContent>
           </Tooltip>
           <PopoverContent
-            align="end"
-            side="right"
+            align="start"
+            side="left"
+            collisionPadding={8}
             className="w-[min(16rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background p-3 shadow-xl"
           >
             <div className="flex items-center justify-between gap-2">
