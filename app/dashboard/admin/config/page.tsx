@@ -699,7 +699,8 @@ function normalizePriorityScoreConfig(
       priorityScore.medical_weight ??
       DEFAULT_PRIORITY_SCORE_WEIGHTS.medical_weight,
     relief_weight:
-      priorityScore.relief_weight ?? DEFAULT_PRIORITY_SCORE_WEIGHTS.relief_weight,
+      priorityScore.relief_weight ??
+      DEFAULT_PRIORITY_SCORE_WEIGHTS.relief_weight,
     request_type_weight:
       priorityScore.request_type_weight ??
       DEFAULT_PRIORITY_SCORE_WEIGHTS.request_type_weight,
@@ -3025,8 +3026,8 @@ function SystemParameterConfigCard() {
         <SystemParameterCard
           tone={SYSTEM_CONFIG_CARD_TONES.cluster}
           eyebrow="SOS cluster grouping"
-          title="Khoảng cách gom SOS vào cùng cluster"
-          description="Khoảng cách tối đa để nhiều SOS request được gom vào cùng một SOS cluster."
+          title="Khoảng cách gom SOS vào cùng cụm"
+          description="Khoảng cách tối đa để nhiều yêu cầu hộ trợ được gom vào cùng một cụm SOS."
           unitSuffix=" km"
           value={clusterValue}
           onValueChange={setClusterDraft}
@@ -3049,8 +3050,8 @@ function SystemParameterConfigCard() {
         <SystemParameterCard
           tone={SYSTEM_CONFIG_CARD_TONES.radius}
           eyebrow="Rescue team search radius"
-          title="Bán kính tìm kiếm đội cứu hộ theo cluster"
-          description="Bán kính hệ thống dùng để tìm các đội cứu hộ quanh SOS cluster khi lập phương án."
+          title="Bán kính tìm kiếm đội cứu hộ"
+          description="Bán kính hệ thống dùng để tìm các đội cứu hộ quanh cụm SOS khi lập phương án."
           unitSuffix=" km"
           value={radiusValue}
           onValueChange={setRadiusDraft}
