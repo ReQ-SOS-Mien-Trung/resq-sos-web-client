@@ -6,7 +6,6 @@ import type {
 
 export type PromptType =
   | "SosPriorityAnalysis"
-  | "MissionPlanning"
   | "MissionRequirementsAssessment"
   | "MissionDepotPlanning"
   | "MissionTeamPlanning"
