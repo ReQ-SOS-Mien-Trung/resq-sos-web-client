@@ -4,6 +4,7 @@ import type { RescuerType } from "../rescuers/type";
 export type AssemblyPointStatus =
   | "Created"
   | "Available"
+  | "PendingUnavailable"
   | "Unavailable"
   | "Closed";
 
@@ -142,6 +143,109 @@ export interface AssemblyPointStatusTransitionRequest {
 export interface AssemblyPointStatusTransitionResponse {
   id: number;
   status: AssemblyPointStatus;
+  message: string;
+  impact?: AssemblyPointUnavailableImpactResponse | null;
+}
+
+export interface AssemblyPointUnavailableAlternative {
+  id: number;
+  code: string;
+  name: string;
+  maxCapacity: number;
+  status: AssemblyPointStatus | string;
+  latitude: number | null;
+  longitude: number | null;
+  distanceKm: number | null;
+}
+
+export interface AssemblyPointUnavailableCheckedInRescuer {
+  userId: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  rescuerType: string | null;
+  checkedInAt: string | null;
+  assemblyEventId: number;
+  topAbilities: string[];
+}
+
+export interface AssemblyPointUnavailableMissionActivity {
+  missionActivityId: number;
+  missionId: number | null;
+  missionTeamId: number | null;
+  rescueTeamId: number | null;
+  rescueTeamCode: string | null;
+  rescueTeamName: string | null;
+  step: number | null;
+  activityType: string | null;
+  status: string;
+  description: string | null;
+}
+
+export interface AssemblyPointUnavailableRescueTeamImpact {
+  rescueTeamId: number | null;
+  rescueTeamCode: string | null;
+  rescueTeamName: string | null;
+  rescueTeamStatus: string | null;
+  missionTeamId: number | null;
+  impactReason: string[];
+  memberUserIds: string[];
+  activities: AssemblyPointUnavailableMissionActivity[];
+}
+
+export interface AssemblyPointUnavailableStationedTeam {
+  rescueTeamId: number;
+  rescueTeamCode: string | null;
+  rescueTeamName: string | null;
+  rescueTeamStatus: string | null;
+  memberUserIds: string[];
+}
+
+export interface AssemblyPointUnavailableImpactResponse {
+  assemblyPointId: number;
+  assemblyPointCode: string;
+  assemblyPointName: string;
+  currentStatus: AssemblyPointStatus | string;
+  statusChangedAt: string | null;
+  availableAssemblyPoints: AssemblyPointUnavailableAlternative[];
+  checkedInRescuers: AssemblyPointUnavailableCheckedInRescuer[];
+  teamlessCheckedInRescuers: AssemblyPointUnavailableCheckedInRescuer[];
+  stationedTeams: AssemblyPointUnavailableStationedTeam[];
+  rescueTeams: AssemblyPointUnavailableRescueTeamImpact[];
+}
+
+export interface RescuerAssemblyPointReassignment {
+  userId: string;
+  targetAssemblyPointId: number;
+}
+
+export interface TeamAssemblyPointReassignment {
+  rescueTeamId: number;
+  targetAssemblyPointId: number;
+}
+
+export interface MissionActivityAssemblyPointReassignment {
+  missionActivityId: number;
+  targetAssemblyPointId: number;
+}
+
+export interface SetAssemblyPointUnavailableWithReassignmentRequest {
+  id: number;
+  reason?: string | null;
+  rescuerReassignments: RescuerAssemblyPointReassignment[];
+  teamReassignments: TeamAssemblyPointReassignment[];
+  missionActivityReassignments: MissionActivityAssemblyPointReassignment[];
+}
+
+export interface SetAssemblyPointUnavailableWithReassignmentResponse {
+  assemblyPointId: number;
+  status: AssemblyPointStatus | string;
+  reassignedRescuerCount: number;
+  reassignedStationedTeamCount: number;
+  reassignedMissionActivityCount: number;
+  notifiedUserCount: number;
   message: string;
 }
 

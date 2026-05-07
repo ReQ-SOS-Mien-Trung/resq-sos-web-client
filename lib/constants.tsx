@@ -789,6 +789,13 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-green-50 dark:bg-green-950/30",
     icon: CheckCircle,
   },
+  PendingUnavailable: {
+    label: "Chờ điều phối lại",
+    color: "bg-orange-500",
+    textColor: "text-orange-700 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-950/30",
+    icon: WarningCircle,
+  },
   Unavailable: {
     label: "Không khả dụng",
     color: "bg-orange-500",

@@ -261,6 +261,23 @@ type AssemblyPointOptionEntry = {
   longitude: number | null;
 };
 
+function getAssemblyPointTargetStatusLabel(status: string | null): string {
+  switch (status) {
+    case "Created":
+      return "Mới tạo";
+    case "Available":
+      return "Sẵn sàng";
+    case "PendingUnavailable":
+      return "Chờ điều phối lại";
+    case "Unavailable":
+      return "Không khả dụng";
+    case "Closed":
+      return "Đã đóng";
+    default:
+      return status ?? "Không xác định";
+  }
+}
+
 type BackendActivityErrorClues = {
   step: number | null;
   itemId: number | null;
@@ -2904,12 +2921,16 @@ const DepotInventoryCard = ({
   depotAddress,
   isDraggable,
   kind = "primary",
+  onInventoryLoaded,
 }: {
   depotId: number;
   depotName: string;
   depotAddress: string | null;
   isDraggable: boolean;
   kind?: "primary" | "alternative";
+  onInventoryLoaded?: (
+    items: Array<{ itemId: number; availableQuantity: number }>,
+  ) => void;
 }) => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -2941,6 +2962,19 @@ const DepotInventoryCard = ({
       ),
     [data?.items],
   );
+
+  useEffect(() => {
+    if (!onInventoryLoaded || !data?.items) return;
+    const entries = data.items.map((item) => ({
+      itemId: item.itemModelId,
+      availableQuantity:
+        item.itemType === "Reusable"
+          ? item.availableUnit
+          : item.availableQuantity,
+    }));
+    onInventoryLoaded(entries);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.items]);
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
@@ -8856,6 +8890,7 @@ const RescuePlanPanel = ({
   const [editSuggestionContext, setEditSuggestionContext] =
     useState<SuggestionPreview | null>(null);
   const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
+  const supplyAvailableQtyByItemIdRef = useRef<Record<number, number>>({});
 
   const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
     useCreateMission();
@@ -9302,6 +9337,24 @@ const RescuePlanPanel = ({
         return;
       }
 
+      // Validate drag-increment before state update (can't call toast inside setEditActivities)
+      if (
+        typeof item.availableQuantity === "number" &&
+        Number.isFinite(item.availableQuantity)
+      ) {
+        const existing = targetActivity?.suppliesToCollect ?? [];
+        const foundSupply = existing.find((s) => s.itemId === item.itemId);
+        if (foundSupply && foundSupply.quantity + 1 > item.availableQuantity) {
+          const unit = normalizeSupplyUnit(
+            foundSupply.unit || item.unit || item.measurementUnit,
+          );
+          toast.warning(
+            `Số lượng không được vượt quá ${item.availableQuantity}\u00a0${unit} (số lượng hiện có trong kho).`,
+          );
+          return;
+        }
+      }
+
       clearEditActivityErrors();
       setExpandedEditSupplyKeys((previous) => ({
         ...previous,
@@ -9323,6 +9376,13 @@ const RescuePlanPanel = ({
             const resolvedItemType = normalizeInventoryItemType(item.itemType);
             if (resolvedUnit) {
               supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
+            }
+            if (
+              typeof item.availableQuantity === "number" &&
+              Number.isFinite(item.availableQuantity)
+            ) {
+              supplyAvailableQtyByItemIdRef.current[item.itemId] =
+                item.availableQuantity;
             }
 
             const nextDepotId =
@@ -9442,6 +9502,17 @@ const RescuePlanPanel = ({
           "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công.",
         );
         return;
+      }
+
+      const supply = targetActivity?.suppliesToCollect?.[supplyIndex];
+      if (supply?.itemId != null) {
+        const maxQty = supplyAvailableQtyByItemIdRef.current[supply.itemId];
+        if (maxQty != null && quantity > maxQty) {
+          toast.warning(
+            `Số lượng không được vượt quá ${maxQty} ${normalizeSupplyUnit(supply.unit)} (số lượng hiện có trong kho).`,
+          );
+          return;
+        }
       }
 
       clearEditActivityErrors();
@@ -10378,6 +10449,10 @@ const RescuePlanPanel = ({
     () => new Map(assemblyPointOptions.map((point) => [point.id, point])),
     [assemblyPointOptions],
   );
+  const availableAssemblyPointOptions = useMemo(
+    () => assemblyPointOptions.filter((point) => point.status === "Available"),
+    [assemblyPointOptions],
+  );
 
   const nearbyRescueTeams = useMemo(() => {
     const sourceTeams = nearbyTeamsByClusterData ?? [];
@@ -10546,6 +10621,11 @@ const RescuePlanPanel = ({
         parsedAssemblyPointId,
       );
       if (!selectedAssemblyPoint) {
+        return;
+      }
+
+      if (selectedAssemblyPoint.status !== "Available") {
+        toast.error("Chỉ có thể chọn điểm tập kết đang ở trạng thái Sẵn sàng.");
         return;
       }
 
@@ -11605,6 +11685,12 @@ const RescuePlanPanel = ({
                 depotAddress={depot.depotAddress}
                 isDraggable={isEditMode}
                 kind={depot.kind}
+                onInventoryLoaded={(entries) => {
+                  for (const { itemId, availableQuantity } of entries) {
+                    supplyAvailableQtyByItemIdRef.current[itemId] =
+                      availableQuantity;
+                  }
+                }}
               />
             ))}
           </div>
@@ -13344,24 +13430,14 @@ const RescuePlanPanel = ({
                                           selectedAssemblyPointOption?.status ??
                                           null;
                                         const selectedAssemblyPointStatusLabel =
-                                          selectedAssemblyPointStatus ===
-                                          "Created"
-                                            ? "Mới tạo"
-                                            : selectedAssemblyPointStatus ===
-                                                "Available"
-                                              ? "Sẵn sàng"
-                                              : selectedAssemblyPointStatus ===
-                                                  "Unavailable"
-                                                ? "Không khả dụng"
-                                                : selectedAssemblyPointStatus ===
-                                                    "Closed"
-                                                  ? "Đã đóng"
-                                                  : selectedAssemblyPointStatus;
+                                          getAssemblyPointTargetStatusLabel(
+                                            selectedAssemblyPointStatus,
+                                          );
                                         const isSelectedAssemblyPointRestricted =
-                                          selectedAssemblyPointStatus ===
-                                            "Unavailable" ||
-                                          selectedAssemblyPointStatus ===
-                                            "Closed";
+                                          selectedAssemblyPointStatus !==
+                                            null &&
+                                          selectedAssemblyPointStatus !==
+                                            "Available";
                                         const selectedAssemblyPointLabel =
                                           hasValidAssemblyPointId
                                             ? (assemblyPointOptionById.get(
@@ -13767,6 +13843,7 @@ const RescuePlanPanel = ({
                                                             selectedAssemblyPointValue
                                                           }
                                                           className="text-sm"
+                                                          disabled
                                                         >
                                                           {
                                                             selectedAssemblyPointLabel
@@ -13775,7 +13852,37 @@ const RescuePlanPanel = ({
                                                         </SelectItem>
                                                       ) : null}
 
-                                                      {assemblyPointOptions.map(
+                                                      {hasValidAssemblyPointId &&
+                                                      selectedAssemblyPointOption &&
+                                                      selectedAssemblyPointStatus !==
+                                                        "Available" ? (
+                                                        <SelectItem
+                                                          value={
+                                                            selectedAssemblyPointValue
+                                                          }
+                                                          className="text-sm"
+                                                          disabled
+                                                        >
+                                                          {
+                                                            selectedAssemblyPointLabel
+                                                          }{" "}
+                                                          (
+                                                          {
+                                                            selectedAssemblyPointStatusLabel
+                                                          }
+                                                          )
+                                                        </SelectItem>
+                                                      ) : null}
+
+                                                      {availableAssemblyPointOptions.length ===
+                                                      0 ? (
+                                                        <div className="px-2 py-2 text-sm text-muted-foreground">
+                                                          Không có điểm tập kết
+                                                          sẵn sàng
+                                                        </div>
+                                                      ) : null}
+
+                                                      {availableAssemblyPointOptions.map(
                                                         (point) => (
                                                           <SelectItem
                                                             key={point.id}
@@ -14244,35 +14351,72 @@ const RescuePlanPanel = ({
                                                                           </span>
                                                                         </div>
                                                                       ) : null}
-                                                                      <Input
-                                                                        type="number"
-                                                                        min={0}
-                                                                        value={
-                                                                          Number.isNaN(
-                                                                            supply.quantity,
-                                                                          )
-                                                                            ? ""
-                                                                            : supply.quantity
-                                                                        }
-                                                                        onChange={(
-                                                                          event,
-                                                                        ) =>
-                                                                          handleUpdateSupplyQuantity(
-                                                                            activity._id,
-                                                                            sIdx,
-                                                                            parseInt(
-                                                                              event
-                                                                                .target
-                                                                                .value,
-                                                                            ),
-                                                                          )
-                                                                        }
-                                                                        disabled={
-                                                                          isAutoManagedSupplyStep ||
-                                                                          lockGeneralActivityEdits
-                                                                        }
-                                                                        className="h-6 w-full px-1 text-center text-sm"
-                                                                      />
+                                                                      {(() => {
+                                                                        const availQty =
+                                                                          supply.itemId !=
+                                                                          null
+                                                                            ? (supplyAvailableQtyByItemIdRef
+                                                                                .current[
+                                                                                supply
+                                                                                  .itemId
+                                                                              ] ??
+                                                                              null)
+                                                                            : null;
+                                                                        const isOverMax =
+                                                                          availQty !=
+                                                                            null &&
+                                                                          supply.quantity >
+                                                                            availQty;
+                                                                        return (
+                                                                          <div className="relative min-w-0">
+                                                                            <Input
+                                                                              type="number"
+                                                                              min={
+                                                                                0
+                                                                              }
+                                                                              max={
+                                                                                availQty ??
+                                                                                undefined
+                                                                              }
+                                                                              value={
+                                                                                Number.isNaN(
+                                                                                  supply.quantity,
+                                                                                )
+                                                                                  ? ""
+                                                                                  : supply.quantity
+                                                                              }
+                                                                              onChange={(
+                                                                                event,
+                                                                              ) =>
+                                                                                handleUpdateSupplyQuantity(
+                                                                                  activity._id,
+                                                                                  sIdx,
+                                                                                  parseInt(
+                                                                                    event
+                                                                                      .target
+                                                                                      .value,
+                                                                                  ),
+                                                                                )
+                                                                              }
+                                                                              disabled={
+                                                                                isAutoManagedSupplyStep ||
+                                                                                lockGeneralActivityEdits
+                                                                              }
+                                                                              title={
+                                                                                availQty !=
+                                                                                null
+                                                                                  ? `Tối đa: ${availQty} ${normalizeSupplyUnit(supply.unit)}`
+                                                                                  : undefined
+                                                                              }
+                                                                              className={cn(
+                                                                                "h-6 w-full px-1 text-center text-sm",
+                                                                                isOverMax &&
+                                                                                  "border-red-400 bg-red-50 text-red-700 dark:border-red-600 dark:bg-red-950/30 dark:text-red-300",
+                                                                              )}
+                                                                            />
+                                                                          </div>
+                                                                        );
+                                                                      })()}
                                                                       <span className="text-right text-sm text-muted-foreground">
                                                                         {normalizeSupplyUnit(
                                                                           supply.unit,

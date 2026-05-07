@@ -23,6 +23,7 @@ import type { MapViewState } from "@/hooks/useMapUrlSync";
 import {
   useSOSRequests,
   useSOSRequestsInBounds,
+  useSOSRequestsByIds,
 } from "@/services/sos_request/hooks";
 import type {
   SOSPriorityLevel,
@@ -1901,10 +1902,40 @@ const CoordinatorDashboardContent = () => {
     activeRescuePlanCluster,
   );
 
-  const rescuePlanSOSRequests = useMemo(
-    () => getClusterSOSRequests(activeClusterId, sosRequests, clusters),
-    [activeClusterId, sosRequests, clusters],
+  // When a cluster is completed/locked, its SOS requests may have status
+  // Resolved/Completed and won't appear in the map status filter.
+  // Fetch them directly by ID as a fallback.
+  const activeClusterSOSIds = useMemo(
+    () =>
+      (activeRescuePlanCluster?.sosRequestIds ?? [])
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && id > 0),
+    [activeRescuePlanCluster],
   );
+  const missingFromMapSOS = useMemo(() => {
+    const mapSOSIdSet = new Set(sosRequests.map((s) => String(s.id)));
+    return activeClusterSOSIds.filter((id) => !mapSOSIdSet.has(String(id)));
+  }, [activeClusterSOSIds, sosRequests]);
+  const { items: fetchedClusterSOSItems } = useSOSRequestsByIds(
+    missingFromMapSOS,
+    { enabled: missingFromMapSOS.length > 0 },
+  );
+  const fetchedClusterSOS = useMemo(
+    () => mapSOSRequestEntitiesToSOS(fetchedClusterSOSItems),
+    [fetchedClusterSOSItems],
+  );
+
+  const rescuePlanSOSRequests = useMemo(() => {
+    const fromMap = getClusterSOSRequests(
+      activeClusterId,
+      sosRequests,
+      clusters,
+    );
+    if (fetchedClusterSOS.length === 0) return fromMap;
+    const merged = new Map(fromMap.map((s) => [String(s.id), s]));
+    for (const s of fetchedClusterSOS) merged.set(String(s.id), s);
+    return Array.from(merged.values());
+  }, [activeClusterId, sosRequests, clusters, fetchedClusterSOS]);
 
   const manualMissionSOSRequests = useMemo(
     () => getClusterSOSRequests(manualMissionClusterId, sosRequests, clusters),

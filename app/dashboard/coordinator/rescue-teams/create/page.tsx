@@ -60,6 +60,7 @@ import { useAbilityCategoryMetadata } from "@/services/user/hooks";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
 import type { RescuerEntity, RescuerType } from "@/services/rescuers/type";
 import type { AssemblyPointCheckedInRescuerEntity } from "@/services/assembly_points/type";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_RESCUER_AVATAR =
   "https://res.cloudinary.com/dezgwdrfs/image/upload/v1773504004/611251674_1432765175119052_6622750233977483141_n_sgxqxd.png";
@@ -171,6 +172,23 @@ function parsePositiveInteger(value: string | null): number | null {
   }
 
   return parsed;
+}
+
+function getAssemblyPointStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case "Created":
+      return "Mới tạo";
+    case "Available":
+      return "Sẵn sàng";
+    case "PendingUnavailable":
+      return "Chờ điều phối lại";
+    case "Unavailable":
+      return "Không khả dụng";
+    case "Closed":
+      return "Đã đóng";
+    default:
+      return status ?? "Không xác định";
+  }
 }
 
 function mapCheckedInRescuerToRescuerEntity(
@@ -759,6 +777,9 @@ function CreateRescueTeamForm({
       null
     );
   }, [assemblyPoints, assemblyPointId, lockedAssemblyPoint]);
+  const selectedAssemblyPointLocked = Boolean(
+    selectedAssemblyPoint && selectedAssemblyPoint.status !== "Available",
+  );
 
   // ─── Member Selection Helpers ───
   const isMemberSelected = (userId: string) =>
@@ -826,6 +847,13 @@ function CreateRescueTeamForm({
 
     if (!assemblyPointId) {
       toast.error("Vui lòng chọn điểm tập kết");
+      return;
+    }
+
+    if (!selectedAssemblyPoint || selectedAssemblyPoint.status !== "Available") {
+      toast.error(
+        "Chỉ có thể tạo đội tại điểm tập kết đang ở trạng thái Sẵn sàng.",
+      );
       return;
     }
 
@@ -1045,7 +1073,11 @@ function CreateRescueTeamForm({
                         </div>
                       )}
                       {assemblyPoints.map((point) => (
-                        <SelectItem key={point.id} value={String(point.id)}>
+                        <SelectItem
+                          key={point.id}
+                          value={String(point.id)}
+                          disabled={point.status !== "Available"}
+                        >
                           <div className="flex items-center gap-2">
                             <span>{point.name}</span>
                             <Badge
@@ -1058,13 +1090,7 @@ function CreateRescueTeamForm({
                               }
                               className="text-sm font-medium h-5 px-1.5"
                             >
-                              {point.status === "Available"
-                                ? "Sẵn sàng"
-                                : point.status === "Created"
-                                  ? "Mới tạo"
-                                  : point.status === "Unavailable"
-                                    ? "Không khả dụng"
-                                    : "Đóng"}
+                              {getAssemblyPointStatusLabel(point.status)}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -1079,15 +1105,31 @@ function CreateRescueTeamForm({
                   </Select>
                 )}
                 {assemblyPointId && assemblyPoints.length > 0 && (
-                  <div className="mt-1 flex items-center gap-2 border border-[#FF5722] bg-[#FF5722]/10 px-3 py-2">
-                    <CheckCircle
-                      className="h-3.5 w-3.5 text-[#FF5722]"
-                      weight="fill"
-                    />
+                  <div
+                    className={cn(
+                      "mt-1 flex items-center gap-2 border px-3 py-2",
+                      selectedAssemblyPointLocked
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-[#FF5722] bg-[#FF5722]/10",
+                    )}
+                  >
+                    {selectedAssemblyPointLocked ? (
+                      <Warning
+                        className="h-3.5 w-3.5 text-amber-600"
+                        weight="fill"
+                      />
+                    ) : (
+                      <CheckCircle
+                        className="h-3.5 w-3.5 text-[#FF5722]"
+                        weight="fill"
+                      />
+                    )}
                     <span className="text-sm text-[#c2410c]">
-                      {selectedAssemblyPoint
-                        ? `Sức chứa khả dụng: ${selectedAssemblyPoint.maxCapacity} người`
-                        : null}
+                      {selectedAssemblyPointLocked
+                        ? `Điểm tập kết đang ${getAssemblyPointStatusLabel(selectedAssemblyPoint?.status).toLowerCase()}, không thể tạo đội mới.`
+                        : selectedAssemblyPoint
+                          ? `Sức chứa khả dụng: ${selectedAssemblyPoint.maxCapacity} người`
+                          : null}
                     </span>
                   </div>
                 )}

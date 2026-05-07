@@ -25,6 +25,8 @@ import {
   getAllCheckInRadiusConfigs,
   setAssemblyPointCheckInRadius,
   deleteAssemblyPointCheckInRadius,
+  getAssemblyPointUnavailableImpact,
+  setAssemblyPointUnavailableWithReassignment,
 } from "./api";
 import {
   GetAssemblyPointsResponse,
@@ -52,9 +54,17 @@ import {
   GetAllCheckInRadiusConfigsResponse,
   SetCheckInRadiusRequest,
   SetCheckInRadiusResponse,
+  AssemblyPointUnavailableImpactResponse,
+  SetAssemblyPointUnavailableWithReassignmentRequest,
+  SetAssemblyPointUnavailableWithReassignmentResponse,
 } from "./type";
 import { AxiosError } from "axios";
 import { RESCUERS_QUERY_KEY } from "../rescuers/hooks";
+import { RESCUE_TEAMS_QUERY_KEY } from "../rescue_teams/hooks";
+import {
+  MISSIONS_QUERY_KEY,
+  MISSION_ACTIVITIES_QUERY_KEY,
+} from "../mission/hooks";
 
 export const ASSEMBLY_POINTS_QUERY_KEY = ["assembly-points"] as const;
 export const ASSEMBLY_POINT_STATUSES_QUERY_KEY = [
@@ -74,6 +84,9 @@ export const ASSEMBLY_POINT_CHECK_IN_RADIUS_QUERY_KEY = [
 ] as const;
 export const ALL_CHECK_IN_RADIUS_CONFIGS_QUERY_KEY = [
   "all-check-in-radius-configs",
+] as const;
+export const ASSEMBLY_POINT_UNAVAILABLE_IMPACT_QUERY_KEY = [
+  "assembly-point-unavailable-impact",
 ] as const;
 
 export interface UseAssemblyPointsOptions {
@@ -100,6 +113,10 @@ export interface UseAssemblyPointEventsOptions {
 
 export interface UseAssemblyPointCheckedInRescuersOptions {
   params?: GetAssemblyPointCheckedInRescuersParams;
+  enabled?: boolean;
+}
+
+export interface UseAssemblyPointUnavailableImpactOptions {
   enabled?: boolean;
 }
 
@@ -182,6 +199,20 @@ export function useAssemblyPointCheckedInRescuers(
 }
 
 /**
+ * Hook to fetch latest impact for set-unavailable reassignment
+ */
+export function useAssemblyPointUnavailableImpact(
+  id: number,
+  options?: UseAssemblyPointUnavailableImpactOptions,
+) {
+  return useQuery<AssemblyPointUnavailableImpactResponse>({
+    queryKey: [...ASSEMBLY_POINT_UNAVAILABLE_IMPACT_QUERY_KEY, id],
+    queryFn: () => getAssemblyPointUnavailableImpact(id),
+    enabled: (options?.enabled ?? true) && Number.isFinite(id) && id > 0,
+  });
+}
+
+/**
  * Hook to fetch assembly point statuses metadata
  */
 export function useAssemblyPointStatuses(
@@ -258,9 +289,16 @@ function invalidateAssemblyPointQueries(
   id?: number,
 ) {
   queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINT_EVENTS_QUERY_KEY });
+  queryClient.invalidateQueries({
+    queryKey: ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+  });
   if (typeof id === "number") {
     queryClient.invalidateQueries({
       queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, id],
+    });
+    queryClient.invalidateQueries({
+      queryKey: [...ASSEMBLY_POINT_UNAVAILABLE_IMPACT_QUERY_KEY, id],
     });
   }
 }
@@ -293,6 +331,30 @@ export function useSetAssemblyPointUnavailable() {
     mutationFn: setAssemblyPointUnavailable,
     onSuccess: (_data, variables) => {
       invalidateAssemblyPointQueries(queryClient, variables.id);
+    },
+  });
+}
+
+/**
+ * Hook to complete set-unavailable flow with reassignment
+ */
+export function useSetAssemblyPointUnavailableWithReassignment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    SetAssemblyPointUnavailableWithReassignmentResponse,
+    Error,
+    SetAssemblyPointUnavailableWithReassignmentRequest
+  >({
+    mutationFn: setAssemblyPointUnavailableWithReassignment,
+    onSuccess: (_data, variables) => {
+      invalidateAssemblyPointQueries(queryClient, variables.id);
+      queryClient.invalidateQueries({ queryKey: RESCUERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: MISSION_ACTIVITIES_QUERY_KEY,
+      });
     },
   });
 }

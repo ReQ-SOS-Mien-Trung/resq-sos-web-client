@@ -90,6 +90,7 @@ import {
   useUpdateMission,
 } from "@/services/mission/hooks";
 import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
+import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useDepotsByCluster } from "@/services/depot";
 import type { DepotByClusterEntity, DepotStatus } from "@/services/depot";
@@ -134,6 +135,7 @@ interface ManualTeamOption {
   teamType: string;
   assemblyPointId: number | null;
   assemblyPointName: string | null;
+  assemblyPointStatus: string | null;
   status: string | null;
   distanceKm?: number | null;
 }
@@ -931,6 +933,27 @@ function getTeamStatusMeta(status?: string | null) {
   }
 }
 
+function getManualAssemblyPointStatusLabel(status?: string | null): string {
+  switch ((status ?? "").trim()) {
+    case "Created":
+      return "Mới tạo";
+    case "Available":
+      return "Sẵn sàng";
+    case "PendingUnavailable":
+      return "Chờ điều phối lại";
+    case "Unavailable":
+      return "Không khả dụng";
+    case "Closed":
+      return "Đã đóng";
+    default:
+      return status?.trim() || "Không xác định";
+  }
+}
+
+function isManualAssemblyPointRestricted(status?: string | null): boolean {
+  return Boolean(status && status !== "Available");
+}
+
 function getDepotStatusMeta(status?: string | null) {
   const normalizedStatus = (status ?? "").trim() as DepotStatus;
 
@@ -1263,6 +1286,11 @@ function SortableActivityCard({
   const primarySupplyBalanceIssue = supplyBalanceIssues[0] ?? null;
   const selectedTeam =
     teamOptions.find((team) => team.id === activity.rescueTeamId) ?? null;
+  const isReturnAssemblyPointStep =
+    activity.activityType === "RETURN_ASSEMBLY_POINT";
+  const selectedTeamAssemblyPointRestricted =
+    isReturnAssemblyPointStep &&
+    isManualAssemblyPointRestricted(selectedTeam?.assemblyPointStatus);
 
   return (
     <div
@@ -1442,10 +1470,18 @@ function SortableActivityCard({
                 key={team.id}
                 value={String(team.id)}
                 className="text-sm"
+                disabled={
+                  isReturnAssemblyPointStep &&
+                  isManualAssemblyPointRestricted(team.assemblyPointStatus)
+                }
               >
                 {team.name}
                 {team.distanceKm != null
                   ? ` • ${team.distanceKm.toFixed(1)} km`
+                  : ""}
+                {isReturnAssemblyPointStep &&
+                isManualAssemblyPointRestricted(team.assemblyPointStatus)
+                  ? ` • ${getManualAssemblyPointStatusLabel(team.assemblyPointStatus)}`
                   : ""}
               </SelectItem>
             ))}
@@ -1459,8 +1495,18 @@ function SortableActivityCard({
         </Select>
 
         {selectedTeam?.assemblyPointName ? (
-          <p className="mt-2 text-sm text-emerald-700/75 dark:text-emerald-300/75">
+          <p
+            className={cn(
+              "mt-2 text-sm",
+              selectedTeamAssemblyPointRestricted
+                ? "text-amber-700 dark:text-amber-300"
+                : "text-emerald-700/75 dark:text-emerald-300/75",
+            )}
+          >
             Điểm tập kết: {selectedTeam.assemblyPointName}
+            {selectedTeamAssemblyPointRestricted
+              ? ` (${getManualAssemblyPointStatusLabel(selectedTeam.assemblyPointStatus)})`
+              : ""}
           </p>
         ) : null}
 
@@ -2063,18 +2109,43 @@ const ManualMissionBuilder = ({
   } = useDepotsByCluster(clusterId ?? 0, {
     enabled: open && !!clusterId && clusterId > 0,
   });
+  const { data: assemblyPointsData } = useAssemblyPoints({
+    params: {
+      pageNumber: 1,
+      pageSize: 300,
+    },
+    enabled: open,
+  });
+
+  const assemblyPointStatusById = useMemo(() => {
+    const statuses = new Map<number, string | null>();
+
+    for (const point of assemblyPointsData?.items ?? []) {
+      statuses.set(point.id, typeof point.status === "string" ? point.status : null);
+    }
+
+    return statuses;
+  }, [assemblyPointsData?.items]);
 
   const teamOptions = useMemo<ManualTeamOption[]>(() => {
     return (rescueTeamsByClusterData ?? [])
-      .map((team) => ({
-        id: team.id,
-        name: team.name,
-        teamType: team.teamType,
-        assemblyPointId: toValidAssemblyPointId(team.assemblyPointId),
-        assemblyPointName: team.assemblyPointName,
-        status: team.status,
-        distanceKm: team.distanceKm,
-      }))
+      .map((team) => {
+        const assemblyPointId = toValidAssemblyPointId(team.assemblyPointId);
+
+        return {
+          id: team.id,
+          name: team.name,
+          teamType: team.teamType,
+          assemblyPointId,
+          assemblyPointName: team.assemblyPointName,
+          assemblyPointStatus:
+            assemblyPointId != null
+              ? (assemblyPointStatusById.get(assemblyPointId) ?? null)
+              : null,
+          status: team.status,
+          distanceKm: team.distanceKm,
+        };
+      })
       .sort((teamA, teamB) => {
         const distanceA = Number.isFinite(teamA.distanceKm)
           ? teamA.distanceKm!
@@ -2089,7 +2160,7 @@ const ManualMissionBuilder = ({
 
         return teamA.name.localeCompare(teamB.name, "vi");
       });
-  }, [rescueTeamsByClusterData]);
+  }, [assemblyPointStatusById, rescueTeamsByClusterData]);
   const nearbyDepots = useMemo(
     () => nearbyDepotsData ?? [],
     [nearbyDepotsData],
@@ -3332,15 +3403,24 @@ const ManualMissionBuilder = ({
 
       if (a.activityType === "RETURN_ASSEMBLY_POINT") {
         const rescueTeamId = toValidRescueTeamId(a.rescueTeamId);
+        const assignedTeam =
+          rescueTeamId != null ? teamOptionById.get(rescueTeamId) : null;
         const assemblyPointId = toValidAssemblyPointId(
-          rescueTeamId != null
-            ? teamOptionById.get(rescueTeamId)?.assemblyPointId
-            : null,
+          assignedTeam?.assemblyPointId,
         );
 
         if (!assemblyPointId) {
           toast.error(
             `Bước ${i + 1}: Hoạt động quay về điểm tập kết cần đội có điểm tập kết hợp lệ.`,
+          );
+          return false;
+        }
+
+        if (
+          isManualAssemblyPointRestricted(assignedTeam?.assemblyPointStatus)
+        ) {
+          toast.error(
+            `Bước ${i + 1}: Điểm tập kết của đội đang ${getManualAssemblyPointStatusLabel(assignedTeam?.assemblyPointStatus).toLowerCase()}, không thể làm mục tiêu quay về.`,
           );
           return false;
         }
@@ -3946,6 +4026,10 @@ const ManualMissionBuilder = ({
                       ) : hasNearbyTeams ? (
                         teamOptions.map((team) => {
                           const statusMeta = getTeamStatusMeta(team.status);
+                          const isAssemblyPointRestricted =
+                            isManualAssemblyPointRestricted(
+                              team.assemblyPointStatus,
+                            );
 
                           return (
                             <div
@@ -3989,6 +4073,16 @@ const ManualMissionBuilder = ({
                                   <span className="line-clamp-2">
                                     {team.assemblyPointName}
                                   </span>
+                                  {isAssemblyPointRestricted ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="h-5 shrink-0 rounded-full border-amber-200 bg-amber-50 px-2 text-[11px] font-semibold text-amber-800"
+                                    >
+                                      {getManualAssemblyPointStatusLabel(
+                                        team.assemblyPointStatus,
+                                      )}
+                                    </Badge>
+                                  ) : null}
                                 </p>
                               ) : null}
                             </div>
