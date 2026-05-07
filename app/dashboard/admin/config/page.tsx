@@ -3051,7 +3051,7 @@ function SystemParameterConfigCard() {
           tone={SYSTEM_CONFIG_CARD_TONES.radius}
           eyebrow="Rescue team search radius"
           title="Bán kính tìm kiếm đội cứu hộ"
-          description="Bán kính hệ thống dùng để tìm các đội cứu hộ quanh cụm SOS khi lập phương án."
+          description="Bán kính hệ thống dùng để tìm các đội cứu hộ quanh cụm SOS khi triển khai phương án."
           unitSuffix=" km"
           value={radiusValue}
           onValueChange={setRadiusDraft}
