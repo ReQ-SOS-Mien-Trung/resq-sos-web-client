@@ -285,6 +285,10 @@ export const AI_PROVIDER_OPTIONS = [
       "Dùng Google AI Studio API key hoặc default Gemini config của server.",
     models: [
       {
+        label: "Gemini 3.1 Pro",
+        code: "gemini-3.1-pro",
+      },
+      {
         label: "Gemini 3.1 Flash Lite Preview",
         code: "gemini-3.1-flash-lite-preview",
       },

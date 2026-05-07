@@ -630,8 +630,8 @@ async function parseVatPdf(file: File): Promise<Partial<VatFormState>> {
             typeof item.width === "number" && item.width > 0
               ? item.width
               : Math.abs(item.transform[0]) *
-              (item.str as string).length *
-              0.55,
+                (item.str as string).length *
+                0.55,
           h:
             typeof item.height === "number" && item.height > 0
               ? item.height
@@ -734,11 +734,11 @@ function getApiError(err: unknown, fallback: string): string {
   if (err instanceof AxiosError) {
     const data = err.response?.data as
       | {
-        message?: unknown;
-        title?: unknown;
-        error?: unknown;
-        errors?: unknown;
-      }
+          message?: unknown;
+          title?: unknown;
+          error?: unknown;
+          errors?: unknown;
+        }
       | undefined;
     const directMessage = data?.message ?? data?.title ?? data?.error;
     if (typeof directMessage === "string" && directMessage.trim()) {
@@ -1373,9 +1373,7 @@ export default function ExcelImportRegular() {
 
     if (validDepotFundOptions.length > 1 && effectiveDepotFundId == null) {
       setShowFundError(true);
-      toast.error(
-        "Vui lòng chọn quỹ cần thanh toán trước khi nhập kho.",
-      );
+      toast.error("Vui lòng chọn quỹ cần thanh toán trước khi nhập kho.");
       return;
     }
 
@@ -1422,6 +1420,21 @@ export default function ExcelImportRegular() {
       if (vatErrors.length > 0) {
         toast.error(
           `Hóa đơn #${idx}: Vui lòng điền đầy đủ thông tin (${vatErrors.join(", ")})`,
+        );
+        return;
+      }
+
+      // Validate tổng tiền hóa đơn phải khớp với tổng tiền hàng tính từ các dòng
+      const computedTotal = g.rows.reduce(
+        (sum, r) => sum + (r.unitPrice ?? 0) * (r.quantity ?? 0),
+        0,
+      );
+      const invoicedTotal = parseFloat(
+        g.vatForm.totalAmount.replace(/[^\d.]/g, ""),
+      );
+      if (Math.round(computedTotal) !== Math.round(invoicedTotal)) {
+        toast.error(
+          `Hóa đơn #${idx}: Tổng tiền hóa đơn (${invoicedTotal.toLocaleString("vi-VN")}đ) không khớp với tổng tiền hàng (${computedTotal.toLocaleString("vi-VN")}đ). Vui lòng kiểm tra lại.`,
         );
         return;
       }
@@ -1663,6 +1676,7 @@ export default function ExcelImportRegular() {
     field: EditableField,
     placeholder: string,
     type: "text" | "number" = "text",
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
@@ -1683,9 +1697,11 @@ export default function ExcelImportRegular() {
               )
             }
             placeholder={placeholder}
+            disabled={disabled}
             className={cn(
               "h-8 text-sm",
               error && "border-red-500 focus-visible:ring-red-500",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           />
           {error && (
@@ -1710,6 +1726,7 @@ export default function ExcelImportRegular() {
     field: EditableField,
     options: { label: string; value: string }[],
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const currentValue = String(row[field] ?? "");
@@ -1718,11 +1735,13 @@ export default function ExcelImportRegular() {
         <Select
           value={currentValue}
           onValueChange={(val) => updateRow(groupId, row.id, field, val)}
+          disabled={disabled}
         >
           <SelectTrigger
             className={cn(
               "h-11 w-full min-w-[180px] rounded-md border-slate-200 bg-white px-4 text-sm shadow-sm",
               error && "border-red-500 focus-visible:ring-red-500",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           >
             <SelectValue placeholder={placeholder} />
@@ -1749,6 +1768,7 @@ export default function ExcelImportRegular() {
     row: ImportRow,
     options: { label: string; value: string }[],
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors.targetGroups;
     const selected = row.targetGroups ?? [];
@@ -1756,8 +1776,8 @@ export default function ExcelImportRegular() {
       selected.length === 0
         ? placeholder
         : selected
-          .map((v) => options.find((o) => o.value === v)?.label ?? v)
-          .join(", ");
+            .map((v) => options.find((o) => o.value === v)?.label ?? v)
+            .join(", ");
     return (
       <div className="space-y-1">
         <Popover>
@@ -1765,10 +1785,12 @@ export default function ExcelImportRegular() {
             <Button
               variant="outline"
               size="sm"
+              disabled={disabled}
               className={cn(
                 "h-8 w-full justify-between text-sm font-normal px-3",
                 error && "border-red-500 focus-visible:ring-red-500",
                 selected.length === 0 && "text-muted-foreground",
+                disabled && "cursor-not-allowed opacity-60 bg-muted/50",
               )}
             >
               <span className="truncate text-left">{labelText}</span>
@@ -1871,6 +1893,7 @@ export default function ExcelImportRegular() {
     row: ImportRow,
     field: "volumePerUnit" | "weightPerUnit",
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
@@ -1893,9 +1916,11 @@ export default function ExcelImportRegular() {
               );
             }}
             placeholder={placeholder}
+            disabled={disabled}
             className={cn(
               "h-8 text-sm",
               error && "border-red-500 focus-visible:ring-red-500",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           />
           {error && (
@@ -2064,9 +2089,9 @@ export default function ExcelImportRegular() {
           className={cn(
             "h-8 text-sm",
             hasFile &&
-            required &&
-            !(vatForm[key] as string).trim() &&
-            "border-red-400 focus-visible:ring-red-400",
+              required &&
+              !(vatForm[key] as string).trim() &&
+              "border-red-400 focus-visible:ring-red-400",
           )}
         />
         {hasFile && required && !(vatForm[key] as string).trim() && (
@@ -2077,7 +2102,6 @@ export default function ExcelImportRegular() {
       </div>
     );
   };
-
 
   return (
     <div className="flex flex-col h-full">
@@ -2600,10 +2624,10 @@ export default function ExcelImportRegular() {
                 className={cn(
                   "rounded-xl border bg-card px-4 py-3",
                   (isDepotFundsError || validDepotFundOptions.length === 0) &&
-                  "border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20",
+                    "border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20",
                   validDepotFundOptions.length > 1 &&
-                  effectiveDepotFundId == null &&
-                  "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20",
+                    effectiveDepotFundId == null &&
+                    "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20",
                 )}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -2648,7 +2672,7 @@ export default function ExcelImportRegular() {
                             className={cn(
                               "h-10 w-full rounded-lg bg-background tracking-tighter",
                               (effectiveDepotFundId == null || showFundError) &&
-                              "border-amber-300 focus-visible:ring-amber-400",
+                                "border-amber-300 focus-visible:ring-amber-400",
                             )}
                           >
                             <SelectValue placeholder="Chọn quỹ thanh toán" />
@@ -2666,7 +2690,8 @@ export default function ExcelImportRegular() {
                         </Select>
                         {showFundError && effectiveDepotFundId == null && (
                           <p className="text-xs text-amber-600 mt-1 font-medium tracking-tighter">
-                            Vui lòng chọn quỹ thanh toán trước khi xác nhận nhập kho
+                            Vui lòng chọn quỹ thanh toán trước khi xác nhận nhập
+                            kho
                           </p>
                         )}
                       </>
@@ -2904,7 +2929,9 @@ export default function ExcelImportRegular() {
                           <Input
                             value={group.batchNote}
                             onChange={(e) =>
-                              patchGroup(group.id, { batchNote: e.target.value })
+                              patchGroup(group.id, {
+                                batchNote: e.target.value,
+                              })
                             }
                             placeholder="Ghi chú cho lần nhập này..."
                             className="h-8 text-sm"
@@ -2917,11 +2944,14 @@ export default function ExcelImportRegular() {
                           <div className="h-8 flex items-center rounded-md border bg-muted/50 px-3 text-sm font-semibold text-emerald-700 tracking-tighter">
                             {formatMoney(
                               group.rows.reduce(
-                                (sum, r) => sum + (r.unitPrice ?? 0) * (r.quantity ?? 0),
+                                (sum, r) =>
+                                  sum + (r.unitPrice ?? 0) * (r.quantity ?? 0),
                                 0,
                               ),
                             )}
-                            <span className="ml-1 text-sm font-normal text-muted-foreground">VNĐ</span>
+                            <span className="ml-1 text-sm font-normal text-muted-foreground">
+                              VNĐ
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -2972,15 +3002,21 @@ export default function ExcelImportRegular() {
                                   className="h-5 px-1.5 text-xs font-medium gap-0.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                                   onClick={() => {
                                     const now = new Date();
-                                    const p2 = (n: number) => String(n).padStart(2, "0");
+                                    const p2 = (n: number) =>
+                                      String(n).padStart(2, "0");
                                     const nowStr = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}T${p2(now.getHours())}:${p2(now.getMinutes())}`;
                                     patchGroup(group.id, (g) => ({
                                       ...g,
                                       rows: g.rows.map((r) =>
-                                        applyRowValidation({ ...r, receivedDate: nowStr }),
+                                        applyRowValidation({
+                                          ...r,
+                                          receivedDate: nowStr,
+                                        }),
                                       ),
                                     }));
-                                    toast.success("Đã điền ngày nhận hôm nay cho tất cả");
+                                    toast.success(
+                                      "Đã điền ngày nhận hôm nay cho tất cả",
+                                    );
                                   }}
                                 >
                                   <CalendarBlank className="h-3 w-3" />
@@ -3000,7 +3036,7 @@ export default function ExcelImportRegular() {
                                 key={row.id}
                                 className={cn(
                                   hasErrors &&
-                                  "bg-red-50/50 dark:bg-red-950/10",
+                                    "bg-red-50/50 dark:bg-red-950/10",
                                 )}
                               >
                                 <TableCell className="text-center text-xs text-muted-foreground font-mono">
@@ -3012,6 +3048,8 @@ export default function ExcelImportRegular() {
                                     row,
                                     "itemName",
                                     "Tên vật phẩm",
+                                    "text",
+                                    !!row.itemModelId,
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -3041,6 +3079,7 @@ export default function ExcelImportRegular() {
                                     "categoryCode",
                                     categoryOptions,
                                     "Chọn danh mục",
+                                    !!row.itemModelId,
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -3052,7 +3091,9 @@ export default function ExcelImportRegular() {
                                         )}
                                       >
                                         <span className="truncate text-left">
-                                          {targetGroupOptions.find((o) => o.value === "Rescuer")?.label ?? "Lực lượng cứu hộ"}
+                                          {targetGroupOptions.find(
+                                            (o) => o.value === "Rescuer",
+                                          )?.label ?? "Lực lượng cứu hộ"}
                                         </span>
                                       </div>
                                       <p className="text-[11px] text-blue-500 mt-0.5">
@@ -3066,6 +3107,7 @@ export default function ExcelImportRegular() {
                                         row,
                                         targetGroupOptions,
                                         "Chọn đối tượng",
+                                        !!row.itemModelId,
                                       )}
                                     </>
                                   )}
@@ -3073,18 +3115,21 @@ export default function ExcelImportRegular() {
                                 <TableCell>
                                   {itemTypeOptions.length > 0
                                     ? renderSelectCell(
-                                      group.id,
-                                      row,
-                                      "itemType",
-                                      itemTypeOptions,
-                                      "Chọn loại",
-                                    )
+                                        group.id,
+                                        row,
+                                        "itemType",
+                                        itemTypeOptions,
+                                        "Chọn loại",
+                                        !!row.itemModelId,
+                                      )
                                     : renderInputCell(
-                                      group.id,
-                                      row,
-                                      "itemType",
-                                      "Loại vật phẩm",
-                                    )}
+                                        group.id,
+                                        row,
+                                        "itemType",
+                                        "Loại vật phẩm",
+                                        "text",
+                                        !!row.itemModelId,
+                                      )}
                                 </TableCell>
                                 <TableCell>
                                   {renderInputCell(
@@ -3092,6 +3137,8 @@ export default function ExcelImportRegular() {
                                     row,
                                     "unit",
                                     "Đơn vị",
+                                    "text",
+                                    !!row.itemModelId,
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -3100,6 +3147,8 @@ export default function ExcelImportRegular() {
                                     row,
                                     "description",
                                     "Mô tả vật phẩm...",
+                                    "text",
+                                    !!row.itemModelId,
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -3120,6 +3169,7 @@ export default function ExcelImportRegular() {
                                     row,
                                     "volumePerUnit",
                                     "dm3",
+                                    !!row.itemModelId,
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -3128,6 +3178,7 @@ export default function ExcelImportRegular() {
                                     row,
                                     "weightPerUnit",
                                     "kg",
+                                    !!row.itemModelId,
                                   )}
                                 </TableCell>
                                 <TableCell>

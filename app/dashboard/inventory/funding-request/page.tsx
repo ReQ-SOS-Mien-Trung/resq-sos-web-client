@@ -127,9 +127,20 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
 
 /* ── Excel column mapping ─────────────────────────────────── */
 
+/** Extract trailing model ID from item name, e.g. "Sữa bột trẻ em - 2" → { cleanName: "Sữa bột trẻ em", itemModelId: 2 } */
+function parseItemName(raw: string): {
+  cleanName: string;
+  itemModelId?: number;
+} {
+  const m = raw.trim().match(/^(.*?)\s*-\s*(\d+)$/);
+  if (m) return { cleanName: m[1].trim(), itemModelId: Number(m[2]) };
+  return { cleanName: raw.trim() };
+}
+
 const COL = {
   STT: "STT",
   TEN: "Tên vật phẩm",
+  MASP: "ID Vật phẩm",
   DANHMUC: "Danh mục",
   DOITUONG: "Đối tượng",
   LOAI: "Loại vật phẩm",
@@ -146,6 +157,7 @@ type FundingColumnKey = keyof typeof COL;
 const COLUMN_ALIASES: Record<FundingColumnKey, string[]> = {
   STT: ["stt"],
   TEN: ["ten vat pham"],
+  MASP: ["id vat pham", "ma san pham", "ma vat pham", "item id", "model id"],
   DANHMUC: ["danh muc"],
   DOITUONG: ["doi tuong"],
   LOAI: ["loai vat pham"],
@@ -542,6 +554,7 @@ function createEmptyRow(rowNum: number): ImportRow {
   return {
     id: `row-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     row: rowNum,
+    itemModelId: undefined,
     itemName: "",
     categoryCode: "",
     unit: "",
@@ -1356,10 +1369,20 @@ export default function FundingRequestPage() {
                 ? ["Rescuer"]
                 : targetGroupsParsed;
 
+              const {
+                cleanName: parsedItemName,
+                itemModelId: parsedItemModelId,
+              } = parseItemName(String(raw.TEN ?? "").trim());
+              // MASP column takes priority; otherwise fall back to ID embedded in item name
+              const resolvedItemModelId = raw.MASP
+                ? Number(raw.MASP) || undefined
+                : parsedItemModelId;
+
               const rowData: Omit<ImportRow, "errors"> = {
                 id: `row-${offset + idx}-${Date.now()}`,
                 row: offset + idx + 1,
-                itemName: String(raw.TEN ?? "").trim(),
+                itemModelId: resolvedItemModelId,
+                itemName: parsedItemName,
                 categoryCode,
                 unit: String(raw.DONVI ?? "").trim(),
                 quantity: parseExcelNumber(raw.SOLUONG),
@@ -1573,6 +1596,7 @@ export default function FundingRequestPage() {
     field: keyof CreateFundingRequestItem,
     placeholder: string,
     type: "text" | "number" = "text",
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
@@ -1591,9 +1615,11 @@ export default function FundingRequestPage() {
             )
           }
           placeholder={placeholder}
+          disabled={disabled}
           className={cn(
             "h-8 text-sm",
             error && "border-red-400 focus-visible:ring-red-400",
+            disabled && "cursor-not-allowed opacity-60 bg-muted/50",
           )}
         />
         {error && (
@@ -1638,6 +1664,7 @@ export default function FundingRequestPage() {
     row: ImportRow,
     field: "volumePerUnit" | "weightPerUnit",
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
@@ -1654,9 +1681,11 @@ export default function FundingRequestPage() {
             updateRow(row.id, field, val === "" ? undefined : parseFloat(val));
           }}
           placeholder={placeholder}
+          disabled={disabled}
           className={cn(
             "h-8 text-sm",
             error && "border-red-400 focus-visible:ring-red-400",
+            disabled && "cursor-not-allowed opacity-60 bg-muted/50",
           )}
         />
         {error && (
@@ -1671,6 +1700,7 @@ export default function FundingRequestPage() {
     field: keyof CreateFundingRequestItem,
     options: { label: string; value: string }[],
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const currentValue = String(row[field] ?? "");
@@ -1679,11 +1709,13 @@ export default function FundingRequestPage() {
         <Select
           value={currentValue}
           onValueChange={(val) => updateRow(row.id, field, val)}
+          disabled={disabled}
         >
           <SelectTrigger
             className={cn(
               "h-8 w-full min-w-[180px] text-sm",
               error && "border-red-400",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           >
             <SelectValue placeholder={placeholder} />
@@ -2216,6 +2248,9 @@ export default function FundingRequestPage() {
                               <TableHead className="w-10 text-center text-sm">
                                 STT
                               </TableHead>
+                              <TableHead className="min-w-20 text-center text-sm">
+                                ID Vật phẩm
+                              </TableHead>
                               <TableHead className="min-w-44 text-sm">
                                 Tên vật phẩm *
                               </TableHead>
@@ -2267,12 +2302,34 @@ export default function FundingRequestPage() {
                                   <TableCell className="text-center text-sm text-muted-foreground font-mono">
                                     {row.row}
                                   </TableCell>
+                                  {/* ID Vật phẩm */}
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      value={row.itemModelId ?? ""}
+                                      onChange={(e) =>
+                                        updateRow(
+                                          row.id,
+                                          "itemModelId",
+                                          e.target.value
+                                            ? Number(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      placeholder="X"
+                                      disabled
+                                      className="h-8 text-sm w-20 disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                  </TableCell>
                                   {/* B: Tên vật phẩm */}
                                   <TableCell>
                                     {renderInputCell(
                                       row,
                                       "itemName",
                                       "Tên vật phẩm",
+                                      "text",
+                                      !!row.itemModelId,
                                     )}
                                   </TableCell>
                                   {/* C: Danh mục */}
@@ -2282,6 +2339,7 @@ export default function FundingRequestPage() {
                                       "categoryCode",
                                       categoryOptions,
                                       "Chọn danh mục",
+                                      !!row.itemModelId,
                                     )}
                                   </TableCell>
                                   {/* D: Đối tượng (multi-select) */}
@@ -2328,12 +2386,15 @@ export default function FundingRequestPage() {
                                               <Button
                                                 variant="outline"
                                                 size="sm"
+                                                disabled={!!row.itemModelId}
                                                 className={cn(
                                                   "h-8 w-full min-w-[160px] justify-between text-sm font-normal px-3",
                                                   error &&
                                                     "border-red-400 focus-visible:ring-red-400",
                                                   selected.length === 0 &&
                                                     "text-muted-foreground",
+                                                  !!row.itemModelId &&
+                                                    "cursor-not-allowed opacity-60 bg-muted/50",
                                                 )}
                                               >
                                                 <span className="truncate text-left">
@@ -2407,11 +2468,14 @@ export default function FundingRequestPage() {
                                           "itemType",
                                           itemTypeOptions,
                                           "Chọn loại vật phẩm",
+                                          !!row.itemModelId,
                                         )
                                       : renderInputCell(
                                           row,
                                           "itemType",
                                           "Hàng khô...",
+                                          "text",
+                                          !!row.itemModelId,
                                         )}
                                   </TableCell>
                                   {/* F: Đơn vị */}
@@ -2420,6 +2484,8 @@ export default function FundingRequestPage() {
                                       row,
                                       "unit",
                                       "kg, thùng...",
+                                      "text",
+                                      !!row.itemModelId,
                                     )}
                                   </TableCell>
                                   {/* G: Mô tả vật phẩm */}
@@ -2434,7 +2500,12 @@ export default function FundingRequestPage() {
                                         )
                                       }
                                       placeholder="Mô tả..."
-                                      className="h-8 text-sm"
+                                      disabled={!!row.itemModelId}
+                                      className={cn(
+                                        "h-8 text-sm",
+                                        !!row.itemModelId &&
+                                          "cursor-not-allowed opacity-60 bg-muted/50",
+                                      )}
                                     />
                                   </TableCell>
                                   {/* H: Số lượng */}
@@ -2456,6 +2527,7 @@ export default function FundingRequestPage() {
                                       row,
                                       "volumePerUnit",
                                       "dm3",
+                                      !!row.itemModelId,
                                     )}
                                   </TableCell>
                                   {/* K: Cân nặng */}
@@ -2464,6 +2536,7 @@ export default function FundingRequestPage() {
                                       row,
                                       "weightPerUnit",
                                       "kg",
+                                      !!row.itemModelId,
                                     )}
                                   </TableCell>
                                   {/* Thành tiền (computed) */}

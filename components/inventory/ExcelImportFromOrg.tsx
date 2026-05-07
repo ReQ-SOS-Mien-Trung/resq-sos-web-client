@@ -1132,6 +1132,7 @@ export default function ExcelImportFromOrg() {
     field: EditableField,
     placeholder: string,
     type: "text" | "number" = "text",
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
@@ -1151,9 +1152,11 @@ export default function ExcelImportFromOrg() {
               )
             }
             placeholder={placeholder}
+            disabled={disabled}
             className={cn(
               "h-8 text-sm",
               error && "border-red-500 focus-visible:ring-red-500",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           />
           {error && (
@@ -1176,6 +1179,7 @@ export default function ExcelImportFromOrg() {
     row: ImportRow,
     field: "volumePerUnit" | "weightPerUnit",
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
@@ -1197,9 +1201,11 @@ export default function ExcelImportFromOrg() {
               );
             }}
             placeholder={placeholder}
+            disabled={disabled}
             className={cn(
               "h-8 text-sm",
               error && "border-red-500 focus-visible:ring-red-500",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           />
           {error && (
@@ -1223,6 +1229,7 @@ export default function ExcelImportFromOrg() {
     field: EditableField,
     options: { label: string; value: string }[],
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors[field];
     const currentValue = String(row[field] ?? "");
@@ -1231,11 +1238,13 @@ export default function ExcelImportFromOrg() {
         <Select
           value={currentValue}
           onValueChange={(val) => updateRow(row.id, field, val)}
+          disabled={disabled}
         >
           <SelectTrigger
             className={cn(
               "h-11 w-full min-w-[180px] rounded-md border-slate-200 bg-white px-4 text-sm shadow-sm",
               error && "border-red-500 focus-visible:ring-red-500",
+              disabled && "cursor-not-allowed opacity-60 bg-muted/50",
             )}
           >
             <SelectValue placeholder={placeholder} />
@@ -1343,6 +1352,7 @@ export default function ExcelImportFromOrg() {
     row: ImportRow,
     options: { label: string; value: string }[],
     placeholder: string,
+    disabled = false,
   ) => {
     const error = row.errors.targetGroups;
     const selected = row.targetGroups ?? [];
@@ -1359,10 +1369,12 @@ export default function ExcelImportFromOrg() {
             <Button
               variant="outline"
               size="sm"
+              disabled={disabled}
               className={cn(
                 "h-8 w-full justify-between text-sm font-normal px-3",
                 error && "border-red-500 focus-visible:ring-red-500",
                 selected.length === 0 && "text-muted-foreground",
+                disabled && "cursor-not-allowed opacity-60 bg-muted/50",
               )}
             >
               <span className="truncate text-left">{labelText}</span>
@@ -1951,7 +1963,13 @@ export default function ExcelImportFromOrg() {
 
                           {/* Tên vật phẩm */}
                           <TableCell>
-                            {renderInputCell(row, "itemName", "Tên vật phẩm")}
+                            {renderInputCell(
+                              row,
+                              "itemName",
+                              "Tên vật phẩm",
+                              "text",
+                              !!row.itemModelId,
+                            )}
                           </TableCell>
 
                           {/* ID Model */}
@@ -1982,6 +2000,7 @@ export default function ExcelImportFromOrg() {
                               "categoryCode",
                               categoryOptions,
                               "Chọn danh mục",
+                              !!row.itemModelId,
                             )}
                           </TableCell>
 
@@ -2010,6 +2029,7 @@ export default function ExcelImportFromOrg() {
                                   row,
                                   targetGroupOptions,
                                   "Chọn đối tượng",
+                                  !!row.itemModelId,
                                 )}
                               </>
                             )}
@@ -2023,17 +2043,26 @@ export default function ExcelImportFromOrg() {
                                   "itemType",
                                   itemTypeOptions,
                                   "Chọn loại",
+                                  !!row.itemModelId,
                                 )
                               : renderInputCell(
                                   row,
                                   "itemType",
                                   "Loại vật phẩm",
+                                  "text",
+                                  !!row.itemModelId,
                                 )}
                           </TableCell>
 
                           {/* Đơn vị */}
                           <TableCell>
-                            {renderInputCell(row, "unit", "Đơn vị")}
+                            {renderInputCell(
+                              row,
+                              "unit",
+                              "Đơn vị",
+                              "text",
+                              !!row.itemModelId,
+                            )}
                           </TableCell>
 
                           {/* Mô tả vật phẩm */}
@@ -2042,6 +2071,8 @@ export default function ExcelImportFromOrg() {
                               row,
                               "description",
                               "Mô tả vật phẩm...",
+                              "text",
+                              !!row.itemModelId,
                             )}
                           </TableCell>
 
@@ -2059,6 +2090,7 @@ export default function ExcelImportFromOrg() {
                               row,
                               "volumePerUnit",
                               "dm3",
+                              !!row.itemModelId,
                             )}
                           </TableCell>
 
@@ -2068,6 +2100,7 @@ export default function ExcelImportFromOrg() {
                               row,
                               "weightPerUnit",
                               "kg",
+                              !!row.itemModelId,
                             )}
                           </TableCell>
 

@@ -476,9 +476,7 @@ export default function FundingRequestsPage() {
     const orderedKeys = ["Campaign", "SystemFund"];
     return disbursementSourceTypes
       .filter((sourceType) => orderedKeys.includes(sourceType.key))
-      .sort(
-        (a, b) => orderedKeys.indexOf(a.key) - orderedKeys.indexOf(b.key),
-      );
+      .sort((a, b) => orderedKeys.indexOf(a.key) - orderedKeys.indexOf(b.key));
   }, [disbursementSourceTypes]);
   const { data: categoriesData } = useInventoryCategories();
   const depotTxSearch = useMemo(
@@ -912,13 +910,13 @@ export default function FundingRequestsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
+            {/* <Button
               onClick={() => setAdvanceLimitOpen(true)}
               className="gap-2 tracking-tighter bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
             >
               <Warehouse size={16} />
               Cấu hình hạn mức
-            </Button>
+            </Button> */}
             <Button
               onClick={() => setAllocateOpen(true)}
               className="gap-2 tracking-tighter bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
@@ -1067,16 +1065,18 @@ export default function FundingRequestsPage() {
                   {depotFunds.map((fund, index) =>
                     (() => {
                       const primarySource = fund.funds[0];
+                      const secondarySource = fund.funds[1];
 
                       return (
                         <div
                           key={`${fund.depotId}-${fund.depotName}-${fund.funds.length}-${index}`}
                           onClick={() => openDepotFundPanel(fund)}
-                          className={`flex h-full flex-col rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${selectedDepotFund?.depotId === fund.depotId &&
+                          className={`flex h-full flex-col rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${
+                            selectedDepotFund?.depotId === fund.depotId &&
                             depotTxPanelOpen
-                            ? "border-primary ring-1 ring-primary/25 shadow-sm"
-                            : "border-border/60"
-                            }`}
+                              ? "border-primary ring-1 ring-primary/25 shadow-sm"
+                              : "border-border/60"
+                          }`}
                         >
                           <div className="mb-2 flex w-full items-start">
                             <div className="min-w-0 w-full pr-2">
@@ -1090,16 +1090,17 @@ export default function FundingRequestsPage() {
                           </div>
 
                           <p
-                            className={`text-3xl font-bold tracking-tighter ${getDepotFundTotalBalance(fund) < 0
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                              }`}
+                            className={`text-3xl font-bold tracking-tighter ${
+                              getDepotFundTotalBalance(fund) < 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            }`}
                           >
                             {formatMoney(getDepotFundTotalBalance(fund))}
                           </p>
 
                           <div className="mt-1 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
-                            <div className="rounded-xl border border-dashed border-border/90 bg-muted/20 px-3 py-2">
+                            {/* <div className="rounded-xl border border-dashed border-border/90 bg-muted/20 px-3 py-2">
                               <p className="text-sm tracking-tighter font-medium text-muted-foreground">
                                 Hạn mức ứng
                               </p>
@@ -1114,11 +1115,11 @@ export default function FundingRequestsPage() {
                               <p className="text-base font-semibold tracking-tighter text-blue-600">
                                 {formatMoney(fund.outstandingAdvanceAmount)}
                               </p>
-                            </div>
+                            </div> */}
                           </div>
 
                           {primarySource && (
-                            <div className="mt-3 space-y-1.5">
+                            <div className="mt-1 space-y-1.5">
                               <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/90 px-3 py-2">
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium tracking-tighter truncate">
@@ -1129,9 +1130,21 @@ export default function FundingRequestsPage() {
                                   {formatMoney(primarySource.balance)}
                                 </span>
                               </div>
-                              {fund.funds.length > 1 && (
+                              {secondarySource && (
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/90 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium tracking-tighter truncate">
+                                      {secondarySource.fundSourceName}
+                                    </p>
+                                  </div>
+                                  <span className="text-sm font-semibold tracking-tighter text-foreground shrink-0">
+                                    {formatMoney(secondarySource.balance)}
+                                  </span>
+                                </div>
+                              )}
+                              {fund.funds.length > 2 && (
                                 <p className="text-xs italic text-muted-foreground tracking-tighter">
-                                  Thêm {fund.funds.length - 1} nguồn quỹ khác
+                                  Thêm {fund.funds.length - 2} nguồn quỹ khác
                                 </p>
                               )}
                             </div>
@@ -1141,8 +1154,8 @@ export default function FundingRequestsPage() {
                             Cập nhật gần nhất:{" "}
                             {getDepotFundLatestUpdatedAt(fund)
                               ? new Date(
-                                getDepotFundLatestUpdatedAt(fund) as string,
-                              ).toLocaleString("vi-VN")
+                                  getDepotFundLatestUpdatedAt(fund) as string,
+                                ).toLocaleString("vi-VN")
                               : "—"}
                           </p>
                         </div>
@@ -1274,8 +1287,9 @@ export default function FundingRequestsPage() {
 
               <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
                 {hasFilters
-                  ? `${filtered.length} / ${data?.totalCount ?? items.length
-                  } yêu cầu`
+                  ? `${filtered.length} / ${
+                      data?.totalCount ?? items.length
+                    } yêu cầu`
                   : `${data?.totalCount ?? items.length} yêu cầu`}
               </div>
             </div>
@@ -1541,8 +1555,8 @@ export default function FundingRequestsPage() {
                           Duyệt bởi: {selectedItem.reviewedByUserName} ·{" "}
                           {selectedItem.reviewedAt
                             ? new Date(selectedItem.reviewedAt).toLocaleString(
-                              "vi-VN",
-                            )
+                                "vi-VN",
+                              )
                             : ""}
                         </p>
                       )}
@@ -1559,7 +1573,6 @@ export default function FundingRequestsPage() {
                       <p className="text-sm tracking-tighter text-rose-700 dark:text-rose-400">
                         {selectedItem.rejectionReason}
                       </p>
-
                     </div>
                   )}
               </div>
@@ -1680,8 +1693,9 @@ export default function FundingRequestsPage() {
         <SheetContent
           side="bottom"
           showClose={false}
-          className={`overflow-y-auto p-6 transition-all ${depotTxFullscreen ? "h-dvh rounded-none" : "h-[85vh] rounded-t-2xl"
-            }`}
+          className={`overflow-y-auto p-6 transition-all ${
+            depotTxFullscreen ? "h-dvh rounded-none" : "h-[85vh] rounded-t-2xl"
+          }`}
         >
           <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
             <Button
@@ -1730,21 +1744,24 @@ export default function FundingRequestsPage() {
           {currentSelectedDepotFund && (
             <div className="space-y-4">
               {/* Fund summary */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                   <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Tổng số dư
                   </p>
                   <p
-                    className={`text-xl font-bold tracking-tighter ${getDepotFundTotalBalance(currentSelectedDepotFund) < 0
-                      ? "text-red-600"
-                      : "text-emerald-600"
-                      }`}
+                    className={`text-xl font-bold tracking-tighter ${
+                      getDepotFundTotalBalance(currentSelectedDepotFund) < 0
+                        ? "text-red-600"
+                        : "text-emerald-600"
+                    }`}
                   >
-                    {formatMoney(getDepotFundTotalBalance(currentSelectedDepotFund))}
+                    {formatMoney(
+                      getDepotFundTotalBalance(currentSelectedDepotFund),
+                    )}
                   </p>
                 </div>
-                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                {/* <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                   <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Hạn mức ứng
                   </p>
@@ -1759,7 +1776,7 @@ export default function FundingRequestsPage() {
                   <p className="text-xl font-bold tracking-tighter text-blue-600">
                     {formatMoney(currentSelectedDepotFund.outstandingAdvanceAmount)}
                   </p>
-                </div>
+                </div> */}
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
                   <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Nguồn quỹ
@@ -1807,10 +1824,11 @@ export default function FundingRequestsPage() {
                           setSelectedFundSourceId(fundSource.id);
                           setDepotTxPage(1);
                         }}
-                        className={`rounded-xl border p-3 text-left transition-all ${selectedFundSourceId === fundSource.id
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
-                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20"
-                          }`}
+                        className={`rounded-xl border p-3 text-left transition-all ${
+                          selectedFundSourceId === fundSource.id
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
+                            : "border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20"
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -2116,8 +2134,9 @@ export default function FundingRequestsPage() {
                               </TableCell>
                               <TableCell className="text-sm font-medium">
                                 <span
-                                  className={`inline-flex items-center gap-1 ${isIn ? "text-emerald-600" : "text-rose-600"
-                                    }`}
+                                  className={`inline-flex items-center gap-1 ${
+                                    isIn ? "text-emerald-600" : "text-rose-600"
+                                  }`}
                                 >
                                   {isIn ? (
                                     <ArrowUp size={12} weight="bold" />
@@ -2137,8 +2156,9 @@ export default function FundingRequestsPage() {
                                 {tx.note || "—"}
                               </TableCell>
                               <TableCell
-                                className={`text-sm font-bold text-right ${isIn ? "text-emerald-600" : "text-rose-600"
-                                  }`}
+                                className={`text-sm font-bold text-right ${
+                                  isIn ? "text-emerald-600" : "text-rose-600"
+                                }`}
                               >
                                 {formatMoney(tx.amount)}
                               </TableCell>
@@ -2402,7 +2422,8 @@ export default function FundingRequestsPage() {
                   Cấp quỹ cho kho
                 </DialogTitle>
                 <DialogDescription className="tracking-tighter">
-                  Phân bổ ngân sách từ quỹ chiến dịch hoặc quỹ hệ thống cho các kho
+                  Phân bổ ngân sách từ quỹ chiến dịch hoặc quỹ hệ thống cho các
+                  kho
                 </DialogDescription>
               </div>
             </div>
