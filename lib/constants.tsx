@@ -244,11 +244,6 @@ export const PROMPT_TYPE_OPTIONS = [
     description: "Dùng để phân tích mức độ ưu tiên và dữ liệu SOS.",
   },
   {
-    label: PROMPT_TYPE_LABELS.MissionPlanning,
-    value: "MissionPlanning",
-    description: "Prompt legacy fallback cho AI gợi ý mission và rescue plan.",
-  },
-  {
     label: PROMPT_TYPE_LABELS.MissionRequirementsAssessment,
     value: "MissionRequirementsAssessment",
     description:
@@ -284,6 +279,10 @@ export const AI_PROVIDER_OPTIONS = [
     description:
       "Dùng Google AI Studio API key hoặc default Gemini config của server.",
     models: [
+      {
+        label: "Gemini 3.1 Pro",
+        code: "gemini-3.1-pro",
+      },
       {
         label: "Gemini 3.1 Flash Lite Preview",
         code: "gemini-3.1-flash-lite-preview",
@@ -342,11 +341,6 @@ export const PROMPT_VARIABLES_BY_TYPE = {
     { label: "Tin nhắn gốc", value: "raw_message" },
     { label: "Loại SOS", value: "sos_type" },
   ],
-  MissionPlanning: [
-    { label: "JSON SOS requests", value: "sos_requests_data" },
-    { label: "Tổng số SOS", value: "total_count" },
-    { label: "Ghi chú kho", value: "depots_data" },
-  ],
   MissionRequirementsAssessment: [
     { label: "JSON SOS requests", value: "sos_requests_data" },
     { label: "Tổng số SOS", value: "total_count" },
@@ -374,7 +368,7 @@ export const PROMPT_VARIABLES_BY_TYPE = {
 
 export const INITIAL_FORM_DATA: PromptFormData = {
   name: "",
-  prompt_type: "MissionPlanning",
+  prompt_type: "SosPriorityAnalysis",
   purpose: "",
   system_prompt: "",
   user_prompt_template: "",
