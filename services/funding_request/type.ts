@@ -84,6 +84,7 @@ export interface GetFundingRequestItemsResponse {
 
 export interface CreateFundingRequestItem {
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
   unit: string;

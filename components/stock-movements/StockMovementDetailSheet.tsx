@@ -180,16 +180,20 @@ export function StockMovementDetailSheet({
   const ActionIcon = ACTION_ICON_BY_TONE[actionFallback.tone] ?? Package;
 
   return (
-    <Sheet open={open} onOpenChange={(val) => {
-      if (!val) setIsFullscreen(false);
-      onOpenChange(val);
-    }}>
+    <Sheet
+      open={open}
+      onOpenChange={(val) => {
+        if (!val) setIsFullscreen(false);
+        onOpenChange(val);
+      }}
+    >
       <SheetContent
         showClose={false}
-        className={`overflow-y-auto ${isFullscreen
-          ? "w-[min(96vw,1560px)] sm:max-w-[96vw]"
-          : "w-full sm:max-w-4xl"
-          }`}
+        className={`overflow-y-auto ${
+          isFullscreen
+            ? "w-[min(96vw,1560px)] sm:max-w-[96vw]"
+            : "w-full sm:max-w-4xl"
+        }`}
         side="right"
       >
         <div className="absolute right-4 top-4 flex items-center gap-2">
@@ -296,7 +300,7 @@ export function StockMovementDetailSheet({
                   <ClipboardText size={16} /> Nguồn
                 </span>
                 <span className="font-medium tracking-tighter">
-                  {movement.sourceName || "—"}
+                  {movement.sourceName || movement.supplierName || "—"}
                 </span>
               </div>
 
@@ -454,25 +458,26 @@ export function StockMovementDetailSheet({
                         ? item.lotDetails
                         : item.lotId || item.supplyInventoryLotId
                           ? [
-                            {
-                              lotId: item.lotId ?? item.supplyInventoryLotId ?? 0,
-                              receivedDate: item.receivedDate,
-                              expiredDate: item.expiredDate,
-                              quantityChange: item.quantityChange,
-                            },
-                          ]
+                              {
+                                lotId:
+                                  item.lotId ?? item.supplyInventoryLotId ?? 0,
+                                receivedDate: item.receivedDate,
+                                expiredDate: item.expiredDate,
+                                quantityChange: item.quantityChange,
+                              },
+                            ]
                           : [];
                     const reusableDetails =
                       item.reusableDetails && item.reusableDetails.length > 0
                         ? item.reusableDetails
                         : item.reusableItemId || item.serialNumber
                           ? [
-                            {
-                              reusableItemId: item.reusableItemId ?? 0,
-                              serialNumber: item.serialNumber,
-                              quantityChange: item.quantityChange,
-                            },
-                          ]
+                              {
+                                reusableItemId: item.reusableItemId ?? 0,
+                                serialNumber: item.serialNumber,
+                                quantityChange: item.quantityChange,
+                              },
+                            ]
                           : [];
                     return (
                       <TableRow
@@ -508,12 +513,13 @@ export function StockMovementDetailSheet({
                         <TableCell className="py-2.5 text-right pr-6">
                           <div className="flex flex-col items-end gap-0.5">
                             <span
-                              className={`font-semibold text-sm tracking-tighter ${item.quantityChange > 0
-                                ? "text-emerald-600"
-                                : item.quantityChange < 0
-                                  ? "text-red-600"
-                                  : ""
-                                }`}
+                              className={`font-semibold text-sm tracking-tighter ${
+                                item.quantityChange > 0
+                                  ? "text-emerald-600"
+                                  : item.quantityChange < 0
+                                    ? "text-red-600"
+                                    : ""
+                              }`}
                             >
                               {item.formattedQuantityChange ||
                                 `${item.quantityChange > 0 ? "+" : ""}${item.quantityChange.toLocaleString("vi-VN")}`}{" "}
@@ -521,11 +527,18 @@ export function StockMovementDetailSheet({
                                 {item.unit}
                               </span>
                             </span>
-                            {item.remainingQuantity !== undefined && item.remainingQuantity !== null && (
-                              <p className="text-sm text-muted-foreground tracking-tighter">
-                                SL còn lại: <span className="font-medium text-black">{item.remainingQuantity.toLocaleString("vi-VN")}</span> {item.unit}
-                              </p>
-                            )}
+                            {item.remainingQuantity !== undefined &&
+                              item.remainingQuantity !== null && (
+                                <p className="text-sm text-muted-foreground tracking-tighter">
+                                  SL còn lại:{" "}
+                                  <span className="font-medium text-black">
+                                    {item.remainingQuantity.toLocaleString(
+                                      "vi-VN",
+                                    )}
+                                  </span>{" "}
+                                  {item.unit}
+                                </p>
+                              )}
                           </div>
                         </TableCell>
 
@@ -572,7 +585,10 @@ export function StockMovementDetailSheet({
                                     >
                                       <div className="min-w-0">
                                         <p className="text-sm font-normal tracking-tighter">
-                                          Lô số <span className="font-semibold">{lot.lotId}</span>
+                                          Lô số{" "}
+                                          <span className="font-semibold">
+                                            {lot.lotId}
+                                          </span>
                                         </p>
                                       </div>
                                     </div>
@@ -587,7 +603,7 @@ export function StockMovementDetailSheet({
                           ) : (
                             <div className="space-y-2">
                               {reusableDetails.length > 0 ? (
-                                <div className="space-y-1.5">
+                                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                                   {reusableDetails.map(
                                     (reusable, reusableIndex) => (
                                       <div
@@ -600,7 +616,10 @@ export function StockMovementDetailSheet({
                                       >
                                         <div className="min-w-0">
                                           <p className="text-sm font-normal tracking-tighter">
-                                            Mã vật phẩm số <span className="font-semibold">{reusable.reusableItemId}</span>
+                                            Mã vật phẩm số{" "}
+                                            <span className="font-semibold">
+                                              {reusable.reusableItemId}
+                                            </span>
                                           </p>
                                           <p
                                             className="truncate text-sm tracking-tighter text-muted-foreground"
@@ -623,8 +642,11 @@ export function StockMovementDetailSheet({
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="py-2.5">
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed tracking-tighter text-foreground/80">
+                        <TableCell className="py-2.5 max-w-[200px]">
+                          <p
+                            className="whitespace-pre-wrap text-sm leading-relaxed tracking-tighter text-foreground/80 line-clamp-4"
+                            title={item.note ?? undefined}
+                          >
                             {formatItemNote(item.note)}
                           </p>
                         </TableCell>
