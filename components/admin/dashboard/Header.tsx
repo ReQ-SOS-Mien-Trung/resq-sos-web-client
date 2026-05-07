@@ -21,6 +21,7 @@ import {
   Warning,
   UsersThree,
   Buildings,
+  Package,
 } from "@phosphor-icons/react";
 import { HeaderProps } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
@@ -63,6 +64,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
       )
     : getUserAvatarInitials(user);
   const isSystemFundPage = pathname === "/dashboard/admin/system-fund";
+  const isItemModelsPage = pathname === "/dashboard/admin/item-models";
   const isTeamOverviewPage = pathname === "/dashboard/admin/team-overview";
 
   // Get role name based on roleId
@@ -135,6 +137,26 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
           {loadingSystemFund
             ? "Số dư quỹ hệ thống: —"
             : `Số dư quỹ hệ thống: ${formatMoney(systemFund?.balance ?? 0)}`}
+        </Button>
+
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => router.push("/dashboard/admin/item-models")}
+          className={cn(
+            "hidden md:flex gap-1.5 h-9 rounded-lg transition-all duration-200 shadow-sm",
+            isItemModelsPage
+              ? "bg-orange-600 text-white hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500"
+              : "bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/60 dark:hover:bg-orange-950/60",
+          )}
+        >
+          <Package
+            size={16}
+            className={cn(
+              isItemModelsPage ? "text-white" : "text-orange-500",
+            )}
+          />
+          Quản lý item model
         </Button>
 
         {/* Customize Widget Button */}
