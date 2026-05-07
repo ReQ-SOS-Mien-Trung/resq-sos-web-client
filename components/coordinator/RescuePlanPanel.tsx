@@ -8891,6 +8891,10 @@ const RescuePlanPanel = ({
     useState<SuggestionPreview | null>(null);
   const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
   const supplyAvailableQtyByItemIdRef = useRef<Record<number, number>>({});
+  const [pendingAutoFixIssues, setPendingAutoFixIssues] = useState<
+    SupplyBalanceIssue<string>[]
+  >([]);
+  const prevIsEditModeRef = useRef(false);
 
   const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
     useCreateMission();
@@ -9825,6 +9829,30 @@ const RescuePlanPanel = ({
       ),
     [editActivities],
   );
+
+  // Auto-fix supply balance issues when entering edit mode
+  useEffect(() => {
+    if (isEditMode && !prevIsEditModeRef.current) {
+      prevIsEditModeRef.current = true;
+      const issues = editSupplyBalanceAnalysis.issues;
+      if (issues.length > 0) {
+        setPendingAutoFixIssues([...issues]);
+      }
+    } else if (!isEditMode) {
+      prevIsEditModeRef.current = false;
+      setPendingAutoFixIssues([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, editSupplyBalanceAnalysis]);
+
+  // Process pending auto-fix issues one at a time
+  useEffect(() => {
+    if (pendingAutoFixIssues.length === 0) return;
+    const [firstIssue, ...rest] = pendingAutoFixIssues;
+    handleQuickFixSupplyIssue(firstIssue);
+    setPendingAutoFixIssues(rest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoFixIssues]);
 
   const validateEditMission = useCallback(() => {
     if (!clusterId) return false;
