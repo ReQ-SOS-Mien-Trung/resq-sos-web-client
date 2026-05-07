@@ -1,4 +1,9 @@
-import { useQuery, useMutation, UseQueryOptions } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  UseQueryOptions,
+} from "@tanstack/react-query";
 import {
   getUserMe,
   updateUserAvatar,
@@ -13,6 +18,11 @@ import {
   getRoleMetadata,
   getRescuerTypeMetadata,
   getAbilityCategoryMetadata,
+  getDocumentFileTypes,
+  getAbilities,
+  updateUserAbilities,
+  createRescuerDocuments,
+  updateRescuerDocuments,
 } from "./api";
 import {
   UserMeResponse,
@@ -30,6 +40,10 @@ import {
   RoleMetadataOption,
   RescuerTypeMetadataOption,
   AbilityCategoryMetadataOption,
+  GetDocumentFileTypesResponse,
+  GetAbilitiesResponse,
+  UpdateUserAbilitiesRequest,
+  UpsertRescuerDocumentsRequest,
 } from "./type";
 
 export const USER_ME_QUERY_KEY = ["user", "me"] as const;
@@ -49,6 +63,14 @@ export interface UseAbilityCategoryMetadataOptions {
 }
 
 export interface UseRescuerTypeMetadataOptions {
+  enabled?: boolean;
+}
+
+export interface UseDocumentFileTypesOptions {
+  enabled?: boolean;
+}
+
+export interface UseAbilitiesOptions {
   enabled?: boolean;
 }
 
@@ -158,6 +180,13 @@ export const RESCUER_TYPE_METADATA_QUERY_KEY = [
   "types",
 ] as const;
 
+export const DOCUMENT_FILE_TYPES_QUERY_KEY = [
+  "identity",
+  "document-file-types",
+] as const;
+
+export const ABILITIES_QUERY_KEY = ["identity", "abilities"] as const;
+
 export function useRoleMetadata(options?: UseRoleMetadataOptions) {
   return useQuery<RoleMetadataOption[], Error>({
     queryKey: ROLE_METADATA_QUERY_KEY,
@@ -186,6 +215,72 @@ export function useAbilityCategoryMetadata(
     queryFn: getAbilityCategoryMetadata,
     enabled: options?.enabled ?? true,
     staleTime: Infinity,
+  });
+}
+
+export function useDocumentFileTypes(options?: UseDocumentFileTypesOptions) {
+  return useQuery<GetDocumentFileTypesResponse, Error>({
+    queryKey: DOCUMENT_FILE_TYPES_QUERY_KEY,
+    queryFn: getDocumentFileTypes,
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
+  });
+}
+
+export function useAbilities(options?: UseAbilitiesOptions) {
+  return useQuery<GetAbilitiesResponse, Error>({
+    queryKey: ABILITIES_QUERY_KEY,
+    queryFn: getAbilities,
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
+  });
+}
+
+export function useUpdateUserAbilities() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    { userId: string; data: UpdateUserAbilitiesRequest }
+  >({
+    mutationFn: ({ userId, data }) => updateUserAbilities(userId, data),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: [...ADMIN_USERS_QUERY_KEY, variables.userId],
+      });
+    },
+  });
+}
+
+export function useCreateRescuerDocuments() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    { userId: string; data: UpsertRescuerDocumentsRequest }
+  >({
+    mutationFn: ({ userId, data }) => createRescuerDocuments(userId, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: USER_ME_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateRescuerDocuments() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    { userId: string; data: UpsertRescuerDocumentsRequest }
+  >({
+    mutationFn: ({ userId, data }) => updateRescuerDocuments(userId, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: USER_ME_QUERY_KEY });
+    },
   });
 }
 

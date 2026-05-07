@@ -36,11 +36,12 @@ type SortColumn = "name" | "email" | "role" | "region" | "status" | "createdAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
-const STATUS_OPTIONS: { value: "all" | "active" | "banned"; label: string }[] = [
-  { value: "all", label: "Tất cả" },
-  { value: "active", label: "Hoạt động" },
-  { value: "banned", label: "Bị cấm" },
-];
+const STATUS_OPTIONS: { value: "all" | "active" | "banned"; label: string }[] =
+  [
+    { value: "all", label: "Tất cả" },
+    { value: "active", label: "Hoạt động" },
+    { value: "banned", label: "Bị cấm" },
+  ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,17 +73,33 @@ const getRoleBadge = (role: User["role"]) => {
 
 const getStatusBadge = (status: User["status"]) =>
   status === "banned"
-    ? { label: "Bị cấm", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400" }
-    : { label: "Hoạt động", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" };
+    ? {
+        label: "Bị cấm",
+        className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+      }
+    : {
+        label: "Hoạt động",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      };
 
 // ─── Sort icons & header ──────────────────────────────────────────────────────
 
-const SortIcon = ({ column, sort }: { column: SortColumn; sort: SortState }) => {
+const SortIcon = ({
+  column,
+  sort,
+}: {
+  column: SortColumn;
+  sort: SortState;
+}) => {
   if (sort?.column === column)
-    return sort.dir === "asc"
-      ? <ArrowUp size={13} className="text-primary shrink-0" />
-      : <ArrowDown size={13} className="text-primary shrink-0" />;
-  return <ArrowsDownUp size={13} className="text-muted-foreground/30 shrink-0" />;
+    return sort.dir === "asc" ? (
+      <ArrowUp size={13} className="text-primary shrink-0" />
+    ) : (
+      <ArrowDown size={13} className="text-primary shrink-0" />
+    );
+  return (
+    <ArrowsDownUp size={13} className="text-muted-foreground/30 shrink-0" />
+  );
 };
 
 const SortHeader = ({
@@ -136,7 +153,8 @@ const UserTable = ({
 
   const setPage = (val: number | ((prev: number) => number)) => {
     if (isServerMode) {
-      const resolved = typeof val === 'function' ? val(serverPagination!.page) : val;
+      const resolved =
+        typeof val === "function" ? val(serverPagination!.page) : val;
       serverPagination!.onPageChange(resolved);
     } else {
       _setPage(val);
@@ -183,12 +201,25 @@ const UserTable = ({
       result = [...result].sort((a, b) => {
         let aVal = "";
         let bVal = "";
-        if (sort.column === "name") { aVal = a.name; bVal = b.name; }
-        else if (sort.column === "email") { aVal = a.email; bVal = b.email; }
-        else if (sort.column === "role") { aVal = a.role; bVal = b.role; }
-        else if (sort.column === "region") { aVal = a.region; bVal = b.region; }
-        else if (sort.column === "status") { aVal = a.status; bVal = b.status; }
-        else if (sort.column === "createdAt") { aVal = a.createdAt; bVal = b.createdAt; }
+        if (sort.column === "name") {
+          aVal = a.name;
+          bVal = b.name;
+        } else if (sort.column === "email") {
+          aVal = a.email;
+          bVal = b.email;
+        } else if (sort.column === "role") {
+          aVal = a.role;
+          bVal = b.role;
+        } else if (sort.column === "region") {
+          aVal = a.region;
+          bVal = b.region;
+        } else if (sort.column === "status") {
+          aVal = a.status;
+          bVal = b.status;
+        } else if (sort.column === "createdAt") {
+          aVal = a.createdAt;
+          bVal = b.createdAt;
+        }
         const cmp = aVal.localeCompare(bVal, "vi");
         return sort.dir === "asc" ? cmp : -cmp;
       });
@@ -198,17 +229,16 @@ const UserTable = ({
   }, [users, sort]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const displayTotalCount = isServerMode ? serverPagination!.totalCount : filteredAndSorted.length;
+  const displayTotalCount = isServerMode
+    ? serverPagination!.totalCount
+    : filteredAndSorted.length;
   const totalPages = isServerMode
     ? serverPagination!.totalPages
     : Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedUsers = isServerMode
     ? filteredAndSorted
-    : filteredAndSorted.slice(
-      (safePage - 1) * pageSize,
-      safePage * pageSize
-    );
+    : filteredAndSorted.slice((safePage - 1) * pageSize, safePage * pageSize);
   const startItem = displayTotalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const endItem = Math.min(safePage * pageSize, displayTotalCount);
   const displayTotal = totalCount ?? displayTotalCount;
@@ -297,14 +327,48 @@ const UserTable = ({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border/50">
-                <SortHeader column="name" label="Họ và tên" sort={sort} onSort={handleSort} />
-                <SortHeader column="email" label="Email" sort={sort} onSort={handleSort} />
-                <th className="text-left tracking-tighter p-3 text-sm font-semibold text-foreground">Số điện thoại</th>
-                <SortHeader column="role" label="Vai trò" sort={sort} onSort={handleSort} />
-                <SortHeader column="region" label="Khu vực" sort={sort} onSort={handleSort} />
-                <SortHeader column="status" label="Trạng thái" sort={sort} onSort={handleSort} />
-                <SortHeader column="createdAt" label="Ngày tạo" sort={sort} onSort={handleSort} />
-                <th className="text-right tracking-tighter p-3 text-sm font-semibold text-foreground">Thao tác</th>
+                <SortHeader
+                  column="name"
+                  label="Họ và tên"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <SortHeader
+                  column="email"
+                  label="Email"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <th className="text-left tracking-tighter p-3 text-sm font-semibold text-foreground">
+                  Số điện thoại
+                </th>
+                <SortHeader
+                  column="role"
+                  label="Vai trò"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <SortHeader
+                  column="region"
+                  label="Khu vực"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <SortHeader
+                  column="status"
+                  label="Trạng thái"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <SortHeader
+                  column="createdAt"
+                  label="Ngày tạo"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <th className="text-right tracking-tighter p-3 text-sm font-semibold text-foreground">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -320,7 +384,10 @@ const UserTable = ({
                 ))
               ) : paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center tracking-tighter text-muted-foreground text-sm">
+                  <td
+                    colSpan={8}
+                    className="p-10 text-center tracking-tighter text-muted-foreground text-sm"
+                  >
                     Không tìm thấy người dùng nào
                   </td>
                 </tr>
@@ -335,22 +402,37 @@ const UserTable = ({
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="p-3">
-                        <div className="text-sm font-medium tracking-tighter text-foreground">{user.name}</div>
+                        <div className="text-sm font-medium tracking-tighter text-foreground">
+                          {user.name}
+                        </div>
                       </td>
-                      <td className="p-3 text-sm tracking-tighter text-foreground/70">{user.email}</td>
-                      <td className="p-3 text-sm tracking-tighter text-foreground/80">{user.phone || "—"}</td>
-                      <td className="p-3">
-                        <Badge className={roleBadge.className}>{roleBadge.label}</Badge>
+                      <td className="p-3 text-sm tracking-tighter text-foreground/70">
+                        {user.email}
                       </td>
-                      <td className="p-3 text-sm tracking-tighter text-foreground/80">{user.region}</td>
+                      <td className="p-3 text-sm tracking-tighter text-foreground/80">
+                        {user.phone || "—"}
+                      </td>
                       <td className="p-3">
-                        <Badge className={statusBadge.className}>{statusBadge.label}</Badge>
+                        <Badge className={roleBadge.className}>
+                          {roleBadge.label}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-sm tracking-tighter text-foreground/80">
+                        {user.region}
+                      </td>
+                      <td className="p-3">
+                        <Badge className={statusBadge.className}>
+                          {statusBadge.label}
+                        </Badge>
                       </td>
                       <td className="p-3 text-sm tracking-tighter text-foreground/60">
                         {new Date(user.createdAt).toLocaleDateString("vi-VN")}
                       </td>
                       <td className="p-3">
-                        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon">
@@ -358,17 +440,23 @@ const UserTable = ({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => onEdit?.(user)}>
-                                <PencilSimple size={16} className="mr-1" />
-                                Chỉnh sửa
-                              </DropdownMenuItem>
+                              {user.role !== "victim" && (
+                                <DropdownMenuItem
+                                  onClick={() => onEdit?.(user)}
+                                >
+                                  <PencilSimple size={16} className="mr-1" />
+                                  Chỉnh sửa
+                                </DropdownMenuItem>
+                              )}
                               {user.status === "active" ? (
                                 <DropdownMenuItem onClick={() => onBan?.(user)}>
                                   <Prohibit size={16} className="mr-1" />
                                   Cấm tài khoản
                                 </DropdownMenuItem>
                               ) : (
-                                <DropdownMenuItem onClick={() => onActivate?.(user)}>
+                                <DropdownMenuItem
+                                  onClick={() => onActivate?.(user)}
+                                >
                                   <CheckCircle size={16} className="mr-2" />
                                   Kích hoạt
                                 </DropdownMenuItem>
@@ -389,10 +477,16 @@ const UserTable = ({
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
           <div className="flex items-center gap-3">
             <div className="text-sm tracking-tighter text-muted-foreground">
-              Hiển thị {startItem}–{endItem} trong {displayTotalCount} người dùng
+              Hiển thị {startItem}–{endItem} trong {displayTotalCount} người
+              dùng
             </div>
             <div className="flex items-center gap-1.5">
-              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); }}>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v));
+                }}
+              >
                 <SelectTrigger className="w-16 h-7 text-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -404,7 +498,9 @@ const UserTable = ({
                   <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+              <span className="text-sm text-muted-foreground tracking-tighter">
+                / trang
+              </span>
             </div>
           </div>
           {totalPages > 1 && (
@@ -419,9 +515,18 @@ const UserTable = ({
               </Button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                  .filter(
+                    (p) =>
+                      p === 1 ||
+                      p === totalPages ||
+                      Math.abs(p - safePage) <= 1,
+                  )
                   .reduce<(number | "...")[]>((acc, p, idx, arr) => {
-                    if (idx > 0 && typeof arr[idx - 1] === "number" && (p as number) - (arr[idx - 1] as number) > 1) {
+                    if (
+                      idx > 0 &&
+                      typeof arr[idx - 1] === "number" &&
+                      (p as number) - (arr[idx - 1] as number) > 1
+                    ) {
                       acc.push("...");
                     }
                     acc.push(p);
@@ -429,7 +534,12 @@ const UserTable = ({
                   }, [])
                   .map((p, i) =>
                     p === "..." ? (
-                      <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground text-sm tracking-tighter">…</span>
+                      <span
+                        key={`ellipsis-${i}`}
+                        className="px-1 text-muted-foreground text-sm tracking-tighter"
+                      >
+                        …
+                      </span>
                     ) : (
                       <Button
                         key={p}
@@ -441,7 +551,7 @@ const UserTable = ({
                       >
                         {p}
                       </Button>
-                    )
+                    ),
                   )}
               </div>
               <Button

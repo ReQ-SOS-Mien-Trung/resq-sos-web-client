@@ -155,7 +155,7 @@ function getAssemblyPointActionDialogDescription(
     case "setAvailable":
       return `Đánh dấu "${pointName}" khả dụng trở lại từ trạng thái Không khả dụng.`;
     case "close":
-      return `Đóng vĩnh viễn "${pointName}". Điểm tập kết đang Khả dụng phải chuyển sang Không khả dụng trước khi đóng. Nếu còn rescuer đang gán, hệ thống sẽ tự gỡ trước khi hoàn tất.`;
+      return `Đóng vĩnh viễn "${pointName}". Nếu còn cứu hộ viên đang gán, hệ thống sẽ tự gỡ trước khi hoàn tất.`;
   }
 }
 

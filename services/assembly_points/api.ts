@@ -24,6 +24,9 @@ import {
   GetAllCheckInRadiusConfigsResponse,
   SetCheckInRadiusRequest,
   SetCheckInRadiusResponse,
+  AssemblyPointUnavailableImpactResponse,
+  SetAssemblyPointUnavailableWithReassignmentRequest,
+  SetAssemblyPointUnavailableWithReassignmentResponse,
 } from "./type";
 
 /**
@@ -122,6 +125,45 @@ export async function setAssemblyPointUnavailable(
     `/personnel/assembly-point/${id}/set-unavailable`,
     {
       reason: reason ?? null,
+    },
+  );
+  return data;
+}
+
+/**
+ * Get latest impact for the unavailable reassignment flow
+ * GET /personnel/assembly-point/{id}/set-unavailable/impact
+ */
+export async function getAssemblyPointUnavailableImpact(
+  id: number,
+): Promise<AssemblyPointUnavailableImpactResponse> {
+  const { data } = await api.get(
+    `/personnel/assembly-point/${id}/set-unavailable/impact`,
+  );
+  return data;
+}
+
+/**
+ * Complete unavailable flow after reassigning all impacted resources
+ * POST /personnel/assembly-point/{id}/set-unavailable/reassign
+ */
+export async function setAssemblyPointUnavailableWithReassignment(
+  payload: SetAssemblyPointUnavailableWithReassignmentRequest,
+): Promise<SetAssemblyPointUnavailableWithReassignmentResponse> {
+  const {
+    id,
+    reason,
+    rescuerReassignments,
+    teamReassignments,
+    missionActivityReassignments,
+  } = payload;
+  const { data } = await api.post(
+    `/personnel/assembly-point/${id}/set-unavailable/reassign`,
+    {
+      reason: reason ?? null,
+      rescuerReassignments,
+      teamReassignments,
+      missionActivityReassignments,
     },
   );
   return data;

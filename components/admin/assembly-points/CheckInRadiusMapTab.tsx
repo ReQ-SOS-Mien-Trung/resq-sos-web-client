@@ -42,6 +42,8 @@ function statusColor(status: AssemblyPointEntity["status"]) {
   switch (status) {
     case "Available":
       return "#22c55e";
+    case "PendingUnavailable":
+      return "#f97316";
     case "Unavailable":
       return "#f59e0b";
     case "Closed":
@@ -57,6 +59,8 @@ function statusLabel(status: AssemblyPointEntity["status"]) {
       return "Mới tạo";
     case "Available":
       return "Sẵn sàng";
+    case "PendingUnavailable":
+      return "Chờ điều phối lại";
     case "Unavailable":
       return "Không khả dụng";
     case "Closed":
