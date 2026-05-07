@@ -774,28 +774,28 @@ export function AdminItemModels() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="border border-border/50 bg-background px-4 py-3">
-                    <p className="text-xs tracking-tighter text-muted-foreground">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="border border-border/50 bg-background px-2 flex items-center justify-between gap-3">
+                    <p className="text-sm tracking-tighter text-muted-foreground shrink-0">
                       Đơn vị
                     </p>
-                    <p className="mt-0.5 text-lg font-black tracking-tighter">
+                    <p className="text-base font-bold tracking-tighter">
                       {selectedItem.unit || "—"}
                     </p>
                   </div>
-                  <div className="border border-border/50 bg-background px-4 py-3">
-                    <p className="text-xs tracking-tighter text-muted-foreground">
+                  <div className="border border-border/50 bg-background px-2 flex items-center justify-between gap-3">
+                    <p className="text-sm tracking-tighter text-muted-foreground shrink-0">
                       Thể tích/dm³
                     </p>
-                    <p className="mt-0.5 text-lg font-black tracking-tighter">
+                    <p className="text-sbasem font-bold tracking-tighter">
                       {formatNumber(selectedItem.volumePerUnit)}
                     </p>
                   </div>
-                  <div className="border border-border/50 bg-background px-4 py-3">
-                    <p className="text-xs tracking-tighter text-muted-foreground">
+                  <div className="border border-border/50 bg-background px-2 flex items-center justify-between gap-3">
+                    <p className="text-sm tracking-tighter text-muted-foreground shrink-0">
                       Khối lượng/kg
                     </p>
-                    <p className="mt-0.5 text-lg font-black tracking-tighter">
+                    <p className="text-base font-bold tracking-tighter">
                       {formatNumber(selectedItem.weightPerUnit)}
                     </p>
                   </div>
@@ -825,8 +825,8 @@ export function AdminItemModels() {
 
           {sheetMode === "edit" && (
             <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
-              <div className="grid flex-1 gap-4 py-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+              <div className="grid flex-1 gap-4 py-1">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                   <div className="grid gap-2">
                     <Label htmlFor="item-model-name">Tên item model</Label>
                     <Input
@@ -853,7 +853,7 @@ export function AdminItemModels() {
                         }))
                       }
                     >
-                      <SelectTrigger className="rounded-none">
+                      <SelectTrigger className="h-auto min-h-[46px] w-full rounded-none px-4 py-3">
                         <SelectValue placeholder="Chọn danh mục" />
                       </SelectTrigger>
                       <SelectContent>
@@ -875,7 +875,7 @@ export function AdminItemModels() {
                       value={form.itemType || undefined}
                       onValueChange={handleItemTypeChange}
                     >
-                      <SelectTrigger className="rounded-none">
+                      <SelectTrigger className="h-auto min-h-[46px] w-full rounded-none px-4 py-3">
                         <SelectValue placeholder="Chọn loại" />
                       </SelectTrigger>
                       <SelectContent>
