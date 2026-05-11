@@ -103,7 +103,7 @@ Make sure you have the following installed:
 **Clone the Repository**
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/ReQ-SOS-Mien-Trung/resq-sos-web-client
 cd resq-sos-web-client
 ```
 
