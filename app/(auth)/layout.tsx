@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatedLogo } from "@/components/auth/AnimatedLogo";
+import { DemoAccounts } from "@/components/auth/DemoAccounts";
 
 const AuthLayout = ({ children }: { children: ReactNode }) => {
   return (
@@ -40,7 +41,8 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+      <div className="flex-1 flex items-center justify-center p-6 bg-background relative">
+        <DemoAccounts />
         <div className="w-full max-w-md animate-in fade-in-0 slide-in-from-right duration-700 scale-in">
           {children}
         </div>
